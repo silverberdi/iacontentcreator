@@ -29,6 +29,7 @@ La estrategia está diseñada para:
 - Crear infraestructura base
 - Lanzar primeros 3 GFE + 3 BFE
 - Validar:
+
   - engagement,
   - retención,
   - monetización,
