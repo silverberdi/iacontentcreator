@@ -20,3 +20,5 @@ Each avatar is:
 | 01-persona | 🟢 Canonical |
 | 03-content-system | 🟢 Canonical |
 | 04-authority-system | 🟢 Canonical |
+
+
