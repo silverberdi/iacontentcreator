@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Silverio Bernal — Diagrama de Arquitectura</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f1117;
+    color: #e1e4e8;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #f0f6fc;
+  }
+  .subtitle {
+    color: #8b949e;
+    margin-bottom: 40px;
+    font-size: 15px;
+  }
+  .diagram {
+    max-width: 1200px;
+    width: 100%;
+  }
+
+  /* === LAYER === */
+  .layer {
+    margin-bottom: 32px;
+  }
+  .layer-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #58a6ff;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #21262d;
+  }
+
+  /* === GRID === */
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* === CARD === */
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px 18px;
+    flex: 1 1 220px;
+    min-width: 200px;
+    transition: border-color .2s;
+  }
+  .card:hover { border-color: #58a6ff; }
+  .card .name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #f0f6fc;
+    margin-bottom: 4px;
+  }
+  .card .desc {
+    font-size: 13px;
+    color: #8b949e;
+    line-height: 1.4;
+  }
+  .card .tags {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .card .tag {
+    font-size: 11px;
+    background: #1c2128;
+    color: #7ee787;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #2d333b;
+  }
+  .card .tag.blue  { color: #79c0ff; }
+  .card .tag.orange{ color: #ffa657; }
+  .card .tag.purple{ color: #d2a8ff; }
+  .card .tag.pink  { color: #ff7b72; }
+  .card .tag.yellow{ color: #d29922; }
+
+  /* === CONNECTION ARROWS === */
+  .connections {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 0 10px 0;
+    color: #484f58;
+    font-size: 13px;
+  }
+  .connections .arrow { color: #58a6ff; font-size: 18px; }
+
+  /* === ECOSYSTEM ROW === */
+  .eco-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .eco-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 14px 16px;
+    flex: 1 1 180px;
+    min-width: 150px;
+    text-align: center;
+  }
+  .eco-card .role {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8b949e;
+    margin-bottom: 4px;
+  }
+  .eco-card .name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #f0f6fc;
+  }
+  .eco-card .desc {
+    font-size: 12px;
+    color: #8b949e;
+    margin-top: 4px;
+  }
+
+  /* === THEME ROW === */
+  .theme-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .theme-pill {
+    background: #1c2128;
+    border: 1px solid #2d333b;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #c9d1d9;
+  }
+  .theme-pill:hover { border-color: #58a6ff; }
+
+  /* === ANTI-PATTERNS === */
+  .anti-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .anti-pill {
+    background: #1c2128;
+    border: 1px solid #2d333b;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #ff7b72;
+    text-decoration: line-through;
+  }
+
+  /* === WRITING CATEGORIES === */
+  .cat-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .cat-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px 14px;
+    flex: 1 1 180px;
+    min-width: 160px;
+  }
+  .cat-card .cat-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #f0f6fc;
+    margin-bottom: 4px;
+  }
+  .cat-card .cat-desc {
+    font-size: 12px;
+    color: #8b949e;
+  }
+
+  /* === AUDIENCE === */
+  .audience-group {
+    margin-bottom: 12px;
+  }
+  .audience-group .group-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #58a6ff;
+    margin-bottom: 6px;
+  }
+  .audience-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .audience-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 10px 14px;
+    flex: 1 1 180px;
+  }
+  .audience-card .aud-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: #f0f6fc;
+  }
+  .audience-card .aud-desc {
+    font-size: 12px;
+    color: #8b949e;
+    margin-top: 2px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid #21262d;
+    margin: 28px 0;
+  }
+  .section-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #484f58;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🏗️ Silverio Bernal</h1>
+<p class="subtitle">Arquitectura de Avatar — Sistema de Identidad, Contenido y Ecosistema</p>
+
+<div class="diagram">
+
+  <!-- ==================== 1. IDENTITY ==================== -->
+  <div class="layer">
+    <div class="layer-title">🧠 1. Identidad Central</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">Senior Systems Architect</div>
+        <div class="desc">25+ años de experiencia empresarial. Arquitecto de sistemas, operador técnico, pensador de sistemas.</div>
+        <div class="tags">
+          <span class="tag">enterprise</span>
+          <span class="tag">architecture</span>
+          <span class="tag">systems</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="name">AI-native Explorer</div>
+        <div class="desc">Transición pública de ingeniería tradicional hacia sistemas operativos nativos de IA.</div>
+        <div class="tags">
+          <span class="tag blue">AI-native</span>
+          <span class="tag blue">exploration</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="name">Public Builder</div>
+        <div class="desc">Construye y documenta públicamente. No es influencer ni gurú. Es autoridad técnica tranquila.</div>
+        <div class="tags">
+          <span class="tag orange">public building</span>
+          <span class="tag orange">transparency</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 2. POSITIONING ==================== -->
+  <div class="layer">
+    <div class="layer-title">🎯 2. Posicionamiento Estratégico</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">AI-native Systems Architect</div>
+        <div class="desc">Documentando la transición de arquitectura empresarial tradicional hacia sistemas nativos de IA.</div>
+      </div>
+      <div class="card">
+        <div class="name">Enterprise Systems Thinker</div>
+        <div class="desc">Fricción organizacional, coordinación de sistemas, orquestación de flujos de trabajo.</div>
+      </div>
+      <div class="card">
+        <div class="name">Technical Operator</div>
+        <div class="desc">Operador con profundidad empresarial. Autoridad basada en experiencia real, no en hype.</div>
+      </div>
+    </div>
+    <div class="connections">
+      <span>Transición de</span>
+      <span class="arrow">→</span>
+      <span><strong>empleado/operador</strong></span>
+      <span class="arrow">→</span>
+      <span><strong>autoridad técnica / asesor / consultor / fundador</strong></span>
+    </div>
+  </div>
+
+  <!-- ==================== 3. NARRATIVE ==================== -->
+  <div class="layer">
+    <div class="layer-title">📖 3. Arco Narrativo</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">Fase 1 — Foundations</div>
+        <div class="desc">Sistemas reales en finanzas, salud y entornos empresariales.</div>
+      </div>
+      <div class="card">
+        <div class="name">Fase 2 — Observation</div>
+        <div class="desc">Las organizaciones operan mediante documentos, flujos y coordinación.</div>
+      </div>
+      <div class="card">
+        <div class="name">Fase 3 — AI-native</div>
+        <div class="desc">Orquestación, ingeniería asistida por IA, sistemas multi-agente.</div>
+      </div>
+      <div class="card">
+        <div class="name">Fase 4 — Public Building</div>
+        <div class="desc">Documentación pública de pensamiento sistémico y transformación operativa.</div>
+      </div>
+      <div class="card">
+        <div class="name">Fase 5 — AIX</div>
+        <div class="desc">Evolución hacia plataforma de coordinación organizacional.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 4. CONTENT PILLARS ==================== -->
+  <div class="layer">
+    <div class="layer-title">📌 4. Pilares de Contenido</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">Organizational Friction</div>
+        <div class="desc">Sistemas fragmentados, complejidad empresarial, caos de integración.</div>
+      </div>
+      <div class="card">
+        <div class="name">AI-native Operations</div>
+        <div class="desc">Flujos asistidos por IA, orquestación, sistemas multi-agente.</div>
+      </div>
+      <div class="card">
+        <div class="name">Systems Thinking</div>
+        <div class="desc">Organizaciones como sistemas de coordinación, memoria operativa.</div>
+      </div>
+      <div class="card">
+        <div class="name">Public Building</div>
+        <div class="desc">Evolución de AIX, decisiones de arquitectura, fracasos, experimentos.</div>
+      </div>
+      <div class="card">
+        <div class="name">Human Impact</div>
+        <div class="desc">Rol cambiante de ingenieros, presión de adaptación, profundidad vs improvisación.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 5. AIX PHILOSOPHY ==================== -->
+  <div class="layer">
+    <div class="layer-title">⚙️ 5. AIX — Filosofía Operativa</div>
+    <div class="grid">
+      <div class="card" style="flex:2;">
+        <div class="name">Core Thesis</div>
+        <div class="desc">Las organizaciones operan mediante documentos, aprobaciones, evidencia, comunicación, decisiones, flujos y coordinación — no a través de pantallas de software aisladas.</div>
+        <div class="tags">
+          <span class="tag purple">document-centered</span>
+          <span class="tag purple">coordination</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="name">AI es un Interaction Layer</div>
+        <div class="desc">No es el producto. Es intérprete contextual, asistente de flujo, acelerador de coordinación.</div>
+      </div>
+      <div class="card">
+        <div class="name">Long-term Goal</div>
+        <div class="desc">Reducir fricción operativa entre personas, organizaciones, flujos, sistemas, documentos y decisiones.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 6. ECOSYSTEM ==================== -->
+  <div class="layer">
+    <div class="layer-title">🌐 6. Ecosistema de Marcas</div>
+    <div class="eco-row">
+      <div class="eco-card">
+        <div class="role">Identidad Central</div>
+        <div class="name">Silverio Bernal</div>
+        <div class="desc">Identidad humana y autoridad técnica</div>
+      </div>
+      <div class="eco-card">
+        <div class="role">Plataforma</div>
+        <div class="name">AIX</div>
+        <div class="desc">Tesis y plataforma de sistemas operativos</div>
+      </div>
+      <div class="eco-card">
+        <div class="role">Capa Global</div>
+        <div class="name">Adrian Vale</div>
+        <div class="desc">Capa editorial/futurista global</div>
+      </div>
+      <div class="eco-card">
+        <div class="role">Distribución Social</div>
+        <div class="name">Estefanía</div>
+        <div class="desc">Capa de distribución social</div>
+      </div>
+      <div class="eco-card">
+        <div class="role">Engagement Emocional</div>
+        <div class="name">Diana</div>
+        <div class="desc">Capa de engagement emocional</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 7. AUDIENCE ==================== -->
+  <div class="layer">
+    <div class="layer-title">👥 7. Audiencia</div>
+    <div class="audience-group">
+      <div class="group-label">Primaria</div>
+      <div class="audience-row">
+        <div class="audience-card">
+          <div class="aud-name">Senior Engineers</div>
+          <div class="aud-desc">Complejidad arquitectónica, fricción operativa, fatiga de integración</div>
+        </div>
+        <div class="audience-card">
+          <div class="aud-name">Architects & Tech Leads</div>
+          <div class="aud-desc">Coordinación, escalabilidad, diseño de flujos, alineación organizacional</div>
+        </div>
+        <div class="audience-card">
+          <div class="aud-name">Technical Middle Mgmt</div>
+          <div class="aud-desc">Presión por modernizar, integrar IA, mejorar operaciones</div>
+        </div>
+      </div>
+    </div>
+    <div class="audience-group">
+      <div class="group-label">Secundaria</div>
+      <div class="audience-row">
+        <div class="audience-card">
+          <div class="aud-name">Ambitious Juniors</div>
+          <div class="aud-desc">Pensamiento sistémico, perspectiva a largo plazo, profundidad más allá de herramientas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 8. SIGNATURE THEMES ==================== -->
+  <div class="layer">
+    <div class="layer-title">🔑 8. Temas Firma</div>
+    <div class="theme-row">
+      <span class="theme-pill">Organizaciones como Sistemas de Coordinación</span>
+      <span class="theme-pill">Fragmentación Operativa</span>
+      <span class="theme-pill">Operaciones AI-native</span>
+      <span class="theme-pill">Posición Humana en Sistemas Acelerados</span>
+      <span class="theme-pill">Orquestación sobre Herramientas</span>
+    </div>
+  </div>
+
+  <!-- ==================== 9. WRITING CATEGORIES ==================== -->
+  <div class="layer">
+    <div class="layer-title">✍️ 9. Categorías de Escritura</div>
+    <div class="cat-grid">
+      <div class="cat-card">
+        <div class="cat-name">Systems Observations</div>
+        <div class="cat-desc">Reflexiones cortas sobre fricción empresarial y complejidad organizacional → Diferenciación intelectual</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-name">Architecture Essays</div>
+        <div class="cat-desc">Escritura larga sobre sistemas AI-native, coordinación operativa → Autoridad profunda</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-name">Public Build Logs</div>
+        <div class="cat-desc">Documentación de evolución de AIX, experimentos, decisiones → Prueba de trabajo</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-name">Operational Critiques</div>
+        <div class="cat-desc">Reflexiones críticas sobre cultura software moderna, hype AI → Posicionamiento</div>
+      </div>
+      <div class="cat-card">
+        <div class="cat-name">Human + AI Reflections</div>
+        <div class="cat-desc">Futuro del trabajo, identidad del ingeniero, adaptación organizacional → Profundidad humana</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 10. VOICE & TONE ==================== -->
+  <div class="layer">
+    <div class="layer-title">🎙️ 10. Voz y Tono</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">Características</div>
+        <div class="desc">Calmado, reflexivo, técnico, pensativo, fundamentado, observador, experimentado, orientado a sistemas.</div>
+      </div>
+      <div class="card">
+        <div class="name">Estilo de Comunicación</div>
+        <div class="desc">Como un arquitecto de sistemas pensando en público. Alguien explorando profundamente, no predicando.</div>
+      </div>
+      <div class="card">
+        <div class="name">Objetivo</div>
+        <div class="desc">"Esta persona entiende la complejidad detrás de lo que estamos experimentando."</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 11. INTELLECTUAL TERRITORY ==================== -->
+  <div class="layer">
+    <div class="layer-title">🌍 11. Territorio Intelectual</div>
+    <div class="grid">
+      <div class="card" style="flex:2;">
+        <div class="name">Legitimidad Narrativa</div>
+        <div class="desc">Sistemas empresariales, coordinación de flujos, arquitectura operativa, ingeniería AI-native, complejidad organizacional, orquestación, fricción operativa.</div>
+      </div>
+      <div class="card">
+        <div class="name">Diferenciación</div>
+        <div class="desc">NO: herramientas AI, prompts, trucos de productividad, tutoriales de código. SÍ: sistemas, organizaciones, flujos, coordinación.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 12. EDITORIAL STRATEGY ==================== -->
+  <div class="layer">
+    <div class="layer-title">📰 12. Estrategia Editorial</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">Objetivo Primario</div>
+        <div class="desc">Construir autoridad técnica a largo plazo mediante claridad, consistencia y prueba de trabajo.</div>
+      </div>
+      <div class="card">
+        <div class="name">Optimizar para</div>
+        <div class="desc">Autoridad, confianza, resonancia, relevancia, consistencia intelectual. NO para viralidad.</div>
+      </div>
+      <div class="card">
+        <div class="name">Efecto a Largo Plazo</div>
+        <div class="desc">Asociar Silverio Bernal con: pensamiento sistémico operativo, transformación AI-native empresarial, coordinación organizacional.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 13. PUBLIC BUILDING ==================== -->
+  <div class="layer">
+    <div class="layer-title">🏛️ 13. Public Building</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">AIX</div>
+        <div class="desc">Filosofía operativa, infraestructura organizacional AI-native, tesis sistémica a largo plazo.</div>
+      </div>
+      <div class="card">
+        <div class="name">Orchestrator</div>
+        <div class="desc">Exploración, experimentación, aprendizaje de orquestación, descubrimiento operativo AI-native.</div>
+      </div>
+      <div class="card">
+        <div class="name">GitHub</div>
+        <div class="desc">Profundidad técnica, realidad arquitectónica, credibilidad de implementación.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 14. CHANNEL STRATEGY ==================== -->
+  <div class="layer">
+    <div class="layer-title">📡 14. Estrategia de Canales</div>
+    <div class="grid">
+      <div class="card">
+        <div class="name">LinkedIn</div>
+        <div class="desc">Plataforma principal de autoridad. Distribución profesional. Networking. Contenido calmado, técnicamente maduro.</div>
+        <div class="tags">
+          <span class="tag blue">authority</span>
+          <span class="tag blue">professional</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="name">Blog</div>
+        <div class="desc">Territorio intelectual de formato largo. Repositorio de pensamiento arquitectónico. Capa de continuidad narrativa.</div>
+        <div class="tags">
+          <span class="tag purple">depth</span>
+          <span class="tag purple">archive</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 15. ANTI-PATTERNS ==================== -->
+  <div class="layer">
+    <div class="layer-title">🚫 15. Anti-Patrones</div>
+    <div class="anti-row">
+      <span class="anti-pill">viralidad</span>
+      <span class="anti-pill">comentario AI superficial</span>
+      <span class="anti-pill">contenido "top tools"</span>
+      <span class="anti-pill">futurismo exagerado</span>
+      <span class="anti-pill">estética startup hustle</span>
+      <span class="anti-pill">autoridad artificial</span>
+      <span class="anti-pill">certeza falsa</span>
+      <span class="anti-pill">engagement bait</span>
+      <span class="anti-pill">auto-promoción excesiva</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ==================== SUMMARY ==================== -->
+  <div class="layer">
+    <div class="layer-title">📐 Resumen Arquitectónico</div>
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:20px;">
+      <div style="display:flex; flex-wrap:wrap; gap:16px; justify-content:center;">
+        <div style="text-align:center; min-width:100px;">
+          <div style="font-size:28px; font-weight:700; color:#58a6ff;">16</div>
+          <div style="font-size:12px; color:#8b949e;">Módulos</div>
+        </div>
+        <div style="text-align:center; min-width:100px;">
+          <div style="font-size:28px; font-weight:700; color:#7ee787;">5</div>
+          <div style="font-size:12px; color:#8b949e;">Pilares de Contenido</div>
+        </div>
+        <div style="text-align:center; min-width:100px;">
+          <div style="font-size:28px; font-weight:700; color:#d2a8ff;">5</div>
+          <div style="font-size:12px; color:#8b949e;">Temas Firma</div>
+        </div>
+        <div style="text-align:center; min-width:100px;">
+          <div style="font-size:28px; font-weight:700; color:#ffa657;">5</div>
+          <div style="font-size:12px; color:#8b949e;">Categorías de Escritura</div>
+        </div>
+        <div style="text-align:center; min-width:100px;">
+          <div style="font-size:28px; font-weight:700; color:#ff7b72;">9</div>
+          <div style="font-size:12px; color:#8b949e;">Anti-Patrones</div>
+        </div>
+        <div style="text-align:center; min-width:100px;">
+          <div style="font-size:28px; font-weight:700; color:#79c0ff;">5</div>
+          <div style="font-size:12px; color:#8b949e;">Marcas en Ecosistema</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
