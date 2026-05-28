@@ -1,0 +1,6 @@
+CONTAINER ID   IMAGE                                      COMMAND                  CREATED             STATUS                    PORTS                                              NAMES
+42e8001fe827   postgres:16-alpine                         "docker-entrypoint.s…"   41 minutes ago      Up 41 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp        local-ai-stack-postgres-1
+7e750084f685   docker.n8n.io/n8nio/n8n:2.21.7             "tini -- /docker-ent…"   About an hour ago   Up About an hour          192.168.0.194:5678->5678/tcp                       local-ai-stack-n8n-1
+b721162d7a02   portainer/portainer-ce:lts                 "/portainer"             4 days ago          Up 26 hours               8000/tcp, 9000/tcp, 192.168.0.194:9443->9443/tcp   local-ai-stack-portainer-1
+93e80717db28   qdrant/qdrant:v1.17.0                      "./entrypoint.sh"        4 days ago          Up 26 hours               6333-6334/tcp                                      local-ai-stack-qdrant-1
+0c34754e720d   minio/minio:RELEASE.2025-07-23T15-54-02Z   "/usr/bin/docker-ent…"   4 days ago          Up 26 hours               9000/tcp, 192.168.0.194:9001->9001/tcp             local-ai-stack-minio-1

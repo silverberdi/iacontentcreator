@@ -1,0 +1,32 @@
+                    Table "public.canonical_asset_registry"
+      Column       |           Type           | Collation | Nullable | Default 
+-------------------+--------------------------+-----------+----------+---------
+ asset_id          | text                     |           | not null | 
+ avatar            | text                     |           | not null | 
+ asset_type        | text                     |           | not null | 
+ scene             | text                     |           |          | 
+ version           | integer                  |           | not null | 
+ workflow          | text                     |           |          | 
+ model             | text                     |           |          | 
+ seed              | bigint                   |           |          | 
+ bucket            | text                     |           | not null | 
+ object_path       | text                     |           | not null | 
+ original_filename | text                     |           | not null | 
+ mime_type         | text                     |           |          | 
+ file_size         | bigint                   |           |          | 
+ extension         | text                     |           |          | 
+ prompt            | text                     |           |          | 
+ negative_prompt   | text                     |           |          | 
+ sampler           | text                     |           |          | 
+ steps             | integer                  |           |          | 
+ cfg               | numeric                  |           |          | 
+ tags              | jsonb                    |           |          | 
+ metadata          | jsonb                    |           | not null | 
+ created_at        | timestamp with time zone |           | not null | now()
+ parent_asset_id   | text                     |           |          | 
+ sha256            | text                     |           |          | 
+Indexes:
+    "canonical_asset_registry_pkey" PRIMARY KEY, btree (asset_id)
+    "canonical_asset_registry_object_path_uidx" UNIQUE, btree (object_path)
+    "canonical_asset_registry_sha256_uidx" UNIQUE, btree (sha256)
+

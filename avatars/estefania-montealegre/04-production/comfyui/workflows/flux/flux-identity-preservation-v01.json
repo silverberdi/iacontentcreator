@@ -1,0 +1,210 @@
+# FLUX Identity Preservation Workflow v01 — Estefanía Montealegre
+
+## Purpose
+
+This workflow exists to preserve identity continuity while expanding visual coverage.
+
+The objective is NOT:
+
+* beauty optimization,
+* cinematic perfection,
+* influencer aesthetics,
+* portrait enhancement.
+
+The objective IS:
+
+* identity stability,
+* emotional realism,
+* everyday humanity,
+* observational continuity.
+
+---
+
+# Primary Identity Rule
+
+All generations must prioritize:
+
+identity continuity > image quality
+
+A technically weaker image that preserves identity is preferred over a visually superior image that introduces drift.
+
+---
+
+# Workflow Philosophy
+
+FLUX is used because it:
+
+* preserves natural realism better,
+* handles subtle facial texture more naturally,
+* avoids some SDXL beauty convergence,
+* produces stronger observational photography.
+
+However:
+
+* FLUX can still drift toward polished/editorial aesthetics if over-prompted.
+
+Because of this:
+
+* prompts must remain human-first,
+* not beauty-first.
+
+---
+
+# Approved Generation Style
+
+Preferred:
+
+* candid photography;
+* observational moments;
+* soft documentary realism;
+* natural posture;
+* everyday lighting;
+* emotional subtlety;
+* smartphone realism.
+
+Avoid:
+
+* glamour portraits;
+* cinematic beauty shots;
+* fashion photography;
+* luxury aesthetics;
+* influencer energy;
+* AI-perfect faces.
+
+---
+
+# Generation Constraints
+
+## Batch Size
+
+Maximum:
+2 images per generation
+
+Reason:
+Large batches increase convergence drift and aesthetic optimization.
+
+---
+
+## Resolution
+
+Preferred:
+1024x1024
+
+Avoid:
+unnecessarily high-resolution portrait rendering.
+
+---
+
+## Prompt Philosophy
+
+Prompts should describe:
+
+* human presence,
+* emotional atmosphere,
+* behavior,
+* environment,
+* realism.
+
+Prompts should NOT emphasize:
+
+* beauty,
+* perfection,
+* glamour,
+* symmetry,
+* idealized attractiveness.
+
+---
+
+# Mandatory Negative Prompt Themes
+
+Always suppress:
+
+* fashion model energy;
+* editorial beauty;
+* glossy skin;
+* influencer aesthetics;
+* cinematic portrait behavior;
+* beauty campaign rendering;
+* AI-perfect symmetry;
+* hyper-defined curls.
+
+---
+
+# Review Process
+
+Every generation must be reviewed for:
+
+* facial continuity;
+* emotional continuity;
+* hair continuity;
+* realism continuity;
+* anti-editorial consistency.
+
+Images must be rejected if they:
+
+* look prettier but less human;
+* look more polished but less recognizable;
+* drift toward influencer aesthetics;
+* become too symmetrical;
+* lose emotional grounding.
+
+---
+
+# Approved Emotional Tone
+
+Estefanía should feel:
+
+* warm;
+* intelligent;
+* observant;
+* emotionally grounded;
+* naturally feminine;
+* subtly expressive.
+
+Never:
+
+* performative,
+* exaggerated,
+* luxury-coded,
+* fashion-oriented,
+* emotionally empty.
+
+---
+
+# Production Direction
+
+Preferred future scenes:
+
+* cafés;
+* soft rain;
+* laptops;
+* windows;
+* reading;
+* travel transitions;
+* quiet social life;
+* morning moments;
+* urban realism;
+* introspective pauses.
+
+Avoid:
+
+* studio shoots;
+* beauty campaigns;
+* luxury fashion moments;
+* heavy makeup aesthetics;
+* highly stylized glamour framing.
+
+---
+
+# Final Rule
+
+If a generation feels:
+
+* more aesthetic,
+* more glamorous,
+* more cinematic,
+* more optimized,
+
+but less emotionally authentic:
+
+reject it.

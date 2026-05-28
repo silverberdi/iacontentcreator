@@ -1,0 +1,8 @@
+- Public identity canon
+- Warm upscale brunch energy
+- Sophisticated but emotionally accessible
+- Elegant natural femininity
+- Medellín cosmopolitan vibe
+- Natural social presence
+- Authentic premium lifestyle
+- Strong candidate for Instagram profile consistency

@@ -1,0 +1,6 @@
+NAME                         IMAGE                                      COMMAND                  SERVICE     CREATED             STATUS                    PORTS
+local-ai-stack-minio-1       minio/minio:RELEASE.2025-07-23T15-54-02Z   "/usr/bin/docker-ent…"   minio       4 days ago          Up 26 hours               9000/tcp, 192.168.0.194:9001->9001/tcp
+local-ai-stack-n8n-1         docker.n8n.io/n8nio/n8n:2.21.7             "tini -- /docker-ent…"   n8n         About an hour ago   Up About an hour          192.168.0.194:5678->5678/tcp
+local-ai-stack-portainer-1   portainer/portainer-ce:lts                 "/portainer"             portainer   4 days ago          Up 26 hours               8000/tcp, 9000/tcp, 192.168.0.194:9443->9443/tcp
+local-ai-stack-postgres-1    postgres:16-alpine                         "docker-entrypoint.s…"   postgres    41 minutes ago      Up 41 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+local-ai-stack-qdrant-1      qdrant/qdrant:v1.17.0                      "./entrypoint.sh"        qdrant      4 days ago          Up 26 hours               6333-6334/tcp
