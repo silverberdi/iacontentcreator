@@ -13,6 +13,7 @@ import ConfirmDialog, {
 } from "./components/ConfirmDialog";
 import FiltersPanel from "./components/FiltersPanel";
 import Header from "./components/Header";
+import BackupsPanel from "./components/BackupsPanel";
 import { defaultFilters } from "./data/catalogs";
 import type {
   AssetCandidate,
@@ -220,6 +221,8 @@ export default function App() {
           onReject={openRejectDialog}
           operationPending={operationPending}
         />
+
+        <BackupsPanel />
       </main>
 
       <ConfirmDialog
