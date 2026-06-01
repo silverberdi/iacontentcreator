@@ -26,12 +26,15 @@ cp .env.example .env
 
 Edit `.env` if your n8n or MinIO hosts differ from the defaults.
 
+For local development, use `VITE_N8N_WEBHOOK_BASE_URL=http://localhost:5173/webhook` so Vite proxies requests to n8n (avoids browser CORS). Spell the path **`webhook`** exactly — a typo like `webhcok` will fail. After any `.env` change, stop and restart `npm run dev`.
+
 ## Environment variables
 
 | Variable | Description |
 | --- | --- |
 | `VITE_N8N_WEBHOOK_BASE_URL` | Base URL for n8n webhooks (e.g. `http://192.168.0.194:5678/webhook`) |
 | `VITE_MINIO_BASE_URL` | MinIO public base URL used in API payloads (e.g. `http://192.168.0.194:9000`) |
+| `VITE_AVATARES_API_KEY` | API key sent as `X-Avatares-Api-Key` on all n8n webhook requests (required when the n8n gateway is enabled) |
 
 Vite exposes only variables prefixed with `VITE_`.
 
@@ -54,7 +57,7 @@ The dev server runs on port `5173` by default.
 
 ## Available endpoints
 
-All requests are `POST` with `Content-Type: application/json`. Paths are appended to `VITE_N8N_WEBHOOK_BASE_URL`.
+All requests are `POST` with `Content-Type: application/json` and `X-Avatares-Api-Key` (from `VITE_AVATARES_API_KEY`). Paths are appended to `VITE_N8N_WEBHOOK_BASE_URL`. Image previews load directly from MinIO URLs and do not use this header.
 
 | Endpoint | Purpose |
 | --- | --- |

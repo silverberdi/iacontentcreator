@@ -11,6 +11,7 @@ import ConfirmDialog, {
   DEFAULT_PROMOTE_NOTES,
   DEFAULT_REJECT_NOTES,
 } from "./components/ConfirmDialog";
+import ApiKeyWarning from "./components/ApiKeyWarning";
 import FiltersPanel from "./components/FiltersPanel";
 import Header from "./components/Header";
 import BackupsPanel from "./components/BackupsPanel";
@@ -175,6 +176,8 @@ export default function App() {
       />
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+        <ApiKeyWarning />
+
         <FiltersPanel
           filters={filters}
           loading={loading}
