@@ -8,6 +8,7 @@ type CandidateGridProps = {
   loading: boolean;
   statusFilter: StatusFilter;
   showCanonicalInCandidates: boolean;
+  onImageClick: (asset: AssetCandidate) => void;
   onPromote: (asset: AssetCandidate) => void;
   onReject: (asset: AssetCandidate) => void;
   operationPending: boolean;
@@ -19,6 +20,7 @@ export default function CandidateGrid({
   loading,
   statusFilter,
   showCanonicalInCandidates,
+  onImageClick,
   onPromote,
   onReject,
   operationPending,
@@ -57,11 +59,12 @@ export default function CandidateGrid({
       )}
 
       {!loading && candidates.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {candidates.map((asset) => (
             <AssetCard
               key={asset.assetId}
               asset={asset}
+              onImageClick={onImageClick}
               onPromote={onPromote}
               onReject={onReject}
               operationPending={operationPending}

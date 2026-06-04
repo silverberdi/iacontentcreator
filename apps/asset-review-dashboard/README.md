@@ -65,14 +65,22 @@ All requests are `POST` with `Content-Type: application/json` and `X-Avatares-Ap
 | `/assets/get-canonical` | Get current canonical asset for the group |
 | `/assets/promote-canonical` | Promote an assetId to canonical |
 | `/assets/reject` | Reject a non-canonical asset |
+| `/admin/catalogs/options` | Active catalog options for selects |
+| `/admin/catalogs/list` | All catalog rows (including disabled) |
+| `/admin/catalogs/upsert` | Create or update a catalog item |
+| `/admin/catalogs/set-status` | Enable or disable a catalog item |
+| `/admin/ingest-profiles/upsert-validated` | Save ingest profile with catalog validation |
+| `/admin/ingest-profiles/delete` | Delete ingest profile when no assets exist for avatar/scene/assetType |
 
-See `infra/snapshoots/20260526-175854/n8n/docs/asset-review-api.md` in the repo for full API documentation.
+See `automation/n8n/docs/asset-review-api.md` and `automation/n8n/docs/catalog-management.md` in the repo for full API documentation.
 
 ## Known assumptions
 
 - n8n workflows are published and reachable from the machine running the browser.
 - MinIO object URLs returned by the API are directly loadable in the browser (no auth on read).
-- Avatar, scene, and asset type catalogs are static in the frontend for now.
+- Filter and ingest profile selects load from `POST /admin/catalogs/options` (static fallback if the API is unavailable).
+- Catalog administration uses `POST /admin/catalogs/list`, `upsert`, and `set-status` (logical enable/disable only).
+- Ingest profiles are saved via `POST /admin/ingest-profiles/upsert-validated` against DB catalogs.
 - Canonical promotion is logical in PostgreSQL; files are not copied to a separate `canon/` path.
 - Rejecting a canonical asset is blocked by the API; promote another asset first, then reject the former canonical.
 - No authentication is implemented yet; endpoints are assumed to be on a trusted network.

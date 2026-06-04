@@ -121,11 +121,8 @@ export default function BackupsPanel() {
   const busy = healthLoading || listLoading || createPending;
 
   return (
-    <section className="rounded-lg border border-border bg-surface-raised p-4 sm:p-5">
-      <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-gray-400">
-        Admin / Backups
-      </h2>
-      <p className="mb-5 text-sm text-gray-500">
+    <section className="space-y-6">
+      <p className="text-sm text-gray-500">
         Backup runner health, manual backup creation, and backup history.
       </p>
 

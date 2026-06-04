@@ -9,6 +9,7 @@ const IMAGE_HEIGHT = "h-40";
 
 type AssetCardProps = {
   asset: AssetCandidate;
+  onImageClick: (asset: AssetCandidate) => void;
   onPromote: (asset: AssetCandidate) => void;
   onReject: (asset: AssetCandidate) => void;
   operationPending: boolean;
@@ -16,12 +17,17 @@ type AssetCardProps = {
 
 export default function AssetCard({
   asset,
+  onImageClick,
   onPromote,
   onReject,
   operationPending,
 }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const isCanonical = isCanonicalAsset(asset);
+
+  const openPreview = () => {
+    if (!imageFailed) onImageClick(asset);
+  };
 
   return (
     <article className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface">
@@ -38,12 +44,24 @@ export default function AssetCard({
             </p>
           </div>
         ) : (
-          <img
-            src={asset.url}
-            alt={`Asset ${asset.assetId}`}
-            onError={() => setImageFailed(true)}
-            className={`${IMAGE_HEIGHT} w-full object-cover`}
-          />
+          <button
+            type="button"
+            onClick={openPreview}
+            className={`group relative block w-full ${IMAGE_HEIGHT} cursor-pointer overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+            aria-label="View full image"
+          >
+            <img
+              src={asset.url}
+              alt={`Asset ${asset.assetId}`}
+              onError={() => setImageFailed(true)}
+              className={`${IMAGE_HEIGHT} w-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:brightness-110`}
+            />
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/35">
+              <span className="rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+                View full image
+              </span>
+            </span>
+          </button>
         )}
       </div>
 
@@ -87,14 +105,6 @@ export default function AssetCard({
         </dl>
 
         <div className="mt-auto flex flex-wrap gap-1.5 border-t border-border-muted pt-2.5">
-          <a
-            href={asset.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-md border border-border bg-surface-overlay px-2 py-1 text-xs text-gray-200 transition hover:border-gray-500 hover:text-white"
-          >
-            Open image
-          </a>
           <CopyButton value={asset.url} label="Copy URL" />
           <CopyButton value={asset.assetId} label="Copy assetId" />
           <CopyButton value={asset.objectPath} label="Copy objectPath" />

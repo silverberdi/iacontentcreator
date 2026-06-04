@@ -54,3 +54,50 @@ export async function postN8nJson<T>(path: string, body: unknown = {}): Promise<
 
   return data as T;
 }
+
+export type N8nRequestResult<T> = {
+  status: number;
+  httpOk: boolean;
+  data: T | null;
+};
+
+/** POST that returns parsed JSON even when HTTP status is not 2xx (for soft API errors). */
+export async function postN8nRequest<T>(
+  path: string,
+  body: unknown = {},
+): Promise<N8nRequestResult<T>> {
+  const url = `${getWebhookBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: n8nHeaders,
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Network request failed";
+    throw new Error(`Failed to reach ${url}: ${message}`);
+  }
+
+  const text = await response.text();
+  let data: T | null = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as T;
+    } catch {
+      if (!response.ok) {
+        throw new Error(
+          `Invalid JSON response from ${path} (${response.status}): ${text.slice(0, 200)}`,
+        );
+      }
+      throw new Error(`Invalid JSON response from ${path}: ${text.slice(0, 200)}`);
+    }
+  }
+
+  return {
+    status: response.status,
+    httpOk: response.ok,
+    data,
+  };
+}
