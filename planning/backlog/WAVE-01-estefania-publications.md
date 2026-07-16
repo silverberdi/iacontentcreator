@@ -643,7 +643,7 @@ As the system, I need a structured Estefanía business profile, so that prompts 
 
 ### Dependencies
 
-- `strategy/business-intent.md`.
+- `docs/product/business-intent.md`.
 - Estefanía canon documents.
 
 ### Notes

@@ -8,7 +8,7 @@ Base revisada:
 
 - Consola: `apps/asset-review-dashboard/src`
 - Workflows exportados: `automation/n8n/workflows/Avatares_AI_workflows_manifest_20260714.json`
-- Reality sync: `automation/n8n/docs/reality-sync-2026-07-14.md`
+- Reality sync: `automation/n8n/docs/audits/reality-sync-2026-07-14.md`
 
 ## Resumen
 

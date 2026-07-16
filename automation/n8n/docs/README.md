@@ -1,96 +1,76 @@
-# Avatares AI — n8n Automation
+# Avatares AI — n8n Documentation
 
-## Estructura recomendada
+This directory contains documentation specific to n8n workflows and n8n-operated automation.
 
-```text
-automation/
-└── n8n/
-    ├── docs/
-    │   ├── asset-pipeline-orchestrator.md
-    │   ├── admin-console-dead-code-audit-2026-07-14.md
-    │   ├── batch-manifest-contract.md
-    │   ├── asset-catalog-validation.md
-    │   ├── asset-review-api.md
-    │   ├── reality-sync-2026-07-14.md
-    │   └── review-notes-api-pending.md
-    ├── workflows/
-    │   ├── Avatares_AI_Asset_Pipeline_Orchestrator_manifest_catalog_validation_v1.json
-    │   ├── Avatares_AI_Register_Raw_Asset_Batch_Callable_manifest_v1.json
-    │   ├── Avatares_AI_Promote_Canonical_Asset_Callable_v3.json
-    │   ├── Avatares_AI_Get_Canonical_Asset_Callable_v3.json
-    │   ├── Avatares_AI_API_List_Review_Candidates_v1.json
-    │   ├── Avatares_AI_API_Get_Canonical_Asset_v1.json
-    │   ├── Avatares_AI_API_Promote_Canonical_Asset_v1.json
-    │   ├── Avatares_AI_API_Reject_Asset_v1.json
-    │   └── Avatares_AI_API_Select_Asset_v1.json
-    └── sql/
-        ├── 001_asset_catalogs.sql
-        └── 002_seed_asset_catalogs.sql
-```
-
-## Pipeline principal
+## Structure
 
 ```text
-Avatares AI - Asset Pipeline Orchestrator - Manifest Catalog Validation
+automation/n8n/docs/
+  api-contracts/
+  architecture/
+  audits/
+  hotfixes/
+  runbooks/
 ```
 
-Responsabilidades:
+## API Contracts
+
+Use `api-contracts/` for webhook contracts, request/response shapes, and API behavior exposed by n8n.
+
+Examples:
+
+- `api-contracts/asset-review-api.md`
+- `api-contracts/select-asset-api.md`
+- `api-contracts/batch-manifest-contract.md`
+
+## Architecture
+
+Use `architecture/` for workflow architecture and pipeline design.
+
+Examples:
+
+- `architecture/asset-pipeline-orchestrator.md`
+- `architecture/asset-catalog-validation.md`
+
+## Audits
+
+Use `audits/` for one-time system inspections and reality-sync reports.
+
+Examples:
+
+- `audits/reality-sync-2026-07-14.md`
+- `audits/admin-console-dead-code-audit-2026-07-14.md`
+
+## Hotfixes
+
+Use `hotfixes/` for narrowly scoped fixes, patches, and historical repair notes.
+
+These are not active runbooks unless explicitly promoted.
+
+## Runbooks
+
+Use `runbooks/` for active operational instructions.
+
+Examples:
+
+- `runbooks/auto-ingest.md`
+- `runbooks/auto-ingest-watcher.md`
+- `runbooks/local-production-backups.md`
+
+## Workflows
+
+Workflow JSON exports live in:
 
 ```text
-leer batch.json
-validar batch contra catálogos
-registrar assets
-subir a MinIO
-mover archivos procesados
-opcionalmente promover canonical
-consultar canonical
-devolver resultado limpio
+automation/n8n/workflows/
 ```
 
-## APIs de curación
+The repository should contain exported workflows required to operate the project. Server-only workflows are considered configuration drift.
 
-Workflows publicados:
+## Placement Rules
 
-```text
-Avatares AI - API - List Review Candidates
-Avatares AI - API - Get Canonical Asset
-Avatares AI - API - Promote Canonical Asset
-Avatares AI - API - Reject Asset
-Avatares AI - API - Select Asset
-```
-
-Endpoints:
-
-```text
-POST /webhook/assets/review-candidates
-POST /webhook/assets/get-canonical
-POST /webhook/assets/promote-canonical
-POST /webhook/assets/reject
-POST /webhook/assets/select
-```
-
-## Decisiones vigentes
-
-```text
-Canonical físico en MinIO: NO
-Canonical lógico en PostgreSQL: SÍ
-batch.json como contrato estable de entrada: SÍ
-Catálogos PostgreSQL para validación: SÍ
-Endpoints n8n para curación: SÍ
-```
-
-## Próximo bloque recomendado
-
-```text
-Viewer / Dashboard mínimo
-```
-
-Objetivo:
-
-```text
-ver candidatos
-abrir imágenes
-promover canonical
-rechazar descartados
-consultar canonical vigente
-```
+- If it describes an endpoint, put it in `api-contracts/`.
+- If it describes how a workflow is designed, put it in `architecture/`.
+- If it tells an operator what to do repeatedly, put it in `runbooks/`.
+- If it documents a one-time investigation, put it in `audits/`.
+- If it documents a repair or historical patch, put it in `hotfixes/`.

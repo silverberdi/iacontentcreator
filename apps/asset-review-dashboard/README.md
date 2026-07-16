@@ -74,7 +74,7 @@ All requests are `POST` with `Content-Type: application/json` and `X-Avatares-Ap
 | `/admin/ingest-profiles/upsert-validated` | Save ingest profile with catalog validation |
 | `/admin/ingest-profiles/delete` | Delete ingest profile when no assets exist for avatar/scene/assetType |
 
-See `automation/n8n/docs/asset-review-api.md` and `automation/n8n/docs/catalog-management.md` in the repo for full API documentation.
+See `automation/n8n/docs/api-contracts/asset-review-api.md` and `automation/n8n/docs/runbooks/catalog-management.md` in the repo for full API documentation.
 
 ## Known assumptions
 
