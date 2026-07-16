@@ -635,6 +635,7 @@ As the system, I need a structured Estefanía business profile, so that prompts 
 
 ### Technical Tasks
 
+- [x] Define human-readable avatar profile contract.
 - [ ] Create JSON schema for character/business profile.
 - [ ] Create Estefanía profile JSON from existing docs.
 - [ ] Store profile in repo.

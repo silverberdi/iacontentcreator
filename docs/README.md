@@ -8,6 +8,8 @@ Use `docs/product/` for business intent, product scope, avatar business lines, a
 
 - `docs/product/business-intent.md`
 - `docs/product/avatar-taxonomy.md`
+- `docs/product/avatar-profile-contract.md`
+- `docs/product/avatar-profile-readiness.md`
 - `docs/product/mvp-portfolio.md`
 - `docs/product/wave-1-status.md`
 
@@ -49,7 +51,12 @@ Use `automation/n8n/` for n8n workflow exports and n8n-specific documentation.
 
 Use `avatars/` for character canon, visual identity, content systems, datasets, and production assets.
 
-This document does not standardize avatar internals. Avatar structure is intentionally left for a separate decision.
+Avatar internals are not fully migrated yet, but new operational profile work should follow:
+
+- `docs/product/avatar-profile-contract.md`
+- `docs/product/avatar-profile-readiness.md`
+
+Existing deep canon can remain in specialized Markdown files. The profile contract is the common operational entry point.
 
 ## Research
 
