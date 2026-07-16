@@ -1,0 +1,205 @@
+{
+  "updatedAt": "2026-07-16T02:07:04.645Z",
+  "createdAt": "2026-07-15T00:00:00.000Z",
+  "id": "AvAIPubExport01",
+  "name": "Avatares AI - Publications - Export Pack",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/export-pack",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "copy-pack-001",
+      "name": "POST /publications/jobs/export-pack",
+      "webhookId": "generate-copy-pack-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst requestedPlatform = String(body.platform || 'instagram').trim();\nconst finalCaption = body.finalCaption || body.final_caption || null;\nconst hashtags = Array.isArray(body.hashtags) ? body.hashtags : null;\nconst publishingNotes = body.publishingNotes || body.publishing_notes || null;\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst overrides = { finalCaption, hashtags, platform: requestedPlatform, publishingNotes };\nconst query = `\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), selected_asset AS (\n  SELECT car.*\n  FROM canonical_asset_registry car\n  JOIN job pj ON car.asset_id::text = pj.metadata->>'selectedAssetId'\n  LIMIT 1\n)\nSELECT\n  true AS ok,\n  pj.publication_job_id AS \"publicationJobId\",\n  pj.avatar,\n  pj.scene,\n  pj.format,\n  pj.objective,\n  pj.business_profile AS \"businessProfile\",\n  pj.asset_type AS \"assetType\",\n  pj.status,\n  pj.brief,\n  pj.prompt_pack AS \"promptPack\",\n  pj.publishing_pack AS \"publishingPack\",\n  pj.metadata,\n  pj.created_at AS \"createdAt\",\n  pj.updated_at AS \"updatedAt\",\n  ac.display_name AS \"avatarDisplayName\",\n  ac.avatar_short AS \"avatarShort\",\n  sc.display_name AS \"sceneDisplayName\",\n  COALESCE(sa.asset_id, pj.metadata->>'selectedAssetId') AS \"selectedAssetId\",\n  sa.bucket AS \"selectedAssetBucket\",\n  sa.object_path AS \"selectedAssetObjectPath\",\n  sa.status AS \"selectedAssetStatus\",\n  ${sql(JSON.stringify(overrides))}::jsonb AS \"exportOverrides\"\nFROM job pj\nLEFT JOIN selected_asset sa ON true\nLEFT JOIN avatar_catalog ac ON ac.avatar = pj.avatar\nLEFT JOIN scene_catalog sc ON sc.avatar = pj.avatar AND sc.scene = pj.scene\nLIMIT 1;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "copy-pack-002",
+      "name": "Build Load Export Context Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "copy-pack-003",
+      "name": "Load Export Context",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) { return sql(JSON.stringify(value ?? {})) + '::jsonb'; }\nfunction parseJson(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nfunction toArray(value, fallback = []) {\n  if (Array.isArray(value)) return value.map(String).filter(Boolean);\n  if (typeof value === 'string' && value.trim()) return value.split(/[\\n,;]/).map((x) => x.trim()).filter(Boolean);\n  return fallback;\n}\nfunction normalizeHashtags(value) {\n  return toArray(value, []).map((tag) => String(tag).startsWith('#') ? String(tag) : '#' + String(tag).replace(/^#+/, '')).slice(0, 20);\n}\nconst row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f' || !row.publicationJobId) {\n  const error = row.error || 'Publication job not found';\n  return [{ json: { query: `SELECT false AS ok, ${sql(error)} AS error;` } }];\n}\nconst publishingPack = parseJson(row.publishingPack, null);\nif (!publishingPack) {\n  return [{ json: { query: \"SELECT false AS ok, 'Copy pack is required before exporting publishing pack' AS error;\" } }];\n}\nif (!row.selectedAssetId) {\n  return [{ json: { query: \"SELECT false AS ok, 'Selected asset is required before exporting publishing pack' AS error;\" } }];\n}\nconst overrides = parseJson(row.exportOverrides, {});\nconst platform = String(overrides.platform || publishingPack.platform || 'instagram').trim();\nconst finalCaption = String(overrides.finalCaption || publishingPack.primaryCaption || publishingPack.caption || '').trim();\nconst hashtags = normalizeHashtags(overrides.hashtags || publishingPack.hashtags || []);\nif (!finalCaption) {\n  return [{ json: { query: \"SELECT false AS ok, 'Final caption is required before exporting publishing pack' AS error;\" } }];\n}\nconst imageUrl = row.selectedAssetBucket && row.selectedAssetObjectPath\n  ? '/minio/' + row.selectedAssetBucket + '/' + row.selectedAssetObjectPath\n  : null;\nconst publishingExport = {\n  publicationJobId: row.publicationJobId,\n  platform,\n  status: 'ready-to-publish',\n  imageUrl,\n  assetId: row.selectedAssetId || null,\n  bucket: row.selectedAssetBucket || null,\n  objectPath: row.selectedAssetObjectPath || null,\n  finalCaption,\n  hashtags,\n  storyText: toArray(publishingPack.storyText || publishingPack.story_text, []),\n  ctaOptions: toArray(publishingPack.ctaOptions || publishingPack.cta_options, []),\n  publishingNotes: String(overrides.publishingNotes || publishingPack.publishingNotes || publishingPack.publishing_notes || 'Manual publishing pack. Review image and copy before public posting.').trim(),\n  metadata: {\n    avatar: row.avatar,\n    avatarDisplayName: row.avatarDisplayName,\n    scene: row.scene,\n    sceneDisplayName: row.sceneDisplayName,\n    format: row.format,\n    businessProfile: row.businessProfile,\n    assetType: row.assetType,\n    sourceStatus: row.status\n  },\n  manualInstructions: [\n    'Open the image URL and verify the selected asset.',\n    'Copy the final caption and hashtags.',\n    'Publish manually on the selected platform after final human review.',\n    'After publishing, use US-009 to record the published URL.'\n  ],\n  exportedAt: new Date().toISOString()\n};\nconst query = `\nUPDATE publication_jobs\nSET\n  status = 'ready-to-publish',\n  error_message = NULL,\n  updated_at = now(),\n  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(\n    'publishingExport', ${sqlJson(publishingExport)},\n    'publishingExportedAt', now(),\n    'publishingPlatform', ${sql(platform)}\n  )\nWHERE publication_job_id = ${sql(row.publicationJobId)}::uuid\nRETURNING\n  true AS ok,\n  publication_job_id AS \"publicationJobId\",\n  avatar,\n  scene,\n  format,\n  objective,\n  business_profile AS \"businessProfile\",\n  asset_type AS \"assetType\",\n  status,\n  brief,\n  prompt_pack AS \"promptPack\",\n  publishing_pack AS \"publishingPack\",\n  metadata->'publishingExport' AS \"publishingExport\",\n  created_at AS \"createdAt\",\n  updated_at AS \"updatedAt\";\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "copy-pack-004",
+      "name": "Build Save Export Pack Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "copy-pack-005",
+      "name": "Save Export Pack",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, exported: false, error: row.error || 'Publishing pack was not exported.' } }];\n}\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nconst brief = parse(row.brief, null);\nconst promptPack = parse(row.promptPack, null);\nconst publishingPack = parse(row.publishingPack, null);\nconst publishingExport = parse(row.publishingExport, null);\nreturn [{\n  json: {\n    ok: true,\n    exported: true,\n    publishingExport,\n    exportPack: publishingExport,\n    job: {\n      publicationJobId: row.publicationJobId,\n      avatar: row.avatar,\n      scene: row.scene,\n      format: row.format,\n      objective: row.objective,\n      businessProfile: row.businessProfile,\n      assetType: row.assetType,\n      status: row.status,\n      brief,\n      promptPack,\n      publishingPack,\n      createdAt: row.createdAt,\n      updatedAt: row.updatedAt\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "copy-pack-006",
+      "name": "Return Export Pack"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "copy-pack-007",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/export-pack": {
+      "main": [
+        [
+          {
+            "node": "Build Load Export Context Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Load Export Context Query": {
+      "main": [
+        [
+          {
+            "node": "Load Export Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Export Context": {
+      "main": [
+        [
+          {
+            "node": "Build Save Export Pack Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Save Export Pack Query": {
+      "main": [
+        [
+          {
+            "node": "Save Export Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Export Pack": {
+      "main": [
+        [
+          {
+            "node": "Return Export Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Export Pack": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "publication-export-pack-v1",
+  "activeVersionId": "publication-export-pack-v1",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

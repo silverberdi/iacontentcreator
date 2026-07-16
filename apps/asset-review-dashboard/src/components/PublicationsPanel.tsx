@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   createPublicationJob,
+  exportPublicationPack,
   generatePublicationBrief,
   generatePublicationCopyPack,
   generatePublicationImages,
@@ -14,6 +15,7 @@ import type { CatalogOptionsBundle } from "../types/catalogs";
 import type {
   PublicationBrief,
   PublicationCopyPack,
+  PublicationPublishingExport,
   PublicationFormat,
   PublicationGenerationSubmission,
   IngestComfyOutputResult,
@@ -24,6 +26,7 @@ import type {
 } from "../types/publications";
 import { findAvatarShort, optionLabel, scenesForAvatar } from "../utils/catalogNormalize";
 import CatalogSelect from "./CatalogSelect";
+import CopyButton from "./CopyButton";
 import LoadingSpinner from "./LoadingSpinner";
 import SectionPanel from "./SectionPanel";
 
@@ -69,6 +72,9 @@ export default function PublicationsPanel({
   const [copyPackText, setCopyPackText] = useState("");
   const [copyPackBusy, setCopyPackBusy] = useState(false);
   const [copyPackMessage, setCopyPackMessage] = useState<string | null>(null);
+  const [publishingExport, setPublishingExport] = useState<PublicationPublishingExport | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [loadJobId, setLoadJobId] = useState("");
   const [recentJobs, setRecentJobs] = useState<PublicationJobLoadItem[]>([]);
   const [loadBusy, setLoadBusy] = useState(false);
@@ -114,6 +120,8 @@ export default function PublicationsPanel({
     setPromptPackMessage(null);
     setCopyPackText(job.publishingPack ? JSON.stringify(job.publishingPack, null, 2) : "");
     setCopyPackMessage(null);
+    setPublishingExport(null);
+    setExportMessage(null);
     setGeneration(item.generation || null);
     setGenerationMessage("Publication job loaded.");
     setComfyOutputUrl("");
@@ -184,6 +192,8 @@ export default function PublicationsPanel({
     setPromptPackMessage(null);
     setCopyPackText("");
     setCopyPackMessage(null);
+    setPublishingExport(null);
+    setExportMessage(null);
     setGeneration(null);
     setGenerationMessage(null);
     setComfyOutputUrl("");
@@ -268,6 +278,8 @@ export default function PublicationsPanel({
       setSelectedAsset(null);
       setCopyPackText("");
       setCopyPackMessage(null);
+      setPublishingExport(null);
+      setExportMessage(null);
       setPromptPackMessage(options.saveEdited ? "Prompt pack saved." : "Prompt pack generated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate publication prompt pack");
@@ -294,6 +306,8 @@ export default function PublicationsPanel({
       setSelectedAsset(null);
       setCopyPackText("");
       setCopyPackMessage(null);
+      setPublishingExport(null);
+      setExportMessage(null);
       setGenerationMessage("Generation job submitted.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit image generation");
@@ -407,6 +421,8 @@ export default function PublicationsPanel({
     setCopyPackBusy(true);
     setError(null);
     setCopyPackMessage(null);
+    setPublishingExport(null);
+    setExportMessage(null);
 
     try {
       let editedCopyPack: PublicationCopyPack | undefined;
@@ -421,10 +437,37 @@ export default function PublicationsPanel({
       setCreatedJob(result.job);
       setCopyPackText(JSON.stringify(result.copyPack, null, 2));
       setCopyPackMessage(options.saveEdited ? "Copy pack saved." : "Copy pack generated.");
+      setPublishingExport(null);
+      setExportMessage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate publication copy pack");
     } finally {
       setCopyPackBusy(false);
+    }
+  }
+
+  async function handleExportPublishingPack() {
+    if (!createdJob?.publicationJobId) return;
+    setExportBusy(true);
+    setError(null);
+    setExportMessage(null);
+
+    try {
+      const copyPack = copyPackText ? (JSON.parse(copyPackText) as PublicationCopyPack) : undefined;
+      const result = await exportPublicationPack({
+        publicationJobId: createdJob.publicationJobId,
+        ...(copyPack?.primaryCaption ? { finalCaption: copyPack.primaryCaption } : {}),
+        ...(copyPack?.hashtags ? { hashtags: copyPack.hashtags } : {}),
+        ...(copyPack?.platform ? { platform: copyPack.platform } : {}),
+        ...(copyPack?.publishingNotes ? { publishingNotes: copyPack.publishingNotes } : {}),
+      });
+      setCreatedJob(result.job);
+      setPublishingExport(result.publishingExport);
+      setExportMessage("Publishing pack exported.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export publishing pack");
+    } finally {
+      setExportBusy(false);
     }
   }
 
@@ -938,6 +981,134 @@ export default function PublicationsPanel({
           ) : (
             <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
               No copy pack generated yet.
+            </div>
+          )}
+        </SectionPanel>
+      )}
+
+      {createdJob && copyPackText && (
+        <SectionPanel
+          title="Publishing Pack"
+          description="Export the approved image and copy for manual publishing."
+          actions={
+            <button
+              type="button"
+              onClick={() => void handleExportPublishingPack()}
+              disabled={exportBusy}
+              className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {exportBusy ? "Exporting..." : publishingExport ? "Regenerate export" : "Export pack"}
+            </button>
+          }
+        >
+          {exportMessage && (
+            <p className="mb-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+              {exportMessage}
+            </p>
+          )}
+
+          {publishingExport ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+                <div className="rounded-md border border-border bg-surface p-3">
+                  {publishingExport.imageUrl ? (
+                    <a href={publishingExport.imageUrl} target="_blank" rel="noreferrer">
+                      <img
+                        src={publishingExport.imageUrl}
+                        alt="Selected publication asset"
+                        className="aspect-[4/5] w-full rounded-md object-cover"
+                      />
+                    </a>
+                  ) : (
+                    <div className="flex aspect-[4/5] items-center justify-center rounded-md border border-dashed border-border text-center text-xs text-gray-500">
+                      No image URL available
+                    </div>
+                  )}
+                  {publishingExport.imageUrl && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={publishingExport.imageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border border-border bg-surface-overlay px-2.5 py-1 text-xs text-gray-300 hover:border-gray-500 hover:text-white"
+                      >
+                        Open image
+                      </a>
+                      <CopyButton value={publishingExport.imageUrl} label="Copy image URL" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-md border border-border bg-surface p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-medium text-gray-200">Final caption</h4>
+                      <CopyButton value={publishingExport.finalCaption} label="Copy caption" />
+                    </div>
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-gray-300">
+                      {publishingExport.finalCaption}
+                    </p>
+                  </div>
+
+                  <div className="rounded-md border border-border bg-surface p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-medium text-gray-200">Hashtags</h4>
+                      <CopyButton
+                        value={(publishingExport.hashtags || []).join(" ")}
+                        label="Copy hashtags"
+                      />
+                    </div>
+                    <p className="mt-3 break-words text-sm text-gray-300">
+                      {(publishingExport.hashtags || []).join(" ")}
+                    </p>
+                  </div>
+
+                  {publishingExport.publishingNotes && (
+                    <div className="rounded-md border border-border bg-surface p-4">
+                      <h4 className="text-sm font-medium text-gray-200">Publishing notes</h4>
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-gray-300">
+                        {publishingExport.publishingNotes}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <CopyButton
+                      value={`${publishingExport.finalCaption}\n\n${(publishingExport.hashtags || []).join(" ")}`}
+                      label="Copy post text"
+                    />
+                    <CopyButton
+                      value={JSON.stringify(publishingExport, null, 2)}
+                      label="Copy export JSON"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <dl className="grid gap-3 rounded-md border border-border bg-surface p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <dt className="text-xs text-gray-500">status</dt>
+                  <dd className="mt-0.5 text-gray-200">{publishingExport.status}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">platform</dt>
+                  <dd className="mt-0.5 text-gray-200">{publishingExport.platform}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">assetId</dt>
+                  <dd className="mt-0.5 break-all font-mono text-gray-200">
+                    {publishingExport.assetId || "n/a"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">exportedAt</dt>
+                  <dd className="mt-0.5 text-gray-200">{publishingExport.exportedAt || "n/a"}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
+              No publishing pack exported yet.
             </div>
           )}
         </SectionPanel>

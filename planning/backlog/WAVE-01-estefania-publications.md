@@ -49,7 +49,7 @@ Wave 1 is done when:
 
 ## US-001 — Create Publication Job
 
-Status: Backlog  
+Status: Done  
 Priority: P0  
 Epic: EPIC-01 Publications  
 Wave: Wave 1  
@@ -506,7 +506,7 @@ As an operator, I want generated images to appear automatically in Asset Review,
 
 ## US-008 — Export Publishing Pack
 
-Status: Backlog  
+Status: Done  
 Priority: P0  
 Epic: EPIC-01 Publications  
 Wave: Wave 1  
@@ -517,20 +517,20 @@ As an operator, I want to export a publishing pack, so that I can manually publi
 
 ### Acceptance Criteria
 
-- [ ] Export includes approved image URL or downloadable asset.
-- [ ] Export includes final caption.
-- [ ] Export includes hashtags.
-- [ ] Export includes platform notes and metadata.
-- [ ] Job status changes to `ready-to-publish`.
-- [ ] Export is stored and can be reopened later.
+- [x] Export includes approved image URL or downloadable asset.
+- [x] Export includes final caption.
+- [x] Export includes hashtags.
+- [x] Export includes platform notes and metadata.
+- [x] Job status changes to `ready-to-publish`.
+- [x] Export is stored and can be reopened later.
 
 ### Technical Tasks
 
-- [ ] Define `publishing_pack` JSON structure.
-- [ ] Create endpoint `POST /publications/jobs/export-pack`.
-- [ ] Store export result in Postgres.
-- [ ] Add export panel in console.
-- [ ] Add copy-to-clipboard actions.
+- [x] Define `publishing_pack` JSON structure.
+- [x] Create endpoint `POST /publications/jobs/export-pack`.
+- [x] Store export result in Postgres.
+- [x] Add export panel in console.
+- [x] Add copy-to-clipboard actions.
 
 ### Dependencies
 
@@ -540,6 +540,7 @@ As an operator, I want to export a publishing pack, so that I can manually publi
 ### Notes
 
 - Wave 1 is manual publish/export, not auto-posting.
+- Implemented as publication-job export metadata stored in `publication_jobs.metadata.publishingExport`.
 
 ---
 
@@ -809,7 +810,7 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 - [x] US-005A — Reopen Existing Publication Jobs
 - [x] US-006 — Select Publication Asset
 - [x] US-007 — Generate Caption / Copy Pack
-- [ ] US-008 — Export Publishing Pack
+- [x] US-008 — Export Publishing Pack
 - [ ] US-009 — Mark Publication As Published
 - [ ] US-011 — Estefanía Business Profile Configuration
 - [ ] US-014 — Validate Existing Asset Review Against Publication Flow

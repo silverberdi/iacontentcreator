@@ -139,6 +139,25 @@ export type PublicationCopyPack = {
   [key: string]: unknown;
 };
 
+export type PublicationPublishingExport = {
+  publicationJobId: string;
+  platform: string;
+  status: string;
+  imageUrl?: string | null;
+  assetId?: string | null;
+  bucket?: string | null;
+  objectPath?: string | null;
+  finalCaption: string;
+  hashtags: string[];
+  storyText?: string[];
+  ctaOptions?: string[];
+  publishingNotes?: string;
+  metadata?: Record<string, unknown>;
+  manualInstructions?: string[];
+  exportedAt?: string;
+  [key: string]: unknown;
+};
+
 export type GeneratePublicationCopyPackPayload = {
   publicationJobId: string;
   copyPack?: PublicationCopyPack;
@@ -149,6 +168,25 @@ export type GeneratePublicationCopyPackResponse = {
   job?: PublicationJob;
   copyPack?: PublicationCopyPack;
   publishingPack?: PublicationCopyPack;
+  message?: string;
+  error?: string;
+  reason?: string;
+};
+
+export type ExportPublicationPackPayload = {
+  publicationJobId: string;
+  finalCaption?: string;
+  hashtags?: string[];
+  platform?: string;
+  publishingNotes?: string;
+};
+
+export type ExportPublicationPackResponse = {
+  ok?: boolean;
+  exported?: boolean;
+  job?: PublicationJob;
+  publishingExport?: PublicationPublishingExport;
+  exportPack?: PublicationPublishingExport;
   message?: string;
   error?: string;
   reason?: string;

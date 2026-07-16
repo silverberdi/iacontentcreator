@@ -2,6 +2,8 @@ import { postN8nJson } from "./n8nClient";
 import type {
   CreatePublicationJobPayload,
   CreatePublicationJobResponse,
+  ExportPublicationPackPayload,
+  ExportPublicationPackResponse,
   GeneratePublicationBriefPayload,
   GeneratePublicationBriefResponse,
   GeneratePublicationImagesPayload,
@@ -21,6 +23,7 @@ import type {
   SelectPublicationAssetResult,
   PublicationBrief,
   PublicationCopyPack,
+  PublicationPublishingExport,
   PublicationGenerationSubmission,
   PublicationJob,
   PublicationPromptPack,
@@ -101,6 +104,21 @@ export async function generatePublicationCopyPack(
     throw new Error(data.error || data.reason || data.message || "Publication copy pack was not generated.");
   }
   return { job, copyPack };
+}
+
+export async function exportPublicationPack(
+  payload: ExportPublicationPackPayload,
+): Promise<{ job: PublicationJob; publishingExport: PublicationPublishingExport }> {
+  const data = await postN8nJson<ExportPublicationPackResponse>(
+    "/publications/jobs/export-pack",
+    payload,
+  );
+  const job = parseJob(data);
+  const publishingExport = data.publishingExport ?? data.exportPack;
+  if (!data.ok || !data.exported || !publishingExport) {
+    throw new Error(data.error || data.reason || data.message || "Publishing pack was not exported.");
+  }
+  return { job, publishingExport };
 }
 
 export async function ingestComfyOutput(
