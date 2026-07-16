@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SNAPSHOT_ROOT="$BASE_DIR/snapshoots"
+SNAPSHOT_ROOT="$BASE_DIR/snapshots"
 COMPOSE_FILE="$HOME/local-ai-stack/compose.yaml"
 
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"

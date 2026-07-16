@@ -67,7 +67,7 @@ function selectAssetEndpointError(status: number, data: unknown, rawText: string
     if (body.code === 404 || body.message?.includes("not registered")) {
       return (
         'Webhook /assets/select is not registered in n8n. Import "Avatares AI - API - Select Asset" ' +
-        "from infra/snapshoots/20260526-175854/n8n/, assign Postgres credentials, and activate the workflow."
+        "from automation/n8n/workflows/, assign Postgres credentials, and activate the workflow."
       );
     }
   }

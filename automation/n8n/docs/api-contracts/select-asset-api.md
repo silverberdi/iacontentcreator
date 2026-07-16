@@ -123,8 +123,7 @@ curl -i -X POST http://192.168.0.194:5678/webhook/assets/reject \
 
 1. En n8n → **Workflows** → **Import from file**
 2. Importa:
-   - `automation/n8n/workflows/Avatares_AI_API_Select_Asset_v1.json`
-   - (copia equivalente) `infra/snapshoots/20260526-175854/n8n/Avatares AI - API - Select Asset.json`
+   - `automation/n8n/workflows/Avatares_AI_API_Select_Asset.json`
 3. Abre el workflow → nodo **Select Asset** (Postgres) → asigna la **misma credencial Postgres** que `API - Reject Asset` / `API - Promote Canonical Asset`.
 4. **Activa** el workflow (toggle verde arriba a la derecha). Sin activar, n8n responde `404 not registered`.
 5. Repite el `curl` de arriba; debe pasar de `404` a `200`.

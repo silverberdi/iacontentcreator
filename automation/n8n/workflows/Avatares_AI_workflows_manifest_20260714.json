@@ -1,8 +1,8 @@
 {
   "exportedAt": "2026-07-14",
   "source": "ssh://silverman@192.168.0.194 docker exec local-ai-stack-n8n-1 n8n export:workflow --all",
-  "totalExported": 56,
-  "avataresWorkflows": 51,
+  "totalExported": 55,
+  "avataresWorkflows": 50,
   "workflows": [
     {
       "name": "Avatares AI - Admin - Auto Ingest Health",
@@ -672,14 +672,6 @@
       "active": true,
       "isArchived": false,
       "filename": "Avatares_AI_Register_Raw_Asset_Batch_Callable.json",
-      "webhooks": []
-    },
-    {
-      "name": "Avatares AI - Register Raw Asset Batch - Callable",
-      "id": "KVev4qMZKHUnXn8j",
-      "active": false,
-      "isArchived": true,
-      "filename": "Avatares_AI_Register_Raw_Asset_Batch_Callable_KVev4qMZKHUnXn8j.json",
       "webhooks": []
     }
   ]

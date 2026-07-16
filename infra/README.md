@@ -1,9 +1,9 @@
-# Snapshot Scripts
+# Infra Snapshot Scripts
 
 ## Ejecutar
 
 ```bash
-cd compartido_mac/snapshoots/scripts
+cd infra/scripts
 
 chmod +x snapshot-infra.sh
 ./snapshot-infra.sh
@@ -11,8 +11,14 @@ chmod +x snapshot-infra.sh
 
 ## Resultado
 
-Los snapshots se generan en:
+Los snapshots se generan localmente en una carpeta ignorada por git:
 
 ```text
-compartido_mac/snapshoots/snapshoots/
+infra/snapshots/YYYYMMDD-HHMMSS/
+```
+
+Estos snapshots son evidencia operativa temporal. Los workflows n8n canónicos del proyecto viven en:
+
+```text
+automation/n8n/workflows/
 ```

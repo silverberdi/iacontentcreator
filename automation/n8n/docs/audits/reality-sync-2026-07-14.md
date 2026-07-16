@@ -7,7 +7,7 @@ Sincronizar la realidad operativa entre:
 - la consola web en `apps/asset-review-dashboard`;
 - los workflows n8n activos en `http://192.168.0.194:5678`;
 - los exports versionados en `automation/n8n/workflows`;
-- los snapshots históricos en `infra/snapshoots`.
+- los snapshots históricos que existían en `infra/snapshoots` antes de la depuración.
 
 ## Resumen ejecutivo
 
@@ -35,11 +35,13 @@ Conclusión: n8n está vivo. La exportación por API administrativa sigue requir
 
 ## Inventario versionado
 
-Export bruto descargado:
+Export bruto descargado durante la sincronización inicial:
 
 ```text
 automation/n8n/workflows/avatares-ai-workflows-20260714.raw.json
 ```
+
+Nota: este archivo fue removido después de generar los workflows individuales y el manifiesto. Los archivos canónicos versionados viven en `automation/n8n/workflows/`.
 
 Manifiesto generado:
 
@@ -57,7 +59,7 @@ Workflows Avatares AI archivados: 1
 Workflows Avatares AI con webhooks: 45
 ```
 
-Snapshots históricos disponibles:
+Snapshots históricos disponibles en ese momento:
 
 ```text
 infra/snapshoots/20260526-175854/n8n/Avatares AI - API - Select Asset.json
@@ -67,6 +69,8 @@ infra/snapshoots/20260526-175854/n8n/Avatares AI - Promote Canonical Asset - Cal
 infra/snapshoots/20260526-175854/n8n/Avatares AI - Register Raw Asset Batch - Callable.json
 infra/snapshoots/20260526-175854/n8n/Avatares AI - Select Asset - Callable.json
 ```
+
+Nota: `infra/snapshoots` fue removido del repo durante la depuración posterior porque duplicaba exports ya normalizados y contenía evidencia operativa histórica, no fuente viva del proyecto.
 
 La documentación esperaba más workflows en `automation/n8n/workflows`. Después de esta sincronización, los workflows activos del servidor ya fueron copiados al repo como archivos individuales.
 

@@ -94,7 +94,11 @@ Uno está archivado:
 Avatares_AI_Register_Raw_Asset_Batch_Callable_KVev4qMZKHUnXn8j.json
 ```
 
-Acción recomendada: conservar el archivado solo si se necesita historia; si no, mover a `automation/n8n/workflows/archive/` o documentar como legacy.
+Acción tomada: se eliminó del repo durante la depuración posterior. El workflow canónico versionado es:
+
+```text
+automation/n8n/workflows/Avatares_AI_Register_Raw_Asset_Batch_Callable.json
+```
 
 ## Clasificación recomendada
 
