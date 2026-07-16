@@ -1,7 +1,7 @@
-import { isN8nApiKeyConfigured } from "../api/n8nClient";
+import { isN8nApiKeyConfigured, isUsingServerWebhookProxy } from "../api/n8nClient";
 
 export default function ApiKeyWarning() {
-  if (isN8nApiKeyConfigured()) {
+  if (isN8nApiKeyConfigured() || isUsingServerWebhookProxy()) {
     return null;
   }
 

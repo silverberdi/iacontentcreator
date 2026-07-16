@@ -1,0 +1,90 @@
+{
+  "updatedAt": "2026-06-01T01:53:29.470Z",
+  "createdAt": "2026-06-01T01:31:14.837Z",
+  "id": "HudUN0EN1puqDjR1",
+  "name": "Avatares AI - Admin - Backup Health",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/backups/health",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        -336
+      ],
+      "id": "9c513a59-512d-4380-a406-c8b48a9e81f1",
+      "name": "POST /admin/backups/health",
+      "webhookId": "c7f7b256-7b89-475f-80a9-05f19adcc8f5"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const data = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'http://backup-runner:8080/health',\n    json: true,\n  });\n\n  return {\n    json: {\n      ok: true,\n      ...data,\n    },\n  };\n} catch (error) {\n  return {\n    json: {\n      ok: false,\n      message: error.message,\n      error: error.description || error.cause || null,\n    },\n  };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -336
+      ],
+      "id": "64652c11-293a-4e84-a208-3d8477db38fb",
+      "name": "Call Backup Runner - Health"
+    }
+  ],
+  "connections": {
+    "POST /admin/backups/health": {
+      "main": [
+        [
+          {
+            "node": "Call Backup Runner - Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "5d3e4b77-4db8-4750-96bb-5904c85ae407",
+  "activeVersionId": "5d3e4b77-4db8-4750-96bb-5904c85ae407",
+  "versionCounter": 71,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-01T01:31:14.837Z",
+      "createdAt": "2026-06-01T01:31:14.837Z",
+      "role": "workflow:owner",
+      "workflowId": "HudUN0EN1puqDjR1",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "v3",
+    "description": ""
+  }
+}

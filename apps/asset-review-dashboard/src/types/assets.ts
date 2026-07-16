@@ -69,6 +69,52 @@ export type PromoteCanonicalResponse = {
   reason?: string;
 };
 
+export type SelectAssetRequest = {
+  assetId: string;
+  reviewNotes: string;
+};
+
+export type SelectAssetPayload = {
+  assetId: string;
+  avatar?: string;
+  scene?: string;
+  assetType?: string;
+  url?: string;
+  bucket?: string;
+  objectPath?: string;
+  mimeType?: string;
+  status?: string;
+  isCanonical?: boolean;
+  sha256?: string;
+  canonicalGroup?: string;
+  reviewNotes?: string | null;
+  createdAt?: string;
+};
+
+export type SelectAssetResponse = {
+  selected: boolean;
+  assetId: string | null;
+  ok?: boolean;
+  statusCode?: number;
+  skipQuery?: boolean;
+  error?: string;
+  reason?: string;
+  asset?: SelectAssetPayload;
+  avatar?: string;
+  scene?: string;
+  assetType?: string;
+  url?: string;
+  bucket?: string;
+  objectPath?: string;
+  mimeType?: string;
+  status?: string;
+  isCanonical?: boolean;
+  sha256?: string;
+  canonicalGroup?: string;
+  reviewNotes?: string | null;
+  createdAt?: string;
+};
+
 export type RejectAssetResponse = {
   rejected: boolean;
   assetId: string;
@@ -103,6 +149,9 @@ export type ApiFilters = Pick<
   "avatar" | "scene" | "assetType" | "limit"
 >;
 
+export type ReviewActionType = "promote" | "select" | "reject";
+
 export type ConfirmAction =
   | { type: "promote"; asset: AssetCandidate }
+  | { type: "select"; asset: AssetCandidate }
   | { type: "reject"; asset: AssetCandidate };

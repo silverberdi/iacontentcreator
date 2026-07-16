@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T21:39:20.377Z",
+  "createdAt": "2026-06-09T21:39:20.377Z",
+  "id": "uXqy6GGlStzAdPpR",
+  "name": "Avatares AI - Generation - Queue Image Job",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generation/jobs/queue",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "26eef84f-e5ac-4b61-9699-2b5a8fdff327",
+      "name": "POST /generation/jobs/queue",
+      "webhookId": "b6263e37-cd62-448a-81dc-cd1286d815e8"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\nfunction slug(value, fallback = '') { return String(value || fallback || '').trim(); }\nconst crypto=require('crypto'); const body=$json.body||{}; const jobId=crypto.randomUUID(); const avatar=slug(body.avatar); const scene=slug(body.scene); const assetType=slug(body.assetType||body.asset_type,'raw-image'); const platform=slug(body.platform,'instagram'); const promptPack=body.promptPack||body.prompt_pack||{}; const re=/^[a-z0-9][a-z0-9-]*$/i;\nif(!re.test(avatar)||!re.test(scene)||!re.test(assetType)) return {json:{ok:false,skipQuery:true,error:'avatar, scene and assetType are required slug-like values',request:{avatar,scene,assetType}}};\nconst query=`INSERT INTO generation_jobs (job_id,avatar,scene,asset_type,platform,status,prompt_pack,request_payload) VALUES (${sql(jobId)}::uuid,${sql(avatar)},${sql(scene)},${sql(assetType)},${sql(platform)},'pending',${sqlJson(promptPack)},${sqlJson(body)}) RETURNING *;`;\nreturn {json:{ok:true,skipQuery:false,query}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "91d41667-fefb-4776-ba9c-6d53b282188d",
+      "name": "Build Queue Job Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "09adc28f-e6ab-4fd4-a4bd-73795a3c3625",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "6d7e0aa6-b528-4c41-9a15-a97183c91cb0",
+      "name": "Queue Image Job",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row=$input.first()?.json||{}; return [{json:{ok:true,queued:true,job:{jobId:row.job_id,avatar:row.avatar,scene:row.scene,assetType:row.asset_type,platform:row.platform,status:row.status,createdAt:row.created_at}}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "d53d964c-61d3-4e44-b5e3-8eed710f18c5",
+      "name": "Return Queued Job"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "f54fdaba-746b-424c-b28f-5764d02e93e5",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /generation/jobs/queue": {
+      "main": [
+        [
+          {
+            "node": "Build Queue Job Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Queue Job Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Queue Image Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Image Job": {
+      "main": [
+        [
+          {
+            "node": "Return Queued Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "29efab08-9eb2-4ec9-bf9a-35f75b3177a3",
+  "activeVersionId": "29efab08-9eb2-4ec9-bf9a-35f75b3177a3",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:39:20.377Z",
+      "createdAt": "2026-06-09T21:39:20.377Z",
+      "role": "workflow:owner",
+      "workflowId": "uXqy6GGlStzAdPpR",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 29efab08",
+    "description": ""
+  }
+}

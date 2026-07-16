@@ -60,10 +60,11 @@ function itemEnabled(item: { isEnabled?: boolean }): boolean {
 }
 
 type CatalogsPanelProps = {
+  technicalMode: boolean;
   onCatalogsChanged?: () => void;
 };
 
-export default function CatalogsPanel({ onCatalogsChanged }: CatalogsPanelProps) {
+export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: CatalogsPanelProps) {
   const [activeKind, setActiveKind] = useState<CatalogKind>("avatars");
   const [list, setList] = useState<CatalogListBundle>({
     avatars: [],
@@ -848,9 +849,11 @@ export default function CatalogsPanel({ onCatalogsChanged }: CatalogsPanelProps)
             <button type="button" onClick={() => void loadList()} disabled={busy} className={actionBtn}>
               {loading ? "Refreshing…" : "Refresh all"}
             </button>
-            <button type="button" onClick={() => void handleInit()} disabled={busy} className={actionBtn}>
-              {initPending ? "Initializing…" : "Initialize catalogs"}
-            </button>
+            {technicalMode && (
+              <button type="button" onClick={() => void handleInit()} disabled={busy} className={actionBtn}>
+                {initPending ? "Initializing…" : "Initialize catalogs"}
+              </button>
+            )}
           </>
         }
       >

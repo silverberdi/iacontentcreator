@@ -1,0 +1,146 @@
+{
+  "updatedAt": "2026-06-03T15:36:41.930Z",
+  "createdAt": "2026-06-03T15:36:41.930Z",
+  "id": "ggzAAMykt7Pl6X2v",
+  "name": "Avatares AI - Admin - Upsert Ingest Profile Catalog Validated",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/ingest-profiles/upsert-validated",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "3bc82301-4db5-40c2-b4be-7cc8c55da6d9",
+      "name": "POST /admin/ingest-profiles/upsert-validated",
+      "webhookId": "68e757e5-7c92-4abf-8220-0cadf31a5d76"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nfunction sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nfunction bool(value) {\n  return value === true || value === 'true' ? 'true' : 'false';\n}\n\nconst body = $json.body || {};\n\nconst profileName = body.profileName || `${body.avatar || 'estefania-montealegre'} / ${body.scene || 'coffee-rain'} / ${body.assetType || 'raw-image'}`;\nconst avatar = body.avatar || 'estefania-montealegre';\nconst avatarShort = body.avatarShort || body.avatar_short || 'estefania';\nconst scene = body.scene || 'coffee-rain';\nconst assetType = body.assetType || body.asset_type || 'raw-image';\nconst workflow = body.workflow || 'flux-krea-dev';\nconst model = body.model || 'flux-krea-dev';\nconst seed = body.seed === undefined || body.seed === null || body.seed === '' ? 'NULL' : Number(body.seed);\nconst version = body.version === undefined || body.version === null || body.version === '' ? 1 : Number(body.version);\nconst autoPromoteLatest = bool(body.autoPromoteLatest ?? body.auto_promote_latest ?? false);\nconst isEnabled = body.isEnabled === false || body.is_enabled === false ? false : true;\nconst setActive = body.setActive === true || body.isActive === true;\n\nconst query = `\nWITH validation AS (\n  SELECT\n    EXISTS (SELECT 1 FROM avatar_catalog WHERE avatar = ${sql(avatar)} AND is_enabled = true) AS avatar_ok,\n    EXISTS (SELECT 1 FROM scene_catalog WHERE scene = ${sql(scene)} AND is_enabled = true) AS scene_ok,\n    EXISTS (SELECT 1 FROM asset_type_catalog WHERE asset_type = ${sql(assetType)} AND is_enabled = true) AS asset_type_ok,\n    EXISTS (SELECT 1 FROM generation_workflow_catalog WHERE workflow = ${sql(workflow)} AND is_enabled = true) AS workflow_ok,\n    EXISTS (SELECT 1 FROM generation_model_catalog WHERE model = ${sql(model)} AND is_enabled = true) AS model_ok\n),\nvalidated AS (\n  SELECT\n    CASE\n      WHEN NOT avatar_ok THEN 'Invalid or disabled avatar'\n      WHEN NOT scene_ok THEN 'Invalid or disabled scene'\n      WHEN NOT asset_type_ok THEN 'Invalid or disabled asset type'\n      WHEN NOT workflow_ok THEN 'Invalid or disabled workflow'\n      WHEN NOT model_ok THEN 'Invalid or disabled model'\n      ELSE NULL\n    END AS error_message\n  FROM validation\n),\nupserted AS (\n  INSERT INTO ingest_profiles (\n    profile_name,\n    avatar,\n    avatar_short,\n    scene,\n    asset_type,\n    workflow,\n    model,\n    seed,\n    version,\n    auto_promote_latest,\n    is_active,\n    is_enabled\n  )\n  SELECT\n    ${sql(profileName)},\n    ${sql(avatar)},\n    ${sql(avatarShort)},\n    ${sql(scene)},\n    ${sql(assetType)},\n    ${sql(workflow)},\n    ${sql(model)},\n    ${seed},\n    ${version},\n    ${autoPromoteLatest},\n    false,\n    ${isEnabled ? 'true' : 'false'}\n  FROM validated\n  WHERE error_message IS NULL\n  ON CONFLICT (avatar, scene, asset_type, workflow, model, version)\n  DO UPDATE SET\n    profile_name = EXCLUDED.profile_name,\n    avatar_short = EXCLUDED.avatar_short,\n    seed = EXCLUDED.seed,\n    auto_promote_latest = EXCLUDED.auto_promote_latest,\n    is_enabled = EXCLUDED.is_enabled,\n    disabled_at = CASE WHEN EXCLUDED.is_enabled THEN NULL ELSE ingest_profiles.disabled_at END,\n    disabled_reason = CASE WHEN EXCLUDED.is_enabled THEN NULL ELSE ingest_profiles.disabled_reason END,\n    updated_at = now()\n  RETURNING *\n),\ndeactivated AS (\n  UPDATE ingest_profiles\n  SET is_active = false, updated_at = now()\n  WHERE ${setActive ? 'true' : 'false'} AND is_active = true\n  RETURNING profile_id\n),\nactivated AS (\n  UPDATE ingest_profiles p\n  SET is_active = true, updated_at = now()\n  FROM upserted u\n  WHERE ${setActive ? 'true' : 'false'}\n    AND p.profile_id = u.profile_id\n    AND p.is_enabled = true\n  RETURNING p.*\n),\nfinal_profile AS (\n  SELECT * FROM activated\n  UNION ALL\n  SELECT * FROM upserted WHERE NOT ${setActive ? 'true' : 'false'}\n),\nerror_result AS (\n  SELECT error_message FROM validated WHERE error_message IS NOT NULL\n)\nSELECT\n  CASE WHEN EXISTS (SELECT 1 FROM error_result) THEN false ELSE true END AS ok,\n  (SELECT error_message FROM error_result LIMIT 1) AS error,\n  (\n    SELECT jsonb_build_object(\n      'profileId', profile_id,\n      'profileName', profile_name,\n      'avatar', avatar,\n      'avatarShort', avatar_short,\n      'scene', scene,\n      'assetType', asset_type,\n      'workflow', workflow,\n      'model', model,\n      'seed', seed,\n      'version', version,\n      'autoPromoteLatest', auto_promote_latest,\n      'isActive', is_active,\n      'isEnabled', is_enabled,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    )\n    FROM final_profile\n    LIMIT 1\n  ) AS profile;\n`;\n\nreturn { json: { query } };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        0
+      ],
+      "id": "9d0eb0b3-0fc8-43f4-b07b-ec4a18aa5d40",
+      "name": "Build Validated Ingest Profile Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        0
+      ],
+      "id": "6a41174c-40eb-45ef-9500-1a355508be8c",
+      "name": "Upsert Validated Ingest Profile",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst profile = typeof row.profile === 'string' ? JSON.parse(row.profile) : row.profile;\n\nreturn [{\n  json: {\n    ok: row.ok,\n    error: row.error || null,\n    profile: profile || null\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        0
+      ],
+      "id": "97dfbcab-bb37-4171-9ee5-c886e8136282",
+      "name": "Return Validated Ingest Profile"
+    }
+  ],
+  "connections": {
+    "POST /admin/ingest-profiles/upsert-validated": {
+      "main": [
+        [
+          {
+            "node": "Build Validated Ingest Profile Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Validated Ingest Profile Query": {
+      "main": [
+        [
+          {
+            "node": "Upsert Validated Ingest Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Validated Ingest Profile": {
+      "main": [
+        [
+          {
+            "node": "Return Validated Ingest Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b15ee7b8-ec4c-43da-a880-8448e6d0b3f3",
+  "activeVersionId": "b15ee7b8-ec4c-43da-a880-8448e6d0b3f3",
+  "versionCounter": 48,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-03T15:36:41.930Z",
+      "createdAt": "2026-06-03T15:36:41.930Z",
+      "role": "workflow:owner",
+      "workflowId": "ggzAAMykt7Pl6X2v",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version b15ee7b8",
+    "description": ""
+  }
+}

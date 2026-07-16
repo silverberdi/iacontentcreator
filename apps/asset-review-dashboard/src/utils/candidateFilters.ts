@@ -4,6 +4,16 @@ export function isCanonicalAsset(asset: AssetCandidate): boolean {
   return asset.isCanonical || asset.status.toLowerCase() === "canonical";
 }
 
+export function isSelectedAsset(asset: AssetCandidate): boolean {
+  return !isCanonicalAsset(asset) && asset.status.toLowerCase() === "selected";
+}
+
+export function canSelectAsset(asset: AssetCandidate): boolean {
+  if (isCanonicalAsset(asset)) return false;
+  const status = asset.status.toLowerCase();
+  return status === "raw" || status === "rejected";
+}
+
 export function filterCandidates(
   candidates: AssetCandidate[],
   filters: Pick<ReviewFilters, "showCanonicalInCandidates" | "statusFilter">,

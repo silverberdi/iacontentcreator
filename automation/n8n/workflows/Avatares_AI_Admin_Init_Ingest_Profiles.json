@@ -1,0 +1,97 @@
+{
+  "updatedAt": "2026-06-02T19:19:16.556Z",
+  "createdAt": "2026-06-02T19:12:19.781Z",
+  "id": "gy5MxnYhGGC2KvwA",
+  "name": "Avatares AI - Admin - Init Ingest Profiles",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/ingest-profiles/init",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d65e2581-6f21-4ef8-a721-52726e51c811",
+      "name": "POST /admin/ingest-profiles/init",
+      "webhookId": "2789c24a-4a9b-4581-a929-16b3e0fb94c9"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE EXTENSION IF NOT EXISTS pgcrypto;\n\nCREATE TABLE IF NOT EXISTS ingest_profiles (\n  profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  profile_name TEXT NOT NULL,\n\n  avatar TEXT NOT NULL,\n  avatar_short TEXT NOT NULL,\n  scene TEXT NOT NULL,\n  asset_type TEXT NOT NULL,\n\n  workflow TEXT NOT NULL,\n  model TEXT NOT NULL,\n  seed BIGINT NULL,\n  version INTEGER NOT NULL DEFAULT 1,\n  auto_promote_latest BOOLEAN NOT NULL DEFAULT false,\n\n  is_active BOOLEAN NOT NULL DEFAULT false,\n  is_enabled BOOLEAN NOT NULL DEFAULT true,\n\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n\n  UNIQUE (avatar, scene, asset_type, workflow, model, version)\n);\n\nCREATE INDEX IF NOT EXISTS idx_ingest_profiles_active\n  ON ingest_profiles (is_active, is_enabled);\n\nCREATE INDEX IF NOT EXISTS idx_ingest_profiles_avatar_scene\n  ON ingest_profiles (avatar, scene, asset_type);\n\nCREATE UNIQUE INDEX IF NOT EXISTS uq_ingest_profiles_single_active\n  ON ingest_profiles ((is_active))\n  WHERE is_active = true;\n\nUPDATE ingest_profiles\nSET is_active = false\nWHERE is_active = true;\n\nINSERT INTO ingest_profiles (\n  profile_name,\n  avatar,\n  avatar_short,\n  scene,\n  asset_type,\n  workflow,\n  model,\n  seed,\n  version,\n  auto_promote_latest,\n  is_active,\n  is_enabled\n)\nVALUES (\n  'Estefanía / Coffee Rain / Raw Image',\n  'estefania-montealegre',\n  'estefania',\n  'coffee-rain',\n  'raw-image',\n  'flux-krea-dev',\n  'flux-krea-dev',\n  847362,\n  1,\n  false,\n  true,\n  true\n)\nON CONFLICT (avatar, scene, asset_type, workflow, model, version)\nDO UPDATE SET\n  profile_name = EXCLUDED.profile_name,\n  avatar_short = EXCLUDED.avatar_short,\n  seed = EXCLUDED.seed,\n  auto_promote_latest = EXCLUDED.auto_promote_latest,\n  is_active = true,\n  is_enabled = true,\n  updated_at = now();\n\nSELECT 'ok' AS status;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        320,
+        0
+      ],
+      "id": "fed7e86d-20da-4862-925e-dd7f55af9b39",
+      "name": "Create Ingest Profiles Table",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "POST /admin/ingest-profiles/init": {
+      "main": [
+        [
+          {
+            "node": "Create Ingest Profiles Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "e6de4952-b093-4458-93d4-daae3f27862e",
+  "activeVersionId": "e6de4952-b093-4458-93d4-daae3f27862e",
+  "versionCounter": 53,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-02T19:12:19.781Z",
+      "createdAt": "2026-06-02T19:12:19.781Z",
+      "role": "workflow:owner",
+      "workflowId": "gy5MxnYhGGC2KvwA",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version e6de4952",
+    "description": ""
+  }
+}

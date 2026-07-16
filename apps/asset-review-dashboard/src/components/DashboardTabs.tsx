@@ -1,12 +1,12 @@
 import PageContainer from "./PageContainer";
 
-export type DashboardTab = "review" | "auto-ingest" | "backups" | "catalogs";
+export type DashboardTab = "review" | "publications" | "content-cycle" | "ops";
 
 const TABS: { id: DashboardTab; label: string }[] = [
   { id: "review", label: "Asset Review" },
-  { id: "auto-ingest", label: "Auto Ingest" },
-  { id: "backups", label: "Backups" },
-  { id: "catalogs", label: "Catalogs" },
+  { id: "publications", label: "Publications" },
+  { id: "content-cycle", label: "Content Cycle" },
+  { id: "ops", label: "Ops / Admin" },
 ];
 
 type DashboardTabsProps = {

@@ -1,0 +1,144 @@
+{
+  "updatedAt": "2026-07-14T00:00:00.000Z",
+  "createdAt": "2026-07-14T00:00:00.000Z",
+  "id": "AvAIPubCreate01",
+  "name": "Avatares AI - Publications - Create Job",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/create",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "6df74d7b-0d99-4d30-a6ab-8a6851ddf001",
+      "name": "POST /publications/jobs/create",
+      "webhookId": "8fb408d5-88a6-4076-a5d5-17dd6de5f001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\n\nconst sql = (value) => {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n};\n\nconst avatar = String(body.avatar || '').trim();\nconst scene = String(body.scene || '').trim();\nconst format = String(body.format || '').trim();\nconst objective = String(body.objective || '').trim();\nconst businessProfile = 'influencer-brand';\nconst assetType = 'raw-image';\nconst status = 'draft';\nconst allowedFormats = new Set(['feed-post', 'story', 'reel', 'carousel']);\nconst slugRegex = /^[a-z0-9][a-z0-9-]*$/i;\nconst errors = [];\n\nif (!slugRegex.test(avatar)) errors.push('avatar is required and must be a slug');\nif (!slugRegex.test(scene)) errors.push('scene is required and must be a slug');\nif (!allowedFormats.has(format)) errors.push('format must be feed-post, story, reel, or carousel');\nif (!objective) errors.push('objective is required');\n\nlet query;\nif (errors.length > 0) {\n  query = `SELECT false AS ok, ${sql(errors.join('; '))} AS error;`;\n} else {\n  query = [\n    'CREATE EXTENSION IF NOT EXISTS pgcrypto;',\n    `CREATE TABLE IF NOT EXISTS publication_jobs (\n      publication_job_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n      avatar TEXT NOT NULL,\n      scene TEXT NOT NULL,\n      format TEXT NOT NULL,\n      objective TEXT NOT NULL,\n      business_profile TEXT NOT NULL DEFAULT 'influencer-brand',\n      asset_type TEXT NOT NULL DEFAULT 'raw-image',\n      status TEXT NOT NULL DEFAULT 'draft',\n      brief JSONB NULL,\n      prompt_pack JSONB NULL,\n      selected_asset_id UUID NULL,\n      publishing_pack JSONB NULL,\n      published_platform TEXT NULL,\n      published_url TEXT NULL,\n      published_at TIMESTAMPTZ NULL,\n      error_message TEXT NULL,\n      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,\n      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n    );`,\n    'CREATE INDEX IF NOT EXISTS publication_jobs_avatar_scene_idx ON publication_jobs (avatar, scene);',\n    'CREATE INDEX IF NOT EXISTS publication_jobs_status_created_idx ON publication_jobs (status, created_at DESC);',\n    `INSERT INTO publication_jobs (\n      avatar,\n      scene,\n      format,\n      objective,\n      business_profile,\n      asset_type,\n      status,\n      metadata\n    ) VALUES (\n      ${sql(avatar)},\n      ${sql(scene)},\n      ${sql(format)},\n      ${sql(objective)},\n      ${sql(businessProfile)},\n      ${sql(assetType)},\n      ${sql(status)},\n      jsonb_build_object('source', 'asset-review-dashboard', 'version', 1)\n    )\n    RETURNING\n      true AS ok,\n      publication_job_id AS \"publicationJobId\",\n      avatar,\n      scene,\n      format,\n      objective,\n      business_profile AS \"businessProfile\",\n      asset_type AS \"assetType\",\n      status,\n      created_at AS \"createdAt\",\n      updated_at AS \"updatedAt\";`\n  ].join('\\n');\n}\n\nreturn [{ json: { query } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "6df74d7b-0d99-4d30-a6ab-8a6851ddf002",
+      "name": "Build Create Job Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "6df74d7b-0d99-4d30-a6ab-8a6851ddf003",
+      "name": "Persist Publication Job",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\n\nif (row.ok === false || row.ok === 'f') {\n  return [{\n    json: {\n      ok: false,\n      error: row.error || 'Publication job was not created.'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    job: {\n      publicationJobId: row.publicationJobId,\n      avatar: row.avatar,\n      scene: row.scene,\n      format: row.format,\n      objective: row.objective,\n      businessProfile: row.businessProfile,\n      assetType: row.assetType,\n      status: row.status,\n      createdAt: row.createdAt,\n      updatedAt: row.updatedAt\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "6df74d7b-0d99-4d30-a6ab-8a6851ddf004",
+      "name": "Return Publication Job"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "6df74d7b-0d99-4d30-a6ab-8a6851ddf005",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/create": {
+      "main": [
+        [
+          {
+            "node": "Build Create Job Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Create Job Query": {
+      "main": [
+        [
+          {
+            "node": "Persist Publication Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Publication Job": {
+      "main": [
+        [
+          {
+            "node": "Return Publication Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Publication Job": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "tags": []
+}

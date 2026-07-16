@@ -1,0 +1,146 @@
+{
+  "updatedAt": "2026-06-04T05:40:02.141Z",
+  "createdAt": "2026-06-03T15:36:07.068Z",
+  "id": "Bzw7D8lvZInaVq5O",
+  "name": "Avatares AI - Admin - Catalog Set Status",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/catalogs/set-status",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -160
+      ],
+      "id": "d3a3e0f2-08d7-4b28-8569-dea33d0e2f60",
+      "name": "POST /admin/catalogs/set-status",
+      "webhookId": "19045095-9074-47d2-8d6f-f02fd4a7aad6"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const allowed = {\n  avatars: { table: 'avatar_catalog', keyColumns: ['avatar'] },\n  scenes: { table: 'scene_catalog', keyColumns: ['avatar', 'scene'] },\n  assetTypes: { table: 'asset_type_catalog', keyColumns: ['asset_type'] },\n  workflows: { table: 'generation_workflow_catalog', keyColumns: ['workflow'] },\n  models: { table: 'generation_model_catalog', keyColumns: ['model'] }\n};\n\nfunction sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nconst body = $json.body || {};\nconst catalog = body.catalog ?? body.catalogType;\nconst def = allowed[catalog];\n\nif (!def) {\n  throw new Error(`Invalid catalog '${catalog}'. Allowed: ${Object.keys(allowed).join(', ')}`);\n}\n\nconst payload = {\n  avatar: body.avatar,\n  scene: body.scene ?? body.value,\n  avatar_catalog_value: body.avatar ?? body.value,\n  asset_type: body.assetType ?? body.asset_type ?? body.value,\n  workflow: body.workflow ?? body.value,\n  model: body.model ?? body.value\n};\n\nfunction valueForKey(key) {\n  if (catalog === 'avatars' && key === 'avatar') return payload.avatar_catalog_value;\n  return payload[key];\n}\n\nconst whereParts = [];\nfor (const key of def.keyColumns) {\n  const value = valueForKey(key);\n  if (!value) {\n    throw new Error(`Missing required key '${key}'`);\n  }\n  whereParts.push(`${key} = ${sql(value)}`);\n}\n\nconst isEnabled = body.isEnabled === true || body.enable === true;\nconst disabledReason = body.disabledReason ?? body.disabled_reason ?? null;\n\nconst query = `\nUPDATE ${def.table}\nSET\n  is_enabled = ${isEnabled ? 'true' : 'false'},\n  ${catalog === 'scenes' ? `is_active = ${isEnabled ? 'true' : 'false'},` : ''}\n  disabled_at = ${isEnabled ? 'NULL' : 'now()'},\n  disabled_reason = ${isEnabled ? 'NULL' : sql(disabledReason || 'Disabled from dashboard')},\n  updated_at = now()\nWHERE ${whereParts.join(' AND ')}\nRETURNING *;\n`;\n\nreturn { json: { query, catalog, table: def.table, keyColumns: def.keyColumns } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -160
+      ],
+      "id": "c78369eb-4fc6-4c06-bea9-86b1b2fc2240",
+      "name": "Build Catalog Status Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        928,
+        -160
+      ],
+      "id": "461264d6-defe-4b45-b7bb-05a4bf454d0e",
+      "name": "Set Catalog Status",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn [{\n  json: {\n    ok: true,\n    count: items.length,\n    item: items.length ? items[0].json : null\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        -160
+      ],
+      "id": "2c9f6345-c257-4b9c-8abd-11bef4e3d6d5",
+      "name": "Return Catalog Status Result"
+    }
+  ],
+  "connections": {
+    "POST /admin/catalogs/set-status": {
+      "main": [
+        [
+          {
+            "node": "Build Catalog Status Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Catalog Status Query": {
+      "main": [
+        [
+          {
+            "node": "Set Catalog Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Catalog Status": {
+      "main": [
+        [
+          {
+            "node": "Return Catalog Status Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "90824f3e-c7f9-42e1-a64c-53715aed40c3",
+  "activeVersionId": "90824f3e-c7f9-42e1-a64c-53715aed40c3",
+  "versionCounter": 52,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-03T15:36:07.068Z",
+      "createdAt": "2026-06-03T15:36:07.068Z",
+      "role": "workflow:owner",
+      "workflowId": "Bzw7D8lvZInaVq5O",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 90824f3e",
+    "description": ""
+  }
+}

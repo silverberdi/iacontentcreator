@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T21:56:19.059Z",
+  "createdAt": "2026-06-09T21:56:19.059Z",
+  "id": "x7jgdgCGcRtZJcFA",
+  "name": "Avatares AI - Publish - Manual Export",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publish/manual-export",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "d22b13ac-c5d9-4f5a-bea9-772394bc0ede",
+      "name": "POST /publish/manual-export",
+      "webhookId": "135eb335-8bbe-4198-b424-ba1986ec97fa"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\nfunction slug(value, fallback = '') { return String(value || fallback || '').trim(); }\nconst body=$json.body||{}; const draftId=String(body.draftId||body.draft_id||'').trim(); const re=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i; if(!re.test(draftId)) return {json:{ok:false,skipQuery:true,error:'draftId is required UUID',draftId}}; const query=`SELECT * FROM publication_drafts WHERE draft_id=${sql(draftId)}::uuid LIMIT 1;`; return {json:{skipQuery:false,query,draftId}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "316aa2dc-2439-47e1-aed9-c57f1021b7f9",
+      "name": "Build Manual Export Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "ac5fae0c-f298-4284-8739-e38133bf140b",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "628491ed-2e27-466b-a7dc-b31d84657b0d",
+      "name": "Load Publication Draft",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row=$input.first()?.json||{}; if(!row.draft_id)return[{json:{ok:false,exported:false,error:'Draft not found'}}]; function parse(v,f){if(v==null)return f;if(typeof v==='string'){try{return JSON.parse(v)}catch{return f}}return v} return[{json:{ok:true,exported:true,draftId:row.draft_id,imageUrl:row.image_url,caption:row.caption,hashtags:parse(row.hashtags,[]),platform:row.platform,status:row.status,metadata:{avatar:row.avatar,scene:row.scene,assetType:row.asset_type,assetId:row.asset_id,generatedAssetId:row.generated_asset_id,bucket:row.bucket,objectPath:row.object_path},manualInstructions:['Open imageUrl','Copy caption and hashtags','Publish manually after final review']}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "b66e8a43-65a4-47aa-997b-457a04b93fe8",
+      "name": "Return Manual Export"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "60f40362-95ed-42dc-b576-01adf40d1749",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /publish/manual-export": {
+      "main": [
+        [
+          {
+            "node": "Build Manual Export Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Manual Export Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Load Publication Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Publication Draft": {
+      "main": [
+        [
+          {
+            "node": "Return Manual Export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "3a42b310-a6ca-496e-b19f-4e6d5134f26b",
+  "activeVersionId": "3a42b310-a6ca-496e-b19f-4e6d5134f26b",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:56:19.059Z",
+      "createdAt": "2026-06-09T21:56:19.059Z",
+      "role": "workflow:owner",
+      "workflowId": "x7jgdgCGcRtZJcFA",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 3a42b310",
+    "description": ""
+  }
+}

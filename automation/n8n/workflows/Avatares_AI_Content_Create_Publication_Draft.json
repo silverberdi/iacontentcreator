@@ -1,0 +1,146 @@
+{
+  "updatedAt": "2026-06-09T22:50:59.281Z",
+  "createdAt": "2026-06-09T21:55:11.366Z",
+  "id": "4tlB4vEo3DE80MzT",
+  "name": "Avatares AI - Content - Create Publication Draft",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content/create-publication-draft",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "88b5eb6a-71e8-4586-82a7-5acdece85b80",
+      "name": "POST /content/create-publication-draft",
+      "webhookId": "585e8083-8592-4a33-91c5-7ee23c3b5d4d"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\n\nfunction slug(value, fallback = '') {\n  return String(value || fallback || '').trim();\n}\n\nconst crypto = require('crypto');\n\nconst body = $json.body || {};\n\nconst draftId = crypto.randomUUID();\n\nconst generatedAssetId = String(\n  body.generatedAssetId ||\n  body.generated_asset_id ||\n  ''\n).trim();\n\nconst assetId = String(\n  body.assetId ||\n  body.asset_id ||\n  ''\n).trim();\n\nconst avatar = slug(body.avatar);\nconst scene = slug(body.scene);\nconst assetType = slug(body.assetType || body.asset_type, 'raw-image');\nconst platform = slug(body.platform, 'instagram');\n\nconst caption = String(\n  body.caption ||\n  body.captionIdea ||\n  'Una pausa en movimiento, una historia que apenas empieza.'\n).trim();\n\nconst hashtags = Array.isArray(body.hashtags)\n  ? body.hashtags\n  : ['estefania', 'lifestyle', 'travel', 'airport', 'cinematic'];\n\nconst baseUrl = slug(\n  body.baseUrl || body.base_url,\n  'http://192.168.0.194:9000'\n).replace(/\\/$/, '');\n\nconst uuidRegex =\n  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\n\nconst slugRegex = /^[a-z0-9][a-z0-9-]*$/i;\n\nlet src;\n\nif (uuidRegex.test(generatedAssetId)) {\n  src = `\nchosen AS (\n  SELECT\n    car.asset_id,\n    car.avatar,\n    car.scene,\n    car.asset_type,\n    car.bucket,\n    car.object_path,\n    car.mime_type,\n    car.metadata,\n    ga.generated_asset_id\n  FROM generated_assets ga\n  JOIN canonical_asset_registry car\n    ON car.asset_id = ga.asset_id::text\n  WHERE ga.generated_asset_id = ${sql(generatedAssetId)}::uuid\n    AND ga.status = 'approved'\n  LIMIT 1\n)`;\n} else if (uuidRegex.test(assetId)) {\n  src = `\nchosen AS (\n  SELECT\n    car.asset_id,\n    car.avatar,\n    car.scene,\n    car.asset_type,\n    car.bucket,\n    car.object_path,\n    car.mime_type,\n    car.metadata,\n    NULL::uuid AS generated_asset_id\n  FROM canonical_asset_registry car\n  WHERE car.asset_id = ${sql(assetId)}\n  LIMIT 1\n)`;\n} else {\n  if (\n    !slugRegex.test(avatar) ||\n    !slugRegex.test(scene) ||\n    !slugRegex.test(assetType)\n  ) {\n    return {\n      json: {\n        ok: false,\n        skipQuery: true,\n        error: 'generatedAssetId, assetId, or avatar/scene/assetType are required',\n        request: {\n          generatedAssetId,\n          assetId,\n          avatar,\n          scene,\n          assetType,\n          platform\n        }\n      }\n    };\n  }\n\n  src = `\nchosen AS (\n  SELECT\n    car.asset_id,\n    car.avatar,\n    car.scene,\n    car.asset_type,\n    car.bucket,\n    car.object_path,\n    car.mime_type,\n    car.metadata,\n    NULL::uuid AS generated_asset_id\n  FROM canonical_asset_registry car\n  WHERE car.avatar = ${sql(avatar)}\n    AND car.scene = ${sql(scene)}\n    AND car.asset_type = ${sql(assetType)}\n    AND (\n      COALESCE(car.is_canonical, false) = true\n      OR car.status = 'canonical'\n    )\n  ORDER BY car.created_at DESC\n  LIMIT 1\n)`;\n}\n\nconst query = `\nWITH ${src},\ninserted AS (\n  INSERT INTO publication_drafts (\n    draft_id,\n    avatar,\n    scene,\n    asset_type,\n    platform,\n    asset_id,\n    generated_asset_id,\n    image_url,\n    bucket,\n    object_path,\n    caption,\n    hashtags,\n    status,\n    metadata,\n    created_at,\n    updated_at\n  )\n  SELECT\n    ${sql(draftId)}::uuid,\n    avatar,\n    scene,\n    asset_type,\n    ${sql(platform)},\n    asset_id::uuid,\n    generated_asset_id,\n    ${sql(baseUrl)} || '/' || bucket || '/' || object_path,\n    bucket,\n    object_path,\n    ${sql(caption)},\n    ${sqlJson(hashtags)},\n    'draft',\n    jsonb_build_object(\n      'source', 'create-publication-draft',\n      'request', ${sqlJson(body)},\n      'generatedAssetId', generated_asset_id,\n      'assetId', asset_id,\n      'mimeType', mime_type,\n      'registryMetadata', metadata\n    ),\n    now(),\n    now()\n  FROM chosen\n  RETURNING\n    draft_id,\n    avatar,\n    scene,\n    asset_type,\n    platform,\n    asset_id,\n    generated_asset_id,\n    image_url,\n    bucket,\n    object_path,\n    caption,\n    hashtags,\n    status,\n    metadata,\n    approved_at,\n    published_at,\n    created_at,\n    updated_at\n)\nSELECT * FROM inserted;\n`;\n\nreturn {\n  json: {\n    ok: true,\n    skipQuery: false,\n    query\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "420d293b-2d16-4aa1-aebd-bba808000f10",
+      "name": "Build Publication Draft Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "4d5ed593-432c-45d2-a5e7-2ef878921cd5",
+      "name": "Create Publication Draft",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row=$input.first()?.json||{}; if(!row.draft_id)return[{json:{ok:false,created:false,error:'No approved/generated/canonical asset found for draft'}}]; let hashtags=row.hashtags||[]; if(typeof hashtags==='string'){try{hashtags=JSON.parse(hashtags)}catch{hashtags=[]}} return[{json:{ok:true,created:true,draft:{draftId:row.draft_id,avatar:row.avatar,scene:row.scene,assetType:row.asset_type,platform:row.platform,assetId:row.asset_id,generatedAssetId:row.generated_asset_id,imageUrl:row.image_url,caption:row.caption,hashtags,status:row.status,createdAt:row.created_at}}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "909670b9-ff72-495f-bb78-b250f810649c",
+      "name": "Return Publication Draft"
+    }
+  ],
+  "connections": {
+    "POST /content/create-publication-draft": {
+      "main": [
+        [
+          {
+            "node": "Build Publication Draft Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Publication Draft Query": {
+      "main": [
+        [
+          {
+            "node": "Create Publication Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Publication Draft": {
+      "main": [
+        [
+          {
+            "node": "Return Publication Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "21ed16df-acce-4ef2-b0e3-6f3ecdd48318",
+  "activeVersionId": "21ed16df-acce-4ef2-b0e3-6f3ecdd48318",
+  "versionCounter": 48,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:55:11.366Z",
+      "createdAt": "2026-06-09T21:55:11.366Z",
+      "role": "workflow:owner",
+      "workflowId": "4tlB4vEo3DE80MzT",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 21ed16df",
+    "description": ""
+  }
+}

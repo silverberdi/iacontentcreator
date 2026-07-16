@@ -1,0 +1,97 @@
+{
+  "updatedAt": "2026-06-04T00:57:51.109Z",
+  "createdAt": "2026-06-02T19:12:52.259Z",
+  "id": "OjQr9LzPF3RFRt3U",
+  "name": "Avatares AI - Admin - Set Active Ingest Profile",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/ingest-profiles/set-active",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -160
+      ],
+      "id": "039263fd-7cb8-4ef7-80e2-116dd69bd7c8",
+      "name": "POST /admin/ingest-profiles/set-active",
+      "webhookId": "4cdd0510-9523-4505-bbd1-f35fb3fbc505"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DROP TABLE IF EXISTS tmp_set_active_profile;\n\nCREATE TEMP TABLE tmp_set_active_profile AS\nSELECT\n  NULLIF('{{ $json.body.profileId || $json.body.profile_id || \"\" }}', '')::uuid AS profile_id;\n\nUPDATE ingest_profiles\nSET\n  is_active = false,\n  updated_at = now()\nWHERE is_active = true\n  AND EXISTS (\n    SELECT 1\n    FROM ingest_profiles p\n    JOIN tmp_set_active_profile t ON t.profile_id = p.profile_id\n    WHERE p.is_enabled = true\n  );\n\nUPDATE ingest_profiles p\nSET\n  is_active = true,\n  updated_at = now()\nFROM tmp_set_active_profile t\nWHERE p.profile_id = t.profile_id\n  AND p.is_enabled = true;\n\nSELECT\n  CASE\n    WHEN EXISTS (\n      SELECT 1\n      FROM ingest_profiles p\n      JOIN tmp_set_active_profile t ON t.profile_id = p.profile_id\n      WHERE p.is_enabled = true\n        AND p.is_active = true\n    )\n    THEN true\n    ELSE false\n  END AS ok,\n\n  CASE\n    WHEN NOT EXISTS (\n      SELECT 1\n      FROM tmp_set_active_profile\n      WHERE profile_id IS NOT NULL\n    )\n    THEN 'Missing profileId'\n    WHEN NOT EXISTS (\n      SELECT 1\n      FROM ingest_profiles p\n      JOIN tmp_set_active_profile t ON t.profile_id = p.profile_id\n      WHERE p.is_enabled = true\n    )\n    THEN 'Profile not found or disabled'\n    WHEN NOT EXISTS (\n      SELECT 1\n      FROM ingest_profiles p\n      JOIN tmp_set_active_profile t ON t.profile_id = p.profile_id\n      WHERE p.is_enabled = true\n        AND p.is_active = true\n    )\n    THEN 'Profile could not be activated'\n    ELSE NULL\n  END AS error,\n\n  (\n    SELECT jsonb_build_object(\n      'profileId', p.profile_id,\n      'profileName', p.profile_name,\n      'avatar', p.avatar,\n      'avatarShort', p.avatar_short,\n      'scene', p.scene,\n      'assetType', p.asset_type,\n      'workflow', p.workflow,\n      'model', p.model,\n      'seed', p.seed,\n      'version', p.version,\n      'autoPromoteLatest', p.auto_promote_latest,\n      'isActive', p.is_active,\n      'isEnabled', p.is_enabled,\n      'createdAt', p.created_at,\n      'updatedAt', p.updated_at\n    )\n    FROM ingest_profiles p\n    JOIN tmp_set_active_profile t ON t.profile_id = p.profile_id\n    WHERE p.is_enabled = true\n    LIMIT 1\n  ) AS profile;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1376,
+        -160
+      ],
+      "id": "e2b2c4bb-b18d-46aa-9865-1e7e28dd7119",
+      "name": "Set Active Ingest Profile",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "POST /admin/ingest-profiles/set-active": {
+      "main": [
+        [
+          {
+            "node": "Set Active Ingest Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "e605d5f3-a8cd-41cc-b18b-574429c53968",
+  "activeVersionId": "e605d5f3-a8cd-41cc-b18b-574429c53968",
+  "versionCounter": 63,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-02T19:12:52.259Z",
+      "createdAt": "2026-06-02T19:12:52.259Z",
+      "role": "workflow:owner",
+      "workflowId": "OjQr9LzPF3RFRt3U",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version e605d5f3",
+    "description": ""
+  }
+}

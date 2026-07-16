@@ -1,0 +1,147 @@
+{
+  "updatedAt": "2026-06-09T22:41:44.365Z",
+  "createdAt": "2026-06-09T21:42:30.837Z",
+  "id": "7IbnGcAhvIISb3so",
+  "name": "Avatares AI - API - List Generated Candidates",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generation/generated/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "04662fb1-fa48-48a1-84c1-8b5cb957e7ff",
+      "name": "POST /generation/generated/list",
+      "webhookId": "99dc3cb5-6573-47d6-ae70-3476034f166b"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nfunction slug(value, fallback = '') {\n  return String(value || fallback || '').trim();\n}\n\nconst body = $json.body || {};\n\nconst avatar = slug(body.avatar);\nconst scene = slug(body.scene);\nconst status = slug(body.status || 'generated');\nconst limit = Math.min(Number(body.limit || 50), 100);\n\nconst slugRegex = /^[a-z0-9][a-z0-9-]*$/i;\n\nif (!slugRegex.test(avatar)) {\n  return {\n    json: {\n      ok: false,\n      skipQuery: true,\n      error: 'avatar is required and must be slug-like',\n      request: { avatar, scene, status }\n    }\n  };\n}\n\nlet where = `\nWHERE ga.avatar = ${sql(avatar)}\n`;\n\nif (scene && slugRegex.test(scene)) {\n  where += `\n  AND ga.scene = ${sql(scene)}\n`;\n}\n\nif (status && slugRegex.test(status)) {\n  where += `\n  AND ga.status = ${sql(status)}\n`;\n}\n\nconst query = `\nSELECT\n  ga.generated_asset_id,\n  ga.job_id,\n  ga.asset_id,\n  ga.avatar,\n  ga.scene,\n  ga.asset_type,\n  ga.status,\n  ga.review_notes,\n  ga.metadata,\n  ga.approved_at,\n  ga.rejected_at,\n  ga.created_at,\n  ga.updated_at,\n  car.bucket,\n  car.object_path,\n  car.mime_type,\n  car.status AS registry_status,\n  car.is_canonical,\n  'http://192.168.0.194:9000' || '/' || car.bucket || '/' || car.object_path AS url\nFROM generated_assets ga\nLEFT JOIN canonical_asset_registry car\n  ON car.asset_id = ga.asset_id::text\n${where}\nORDER BY ga.created_at DESC\nLIMIT ${limit};\n`;\n\nreturn {\n  json: {\n    ok: true,\n    skipQuery: false,\n    query\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "7c61f90d-eb79-4b4b-93b5-53811c42c384",
+      "name": "Build List Generated Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "3fe2da0f-49ac-488a-8b50-a184fe9bad4b",
+      "name": "List Generated Candidates",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input\n  .all()\n  .map((item) => item.json || {})\n  .filter((row) => row.generated_asset_id);\n\nreturn [\n  {\n    json: {\n      ok: true,\n      count: rows.length,\n      candidates: rows.map(row => ({\n        generatedAssetId: row.generated_asset_id,\n        jobId: row.job_id,\n        assetId: row.asset_id,\n        avatar: row.avatar,\n        scene: row.scene,\n        assetType: row.asset_type,\n        status: row.status,\n        reviewNotes: row.review_notes,\n        url: row.url,\n        bucket: row.bucket,\n        objectPath: row.object_path,\n        mimeType: row.mime_type,\n        registryStatus: row.registry_status,\n        isCanonical: row.is_canonical,\n        metadata: row.metadata,\n        approvedAt: row.approved_at,\n        rejectedAt: row.rejected_at,\n        createdAt: row.created_at,\n        updatedAt: row.updated_at\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "2319b96a-d9ef-4fc9-8960-00eddfb0808d",
+      "name": "Return Generated Candidates"
+    }
+  ],
+  "connections": {
+    "POST /generation/generated/list": {
+      "main": [
+        [
+          {
+            "node": "Build List Generated Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build List Generated Query": {
+      "main": [
+        [
+          {
+            "node": "List Generated Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Generated Candidates": {
+      "main": [
+        [
+          {
+            "node": "Return Generated Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "a761e906-65bd-4592-aea0-1de6ba650d00",
+  "activeVersionId": "a761e906-65bd-4592-aea0-1de6ba650d00",
+  "versionCounter": 48,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:42:30.837Z",
+      "createdAt": "2026-06-09T21:42:30.837Z",
+      "role": "workflow:owner",
+      "workflowId": "7IbnGcAhvIISb3so",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version a761e906",
+    "description": ""
+  }
+}

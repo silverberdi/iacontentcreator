@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { AssetCandidate } from "../types/assets";
-import { isCanonicalAsset } from "../utils/candidateFilters";
+import { canSelectAsset, isCanonicalAsset, isSelectedAsset } from "../utils/candidateFilters";
 import { formatDate } from "../utils/format";
 import CopyButton from "./CopyButton";
 import LoadingSpinner from "./LoadingSpinner";
@@ -13,11 +13,12 @@ type AssetPreviewModalProps = {
   selectedAssetIndex: number;
   reviewNotes: string;
   actionLoading: boolean;
-  actionType: "promote" | "reject" | null;
+  actionType: "promote" | "select" | "reject" | null;
   error: string | null;
   onClose: () => void;
   onNavigate: (index: number) => void;
   onPromote: () => void;
+  onSelect: () => void;
   onReject: () => void;
   onReviewNotesChange: (notes: string) => void;
 };
@@ -34,6 +35,7 @@ export default function AssetPreviewModal({
   onClose,
   onNavigate,
   onPromote,
+  onSelect,
   onReject,
   onReviewNotesChange,
 }: AssetPreviewModalProps) {
@@ -43,6 +45,8 @@ export default function AssetPreviewModal({
   const canGoPrev = selectedAssetIndex > 0;
   const canGoNext = selectedAssetIndex < assets.length - 1;
   const isCanonical = isCanonicalAsset(asset);
+  const isSelected = isSelectedAsset(asset);
+  const canSelect = canSelectAsset(asset);
   const busy = actionLoading;
 
   useEffect(() => {
@@ -164,7 +168,6 @@ export default function AssetPreviewModal({
               <MetadataRow label="assetId" value={asset.assetId} mono />
               <MetadataRow label="avatar" value={asset.avatar} />
               <MetadataRow label="scene" value={asset.scene} />
-              <MetadataRow label="assetType" value={asset.assetType} />
               <MetadataRow label="status" value={asset.status} />
               <MetadataRow label="isCanonical" value={isCanonical ? "yes" : "no"} />
               <MetadataRow label="sha256" value={asset.sha256} mono />
@@ -181,7 +184,7 @@ export default function AssetPreviewModal({
             </dl>
 
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-gray-400">Notes for promote / reject</span>
+              <span className="text-gray-400">Notes for promote / select / reject</span>
               <textarea
                 value={reviewNotes}
                 onChange={(e) => onReviewNotesChange(e.target.value)}
@@ -208,6 +211,9 @@ export default function AssetPreviewModal({
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
                 Review Actions
               </p>
+              {isSelected && (
+                <p className="text-xs text-blue-200/90">This asset is already marked as selected.</p>
+              )}
               <button
                 type="button"
                 disabled={isCanonical || busy}
@@ -217,7 +223,19 @@ export default function AssetPreviewModal({
                 {actionLoading && actionType === "promote" ? (
                   <LoadingSpinner className="size-4" label="Promoting…" />
                 ) : (
-                  "Promote"
+                  "Promote to canonical"
+                )}
+              </button>
+              <button
+                type="button"
+                disabled={!canSelect || busy}
+                onClick={onSelect}
+                className="flex items-center justify-center gap-2 rounded-md bg-blue-800 px-3 py-2 text-sm font-medium text-blue-50 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {actionLoading && actionType === "select" ? (
+                  <LoadingSpinner className="size-4" label="Selecting…" />
+                ) : (
+                  "Mark as selected"
                 )}
               </button>
               <button

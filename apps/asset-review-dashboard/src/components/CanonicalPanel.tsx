@@ -61,7 +61,7 @@ export default function CanonicalPanel({ canonical, reason, loading }: Canonical
         <div className="rounded-md border border-dashed border-border bg-surface p-6 text-center">
           <p className="text-sm font-medium text-gray-300">No canonical asset</p>
           <p className="mt-1 text-sm text-gray-500">
-            {reason ?? "No canonical asset found for this avatar, scene, and asset type."}
+            {reason ?? "No canonical asset found for this avatar and scene."}
           </p>
         </div>
       )}

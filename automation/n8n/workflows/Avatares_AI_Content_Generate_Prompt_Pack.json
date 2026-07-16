@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T21:36:16.464Z",
+  "createdAt": "2026-06-09T21:36:16.464Z",
+  "id": "3hIClKlbEhWg3H0K",
+  "name": "Avatares AI - Content - Generate Prompt Pack",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content/generate-prompt-pack",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "6caece4b-54c9-495c-98b1-d325a50c5360",
+      "name": "POST /content/generate-prompt-pack",
+      "webhookId": "a10369a6-ac80-405d-b812-ea2f26c69913"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\nfunction slug(value, fallback = '') { return String(value || fallback || '').trim(); }\nconst body=$json.body||{}; const avatar=slug(body.avatar); const scene=slug(body.scene); const assetType=slug(body.assetType||body.asset_type,'raw-image'); const platform=slug(body.platform,'instagram'); const baseUrl=slug(body.baseUrl||body.base_url,'http://192.168.0.194:9000').replace(/\\/$/,''); const brief=body.brief||{}; const re=/^[a-z0-9][a-z0-9-]*$/i;\nif(!re.test(avatar)||!re.test(scene)||!re.test(assetType)) return {json:{ok:false,skipQuery:true,error:'avatar, scene and assetType are required slug-like values',request:{avatar,scene,assetType}}};\nconst query=`WITH refs AS (SELECT asset_id,bucket,object_path,status,is_canonical,created_at FROM canonical_asset_registry WHERE avatar=${sql(avatar)} AND scene=${sql(scene)} AND asset_type=${sql(assetType)} AND COALESCE(status,'') IN ('canonical','selected','raw') ORDER BY CASE WHEN COALESCE(is_canonical,false)=true OR status='canonical' THEN 1 WHEN status='selected' THEN 2 WHEN status='raw' THEN 3 ELSE 4 END, created_at DESC LIMIT 6) SELECT ac.avatar, ${sql(scene)} AS scene, ${sql(assetType)} AS asset_type, ${sql(platform)} AS platform, ac.display_name AS avatar_display_name, ac.avatar_short, sc.display_name AS scene_display_name, COALESCE(sb.visual_intent,sc.description,sc.display_name,sc.scene) AS visual_intent, COALESCE(sb.allowed_mood,'natural, cinematic, emotionally warm') AS allowed_mood, COALESCE(sb.avoid,'[]'::jsonb) AS avoid, COALESCE(sb.prompt_notes,'') AS prompt_notes, COALESCE((SELECT jsonb_agg(jsonb_build_object('assetId',asset_id,'status',status,'isCanonical',is_canonical,'objectPath',object_path,'url',${sql(baseUrl)} || '/' || bucket || '/' || object_path)) FROM refs),'[]'::jsonb) AS reference_images FROM avatar_catalog ac JOIN scene_catalog sc ON sc.avatar=ac.avatar AND sc.scene=${sql(scene)} LEFT JOIN scene_brief_catalog sb ON sb.avatar=ac.avatar AND sb.scene=sc.scene WHERE ac.avatar=${sql(avatar)} LIMIT 1;`;\nreturn {json:{ok:true,skipQuery:false,query,brief}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "f7259c91-5983-4445-b172-32943f4ce49b",
+      "name": "Build Prompt Pack Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "cfea02ae-4fd8-479d-a3c2-12415c91753e",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "44541ba7-7bdb-4388-a560-802a052c27b4",
+      "name": "Load Prompt Pack Context",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row=$input.first()?.json||{}; const params=$('Build Prompt Pack Query').first().json; if(!row.avatar) return [{json:{ok:false,error:'Prompt pack context not found'}}];\nfunction parse(v,f){if(v==null)return f;if(typeof v==='string'){try{return JSON.parse(v)}catch{return f}}return v} const avoid=parse(row.avoid,[]); const referenceImages=parse(row.reference_images,[]); const brief=params.brief||{};\nconst positivePrompt=[row.avatar_display_name||row.avatar,row.visual_intent,brief.promptIntent||'',brief.visualDirection||'',row.allowed_mood,row.prompt_notes,'photorealistic, natural skin texture, candid lifestyle photography, consistent identity, high quality'].filter(Boolean).join(', ');\nconst negativePrompt=['cartoon, anime, illustration, plastic skin, overprocessed face, distorted hands, extra fingers, bad anatomy','low quality, blurry, duplicate person, wrong identity, heavy makeup, unrealistic body proportions',...(Array.isArray(avoid)?avoid:[])].filter(Boolean).join(', ');\nreturn [{json:{ok:true,avatar:row.avatar,scene:row.scene,assetType:row.asset_type,platform:row.platform,positivePrompt,negativePrompt,referenceImages,promptMetadata:{avatarDisplayName:row.avatar_display_name,avatarShort:row.avatar_short,sceneDisplayName:row.scene_display_name,visualIntent:row.visual_intent,allowedMood:row.allowed_mood}}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "32864bd9-8e9b-47fb-a7b7-549084ac90d6",
+      "name": "Return Prompt Pack"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "982df834-d272-47bc-91a6-fcca19b1e930",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /content/generate-prompt-pack": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt Pack Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt Pack Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Load Prompt Pack Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Prompt Pack Context": {
+      "main": [
+        [
+          {
+            "node": "Return Prompt Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "76c278b2-7556-45d3-ba8c-285d70b4bad4",
+  "activeVersionId": "76c278b2-7556-45d3-ba8c-285d70b4bad4",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:36:16.464Z",
+      "createdAt": "2026-06-09T21:36:16.464Z",
+      "role": "workflow:owner",
+      "workflowId": "3hIClKlbEhWg3H0K",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 76c278b2",
+    "description": ""
+  }
+}

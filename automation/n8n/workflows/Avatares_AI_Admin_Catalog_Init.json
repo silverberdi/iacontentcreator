@@ -1,0 +1,97 @@
+{
+  "updatedAt": "2026-06-03T15:48:50.680Z",
+  "createdAt": "2026-06-03T15:35:10.343Z",
+  "id": "VFqJ1Ucg1YpJZIbl",
+  "name": "Avatares AI - Admin - Catalog Init",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/catalogs/init",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        96,
+        0
+      ],
+      "id": "0c81763f-5514-4a3f-95f9-8d210af338e1",
+      "name": "POST /admin/catalogs/init",
+      "webhookId": "428bef44-5cd2-4d66-b4c3-dde7eb3a5c07"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Avatares AI — Catalog Init HOTFIX v3\n-- Fix: existing ingest_profiles may not have is_enabled.\n\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\n\nCREATE TABLE IF NOT EXISTS avatar_catalog (\n  avatar_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  avatar TEXT NOT NULL UNIQUE,\n  avatar_short TEXT NOT NULL UNIQUE,\n  display_name TEXT NOT NULL,\n  avatar_kind TEXT NOT NULL DEFAULT 'influencer',\n  description TEXT NULL,\n  notes TEXT NULL,\n  is_enabled BOOLEAN NOT NULL DEFAULT true,\n  disabled_at TIMESTAMPTZ NULL,\n  disabled_reason TEXT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS scene_catalog (\n  scene_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  scene TEXT NOT NULL UNIQUE,\n  display_name TEXT NOT NULL,\n  description TEXT NULL,\n  notes TEXT NULL,\n  is_enabled BOOLEAN NOT NULL DEFAULT true,\n  disabled_at TIMESTAMPTZ NULL,\n  disabled_reason TEXT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS asset_type_catalog (\n  asset_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  asset_type TEXT NOT NULL UNIQUE,\n  display_name TEXT NOT NULL,\n  description TEXT NULL,\n  notes TEXT NULL,\n  is_enabled BOOLEAN NOT NULL DEFAULT true,\n  disabled_at TIMESTAMPTZ NULL,\n  disabled_reason TEXT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS generation_workflow_catalog (\n  generation_workflow_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  workflow TEXT NOT NULL UNIQUE,\n  display_name TEXT NOT NULL,\n  description TEXT NULL,\n  notes TEXT NULL,\n  is_enabled BOOLEAN NOT NULL DEFAULT true,\n  disabled_at TIMESTAMPTZ NULL,\n  disabled_reason TEXT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS generation_model_catalog (\n  generation_model_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  model TEXT NOT NULL UNIQUE,\n  display_name TEXT NOT NULL,\n  provider TEXT NULL,\n  description TEXT NULL,\n  notes TEXT NULL,\n  is_enabled BOOLEAN NOT NULL DEFAULT true,\n  disabled_at TIMESTAMPTZ NULL,\n  disabled_reason TEXT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS ingest_profiles (\n  profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  profile_name TEXT NOT NULL,\n  avatar TEXT NOT NULL,\n  avatar_short TEXT NOT NULL,\n  scene TEXT NOT NULL,\n  asset_type TEXT NOT NULL,\n  workflow TEXT NOT NULL,\n  model TEXT NOT NULL,\n  seed BIGINT NULL,\n  version INTEGER NOT NULL DEFAULT 1,\n  auto_promote_latest BOOLEAN NOT NULL DEFAULT false,\n  is_active BOOLEAN NOT NULL DEFAULT false,\n  is_enabled BOOLEAN NOT NULL DEFAULT true,\n  disabled_at TIMESTAMPTZ NULL,\n  disabled_reason TEXT NULL,\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n  UNIQUE (avatar, scene, asset_type, workflow, model, version)\n);\n\n-- Existing table compatibility.\nALTER TABLE ingest_profiles ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN NOT NULL DEFAULT true;\nALTER TABLE ingest_profiles ADD COLUMN IF NOT EXISTS disabled_at TIMESTAMPTZ NULL;\nALTER TABLE ingest_profiles ADD COLUMN IF NOT EXISTS disabled_reason TEXT NULL;\n\nUPDATE ingest_profiles\nSET is_enabled = true\nWHERE is_enabled IS NULL;\n\nCREATE INDEX IF NOT EXISTS idx_avatar_catalog_enabled ON avatar_catalog (is_enabled, avatar);\nCREATE INDEX IF NOT EXISTS idx_scene_catalog_enabled ON scene_catalog (is_enabled, scene);\nCREATE INDEX IF NOT EXISTS idx_asset_type_catalog_enabled ON asset_type_catalog (is_enabled, asset_type);\nCREATE INDEX IF NOT EXISTS idx_generation_workflow_catalog_enabled ON generation_workflow_catalog (is_enabled, workflow);\nCREATE INDEX IF NOT EXISTS idx_generation_model_catalog_enabled ON generation_model_catalog (is_enabled, model);\nCREATE INDEX IF NOT EXISTS idx_ingest_profiles_active ON ingest_profiles (is_active, is_enabled);\nCREATE INDEX IF NOT EXISTS idx_ingest_profiles_avatar_scene ON ingest_profiles (avatar, scene, asset_type);\n\n-- Normalize existing active profiles before unique index.\nWITH ranked AS (\n  SELECT\n    profile_id,\n    ROW_NUMBER() OVER (\n      ORDER BY\n        CASE\n          WHEN avatar = 'estefania-montealegre'\n           AND scene = 'coffee-rain'\n           AND asset_type = 'raw-image'\n           AND workflow = 'flux-krea-dev'\n           AND model = 'flux-krea-dev'\n          THEN 0 ELSE 1\n        END,\n        updated_at DESC,\n        created_at DESC\n    ) AS rn\n  FROM ingest_profiles\n  WHERE is_active = true\n)\nUPDATE ingest_profiles p\nSET\n  is_active = CASE WHEN r.rn = 1 THEN true ELSE false END,\n  updated_at = now()\nFROM ranked r\nWHERE p.profile_id = r.profile_id;\n\nCREATE UNIQUE INDEX IF NOT EXISTS uq_ingest_profiles_single_active\n  ON ingest_profiles ((is_active))\n  WHERE is_active = true;\n\nINSERT INTO avatar_catalog (avatar, avatar_short, display_name, avatar_kind, description, is_enabled)\nVALUES ('estefania-montealegre', 'estefania', 'Estefanía Montealegre', 'influencer', 'Primary influencer avatar for the current MVP visual pipeline.', true)\nON CONFLICT (avatar)\nDO UPDATE SET\n  avatar_short = EXCLUDED.avatar_short,\n  display_name = EXCLUDED.display_name,\n  avatar_kind = EXCLUDED.avatar_kind,\n  description = EXCLUDED.description,\n  is_enabled = true,\n  disabled_at = NULL,\n  disabled_reason = NULL,\n  updated_at = now();\n\nINSERT INTO scene_catalog (scene, display_name, description, is_enabled)\nVALUES\n  ('coffee-rain', 'Coffee Rain', 'Indoor coffee/rain scene used as the initial Estefanía validation scene.', true),\n  ('airport', 'Airport', 'Airport / travel transition scene.', true),\n  ('plant-shop', 'Plant Shop', 'Plant shop / greenery lifestyle scene.', true),\n  ('coworking', 'Coworking', 'Work/coworking lifestyle scene.', true),\n  ('rock-lab', 'Rock Lab', 'Private music / rock identity scene.', true)\nON CONFLICT (scene)\nDO UPDATE SET\n  display_name = EXCLUDED.display_name,\n  description = EXCLUDED.description,\n  is_enabled = true,\n  disabled_at = NULL,\n  disabled_reason = NULL,\n  updated_at = now();\n\nINSERT INTO asset_type_catalog (asset_type, display_name, description, is_enabled)\nVALUES\n  ('raw-image', 'Raw Image', 'Raw generated image before curation.', true),\n  ('reference-image', 'Reference Image', 'Identity/style reference image used as input context.', false),\n  ('post-image', 'Post Image', 'Prepared social media feed image.', false),\n  ('story-image', 'Story Image', 'Prepared social media story or reel cover image.', false),\n  ('training-image', 'Training Image', 'Image approved for identity training datasets.', false)\nON CONFLICT (asset_type)\nDO UPDATE SET\n  display_name = EXCLUDED.display_name,\n  description = EXCLUDED.description,\n  is_enabled = true,\n  disabled_at = NULL,\n  disabled_reason = NULL,\n  updated_at = now();\n\nINSERT INTO generation_workflow_catalog (workflow, display_name, description, is_enabled)\nVALUES\n  ('flux-krea-dev', 'Flux Krea Dev', 'Flux Krea Dev generation workflow/profile.', true),\n  ('z-image-turbo', 'Z-Image Turbo', 'Z-Image Turbo generation workflow/profile.', true)\nON CONFLICT (workflow)\nDO UPDATE SET\n  display_name = EXCLUDED.display_name,\n  description = EXCLUDED.description,\n  is_enabled = true,\n  disabled_at = NULL,\n  disabled_reason = NULL,\n  updated_at = now();\n\nINSERT INTO generation_model_catalog (model, display_name, provider, description, is_enabled)\nVALUES\n  ('flux-krea-dev', 'Flux Krea Dev', 'Comfy', 'Flux Krea Dev model/profile.', true),\n  ('z_image_turbo_bf16', 'Z-Image Turbo BF16', 'Comfy', 'Z-Image Turbo BF16 model file.', true)\nON CONFLICT (model)\nDO UPDATE SET\n  display_name = EXCLUDED.display_name,\n  provider = EXCLUDED.provider,\n  description = EXCLUDED.description,\n  is_enabled = true,\n  disabled_at = NULL,\n  disabled_reason = NULL,\n  updated_at = now();\n\nINSERT INTO ingest_profiles (\n  profile_name, avatar, avatar_short, scene, asset_type, workflow, model, seed, version, auto_promote_latest, is_active, is_enabled\n)\nVALUES (\n  'Estefanía / Coffee Rain / Raw Image',\n  'estefania-montealegre',\n  'estefania',\n  'coffee-rain',\n  'raw-image',\n  'flux-krea-dev',\n  'flux-krea-dev',\n  847362,\n  1,\n  false,\n  NOT EXISTS (SELECT 1 FROM ingest_profiles WHERE is_active = true),\n  true\n)\nON CONFLICT (avatar, scene, asset_type, workflow, model, version)\nDO UPDATE SET\n  profile_name = EXCLUDED.profile_name,\n  avatar_short = EXCLUDED.avatar_short,\n  seed = EXCLUDED.seed,\n  auto_promote_latest = EXCLUDED.auto_promote_latest,\n  is_enabled = true,\n  disabled_at = NULL,\n  disabled_reason = NULL,\n  updated_at = now();\n\nSELECT 'ok' AS status;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        0
+      ],
+      "id": "f13bbfbc-1730-4b91-8ee8-c612390595f4",
+      "name": "Create Catalog Tables Hotfix v3",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "POST /admin/catalogs/init": {
+      "main": [
+        [
+          {
+            "node": "Create Catalog Tables Hotfix v3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "2c6a2422-b81d-49c8-8d2e-524e76f39b23",
+  "activeVersionId": "2c6a2422-b81d-49c8-8d2e-524e76f39b23",
+  "versionCounter": 56,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-03T15:35:10.343Z",
+      "createdAt": "2026-06-03T15:35:10.343Z",
+      "role": "workflow:owner",
+      "workflowId": "VFqJ1Ucg1YpJZIbl",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 2c6a2422",
+    "description": ""
+  }
+}

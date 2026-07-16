@@ -1,0 +1,172 @@
+{
+  "updatedAt": "2026-05-31T21:13:53.398Z",
+  "createdAt": "2026-05-31T21:13:53.398Z",
+  "id": "f7MMTbEpIvwmrmrI",
+  "name": "Avatares AI - API - Reject Asset",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assets/reject",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "85608cd1-fc94-44f6-9f2a-b0ce160c4bb6",
+      "name": "POST /assets/reject",
+      "webhookId": "b4e15d29-972a-4143-b744-ad9b9dce4afd"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $json.body || $json;\n\nif (!input.assetId) {\n  throw new Error('Missing required field: assetId');\n}\n\nreturn [{\n  json: {\n    assetId: input.assetId,\n    reviewNotes: input.reviewNotes || 'Rejected via Asset Review API',\n    baseUrl: input.baseUrl || 'http://192.168.0.194:9000'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "f3054e13-7970-4e96-9085-1eb1e63b92b2",
+      "name": "Normalize Reject Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nUPDATE canonical_asset_registry\nSET\n  is_canonical = false,\n  status = 'rejected',\n  review_notes = '{{ $(\"Normalize Reject Request\").first().json.reviewNotes }}',\n  metadata = jsonb_set(\n    jsonb_set(\n      jsonb_set(\n        metadata,\n        '{status}',\n        '\"rejected\"'\n      ),\n      '{isCanonical}',\n      'false'\n    ),\n    '{reviewNotes}',\n    '\"{{ $(\"Normalize Reject Request\").first().json.reviewNotes }}\"'\n  )\nWHERE asset_id = '{{ $(\"Normalize Reject Request\").first().json.assetId }}'\n  AND status <> 'canonical'\nRETURNING\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  sha256,\n  canonical_group,\n  review_notes,\n  created_at;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "b8c9178e-bdcf-4044-bb42-331ae8740f5e",
+      "name": "Reject Asset",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst params = $('Normalize Reject Request').first().json;\nconst rejected = $input.first().json;\n\nif (!rejected || !rejected.asset_id) {\n  return [{\n    json: {\n      rejected: false,\n      assetId: params.assetId,\n      reason: 'Asset not found, already canonical, or rejection failed'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    rejected: true,\n    assetId: rejected.asset_id,\n    avatar: rejected.avatar,\n    scene: rejected.scene,\n    assetType: rejected.asset_type,\n    url: `${params.baseUrl}/${rejected.bucket}/${rejected.object_path}`,\n    bucket: rejected.bucket,\n    objectPath: rejected.object_path,\n    mimeType: rejected.mime_type,\n    status: rejected.status,\n    sha256: rejected.sha256,\n    canonicalGroup: rejected.canonical_group,\n    reviewNotes: rejected.review_notes,\n    createdAt: rejected.created_at\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "78ac25ae-093a-4c4c-b650-b2c7d8e68a56",
+      "name": "Build Reject Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "id": "b15147b3-45d8-41df-8067-9008449284c2",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /assets/reject": {
+      "main": [
+        [
+          {
+            "node": "Normalize Reject Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Reject Request": {
+      "main": [
+        [
+          {
+            "node": "Reject Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Asset": {
+      "main": [
+        [
+          {
+            "node": "Build Reject Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reject Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "d531c5b9-5491-4395-82bc-548669931a85",
+  "activeVersionId": "d531c5b9-5491-4395-82bc-548669931a85",
+  "versionCounter": 52,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-05-31T21:13:53.398Z",
+      "createdAt": "2026-05-31T21:13:53.398Z",
+      "role": "workflow:owner",
+      "workflowId": "f7MMTbEpIvwmrmrI",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Reject asset v1",
+    "description": "Initial webhook endpoint"
+  }
+}

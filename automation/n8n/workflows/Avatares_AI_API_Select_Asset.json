@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-08T23:34:15.727Z",
+  "createdAt": "2026-06-08T20:24:44.407Z",
+  "id": "UuAfi47a8ZHOJr70",
+  "name": "Avatares AI - API - Select Asset",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assets/select",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        -32
+      ],
+      "id": "0c44edfc-6a30-4575-b8ed-a89005dea5d5",
+      "name": "POST /assets/select",
+      "webhookId": "6e757c2a-b5c1-4862-b3ef-cb3c82e08d0c"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nconst body = $json.body || {};\nconst assetId = String(body.assetId || body.asset_id || '').trim();\nconst reviewNotes = String(body.reviewNotes || body.review_notes || 'Marked as selected via Asset Review API').trim();\nconst baseUrl = String(body.baseUrl || body.base_url || 'http://192.168.0.194:9000').replace(/\\/$/, '');\n\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\n\nif (!uuidRegex.test(assetId)) {\n  return {\n    json: {\n      skipQuery: true,\n      ok: false,\n      selected: false,\n      statusCode: 400,\n      error: assetId ? 'Invalid assetId. Expected a UUID.' : 'assetId is required',\n      assetId: assetId || null\n    }\n  };\n}\n\nconst query = `\nUPDATE canonical_asset_registry\nSET\n  is_canonical = false,\n  status = 'selected',\n  review_notes = ${sql(reviewNotes)},\n  metadata = jsonb_set(\n    jsonb_set(\n      COALESCE(metadata, '{}'::jsonb),\n      '{status}',\n      '\"selected\"'::jsonb,\n      true\n    ),\n    '{isCanonical}',\n    'false'::jsonb,\n    true\n  )\nWHERE asset_id = ${sql(assetId)}\n  AND COALESCE(is_canonical, false) = false\n  AND COALESCE(status, '') <> 'canonical'\nRETURNING\n  asset_id,\n  sha256,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  is_canonical,\n  canonical_group,\n  review_notes,\n  created_at;\n`;\n\nreturn {\n  json: {\n    skipQuery: false,\n    query,\n    assetId,\n    baseUrl\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -32
+      ],
+      "id": "87b1c1fb-a8b6-48a3-aaec-d5bc9b90c268",
+      "name": "Build Select Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-select",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        -32
+      ],
+      "id": "94ce9178-17c2-43d7-bd11-c8fbf93148f9",
+      "name": "Is Valid Select Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        -144
+      ],
+      "id": "a5c183ea-af7f-4b96-96b0-7f2de1314e8a",
+      "name": "Select Asset",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $('Build Select Query').first().json;\nconst row = $input.first()?.json ?? {};\n\nif (!row.asset_id || !row.bucket || !row.object_path) {\n  return [{\n    json: {\n      ok: false,\n      selected: false,\n      statusCode: 404,\n      error: 'Asset not found, already canonical, or selection failed',\n      assetId: params.assetId\n    }\n  }];\n}\n\nconst baseUrl = (params.baseUrl || 'http://192.168.0.194:9000').replace(/\\/$/, '');\n\nconst asset = {\n  assetId: row.asset_id,\n  avatar: row.avatar,\n  scene: row.scene,\n  assetType: row.asset_type,\n  status: row.status,\n  isCanonical: row.is_canonical,\n  canonicalGroup: row.canonical_group,\n  bucket: row.bucket,\n  objectPath: row.object_path,\n  url: `${baseUrl}/${row.bucket}/${row.object_path}`,\n  mimeType: row.mime_type,\n  sha256: row.sha256,\n  reviewNotes: row.review_notes,\n  createdAt: row.created_at\n};\n\nreturn [{\n  json: {\n    ok: true,\n    selected: true,\n    statusCode: 200,\n    asset,\n    ...asset\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -144
+      ],
+      "id": "7904e649-38ef-478d-bec7-9625fd73ae5f",
+      "name": "Return Select Asset"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        96
+      ],
+      "id": "507b3286-9549-4407-bcc0-1d965c18e6a8",
+      "name": "Return Invalid Select Request"
+    }
+  ],
+  "connections": {
+    "POST /assets/select": {
+      "main": [
+        [
+          {
+            "node": "Build Select Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Select Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Select Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Select Request": {
+      "main": [
+        [
+          {
+            "node": "Select Asset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Select Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Asset": {
+      "main": [
+        [
+          {
+            "node": "Return Select Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "64a5c85b-8bd9-4990-955f-6c067dc59e97",
+  "activeVersionId": "64a5c85b-8bd9-4990-955f-6c067dc59e97",
+  "versionCounter": 64,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-08T20:24:44.407Z",
+      "createdAt": "2026-06-08T20:24:44.407Z",
+      "role": "workflow:owner",
+      "workflowId": "UuAfi47a8ZHOJr70",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 64a5c85b",
+    "description": ""
+  }
+}

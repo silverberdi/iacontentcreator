@@ -16,9 +16,10 @@ export const scenes = [
 
 export const assetTypes = [
   { id: "raw-image", label: "Raw Image" },
-  { id: "generated", label: "Generated" },
-  { id: "select", label: "Select" },
-  { id: "canonical", label: "Canonical" },
+  { id: "reference-image", label: "Reference Image" },
+  { id: "post-image", label: "Post Image" },
+  { id: "story-image", label: "Story Image" },
+  { id: "training-image", label: "Training Image" },
 ] as const;
 
 export const statusFilters = [

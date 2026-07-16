@@ -1,0 +1,147 @@
+{
+  "updatedAt": "2026-06-09T21:55:32.974Z",
+  "createdAt": "2026-06-09T21:55:32.974Z",
+  "id": "g53mRwoltDUZQGXT",
+  "name": "Avatares AI - API - List Publication Drafts",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publication/drafts/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "db3a46f6-9ce9-4125-add3-989890986053",
+      "name": "POST /publication/drafts/list",
+      "webhookId": "37d2ea48-a947-481d-b437-4b5ba3f7abb2"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\nfunction slug(value, fallback = '') { return String(value || fallback || '').trim(); }\nconst body=$json.body||{}; const avatar=slug(body.avatar); const scene=slug(body.scene); const status=slug(body.status,''); const limit=Number(body.limit||50); const where=[]; if(avatar)where.push(`avatar=${sql(avatar)}`); if(scene)where.push(`scene=${sql(scene)}`); if(status)where.push(`status=${sql(status)}`); const wc=where.length?'WHERE '+where.join(' AND '):''; const query=`SELECT * FROM publication_drafts ${wc} ORDER BY updated_at DESC LIMIT ${Number.isFinite(limit)?limit:50};`; return {json:{query}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "ac768888-db4a-4534-8093-61943801af85",
+      "name": "Build List Drafts Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "6adc13bb-1fe2-4660-96de-13d207ee5713",
+      "name": "List Publication Drafts",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "function parse(v, fallback) {\n  if (v == null) return fallback;\n  if (typeof v === 'string') {\n    try { return JSON.parse(v); } catch { return fallback; }\n  }\n  return v;\n}\n\nconst rows = $input\n  .all()\n  .map((item) => item.json || {})\n  .filter((row) => row.draft_id);\n\nconst drafts = rows.map((r) => ({\n  draftId: r.draft_id,\n  avatar: r.avatar,\n  scene: r.scene,\n  assetType: r.asset_type,\n  platform: r.platform,\n  assetId: r.asset_id,\n  generatedAssetId: r.generated_asset_id,\n  imageUrl: r.image_url,\n  caption: r.caption,\n  hashtags: parse(r.hashtags, []),\n  status: r.status,\n  createdAt: r.created_at,\n  updatedAt: r.updated_at,\n  approvedAt: r.approved_at,\n}));\n\nreturn [{ json: { ok: true, count: drafts.length, drafts } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "e4df7784-687b-4df8-8cd5-6f9fab37922e",
+      "name": "Return Publication Drafts"
+    }
+  ],
+  "connections": {
+    "POST /publication/drafts/list": {
+      "main": [
+        [
+          {
+            "node": "Build List Drafts Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build List Drafts Query": {
+      "main": [
+        [
+          {
+            "node": "List Publication Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Publication Drafts": {
+      "main": [
+        [
+          {
+            "node": "Return Publication Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "251e7689-c4c6-46b9-b6bc-403f189a84e4",
+  "activeVersionId": "251e7689-c4c6-46b9-b6bc-403f189a84e4",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:55:32.974Z",
+      "createdAt": "2026-06-09T21:55:32.974Z",
+      "role": "workflow:owner",
+      "workflowId": "g53mRwoltDUZQGXT",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 251e7689",
+    "description": ""
+  }
+}

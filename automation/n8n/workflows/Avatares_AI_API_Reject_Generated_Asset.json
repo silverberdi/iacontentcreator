@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T21:43:46.303Z",
+  "createdAt": "2026-06-09T21:43:46.303Z",
+  "id": "KqiwZpDLjHcm8LYl",
+  "name": "Avatares AI - API - Reject Generated Asset",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generation/generated/reject",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "400af379-9995-4e62-953c-c37abd46088a",
+      "name": "POST /generation/generated/reject",
+      "webhookId": "d3848c4e-b38a-479e-b063-d20b3b6c376c"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\nfunction slug(value, fallback = '') { return String(value || fallback || '').trim(); }\nconst body=$json.body||{}; const generatedAssetId=String(body.generatedAssetId||body.generated_asset_id||'').trim(); const notes=String(body.reviewNotes||body.review_notes||'Rejected from generated asset review').trim(); const re=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif(!re.test(generatedAssetId)) return {json:{ok:false,skipQuery:true,error:'generatedAssetId is required UUID',generatedAssetId}};\nconst finalStatus = 'rejected' === 'rejected' ? (['rejected','needs_fix'].includes(String(body.status||'rejected')) ? String(body.status||'rejected') : 'rejected') : 'approved';\nconst query=`UPDATE generated_assets SET status=${sql(finalStatus)}, review_notes=${sql(notes)}, approved_at=CASE WHEN ${sql(finalStatus)}='approved' THEN now() ELSE approved_at END, rejected_at=CASE WHEN ${sql(finalStatus)}='rejected' THEN now() ELSE rejected_at END, updated_at=now() WHERE generated_asset_id=${sql(generatedAssetId)}::uuid RETURNING *;`;\nreturn {json:{skipQuery:false,query,generatedAssetId}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "8c331f25-39a2-4e49-a137-73360391d05e",
+      "name": "Build Reject Generated Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "cad365fd-8364-4c77-b97f-1cd65f71088c",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a1af76a8-c25a-4fc1-baf0-6b01c2908f84",
+      "name": "Reject Generated Asset",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row=$input.first()?.json||{}; if(!row.generated_asset_id) return [{json:{ok:false,updated:false,error:'Generated asset not found'}}];\nreturn [{json:{ok:true,updated:true,generatedAsset:{generatedAssetId:row.generated_asset_id,jobId:row.job_id,assetId:row.asset_id,avatar:row.avatar,scene:row.scene,assetType:row.asset_type,status:row.status,reviewNotes:row.review_notes,approvedAt:row.approved_at,rejectedAt:row.rejected_at}}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "09998c7a-565f-4b08-8b69-0ab1597ddfd9",
+      "name": "Return Rejected Generated Asset"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "53e721a8-49ca-4bf1-a1fe-fdc6bc148dcd",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /generation/generated/reject": {
+      "main": [
+        [
+          {
+            "node": "Build Reject Generated Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reject Generated Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Reject Generated Asset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject Generated Asset": {
+      "main": [
+        [
+          {
+            "node": "Return Rejected Generated Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "f6b5b2af-5464-4554-b2bf-64b1f287c68f",
+  "activeVersionId": "f6b5b2af-5464-4554-b2bf-64b1f287c68f",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:43:46.303Z",
+      "createdAt": "2026-06-09T21:43:46.303Z",
+      "role": "workflow:owner",
+      "workflowId": "KqiwZpDLjHcm8LYl",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version f6b5b2af",
+    "description": ""
+  }
+}

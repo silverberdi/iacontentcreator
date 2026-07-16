@@ -1,0 +1,115 @@
+{
+  "updatedAt": "2026-06-01T15:46:21.573Z",
+  "createdAt": "2026-06-01T15:46:21.573Z",
+  "id": "bMaE52DvSYO4cipf",
+  "name": "Avatares AI - Admin - Daily Backup",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "02b0be6c-a065-4d04-8312-d6db48119eb1",
+      "name": "Daily 2 AM"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        208
+      ],
+      "id": "ec17152c-1ace-452a-880f-ed80b04d10c3",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const backup = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://backup-runner:8080/backups/create',\n    headers: { 'Content-Type': 'application/json' },\n    body: { requestedBy: 'n8n-daily-schedule' },\n    json: true,\n  });\n\n  const prune = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://backup-runner:8080/backups/prune',\n    headers: { 'Content-Type': 'application/json' },\n    body: { keepLast: 14, dryRun: false },\n    json: true,\n  });\n\n  return { json: { ok: true, scheduledBackup: true, backup, prune } };\n} catch (error) {\n  return { json: { ok: false, scheduledBackup: true, message: error.message, error: error.description || error.cause || null } };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        128
+      ],
+      "id": "dee0d615-1e16-41c4-835c-c894491b19b5",
+      "name": "Create Backup And Prune"
+    }
+  ],
+  "connections": {
+    "Daily 2 AM": {
+      "main": [
+        [
+          {
+            "node": "Create Backup And Prune",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Backup And Prune",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "20099571-8ead-414d-8649-6fe2524cb392",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-01T15:46:21.573Z",
+      "createdAt": "2026-06-01T15:46:21.573Z",
+      "role": "workflow:owner",
+      "workflowId": "bMaE52DvSYO4cipf",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

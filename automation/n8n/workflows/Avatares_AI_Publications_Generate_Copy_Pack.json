@@ -1,0 +1,205 @@
+{
+  "updatedAt": "2026-07-16T00:00:00.000Z",
+  "createdAt": "2026-07-16T00:00:00.000Z",
+  "id": "AvAIPubCopy01",
+  "name": "Avatares AI - Publications - Generate Copy Pack",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/generate-copy-pack",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "copy-pack-001",
+      "name": "POST /publications/jobs/generate-copy-pack",
+      "webhookId": "generate-copy-pack-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst manualCopyPack = body.copyPack && typeof body.copyPack === 'object' ? body.copyPack : null;\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst query = `\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), selected_asset AS (\n  SELECT car.*\n  FROM canonical_asset_registry car\n  JOIN job pj ON car.asset_id::text = pj.metadata->>'selectedAssetId'\n  LIMIT 1\n)\nSELECT\n  true AS ok,\n  pj.publication_job_id AS \"publicationJobId\",\n  pj.avatar,\n  pj.scene,\n  pj.format,\n  pj.objective,\n  pj.business_profile AS \"businessProfile\",\n  pj.asset_type AS \"assetType\",\n  pj.status,\n  pj.brief,\n  pj.prompt_pack AS \"promptPack\",\n  pj.publishing_pack AS \"publishingPack\",\n  pj.metadata,\n  pj.created_at AS \"createdAt\",\n  pj.updated_at AS \"updatedAt\",\n  ac.display_name AS \"avatarDisplayName\",\n  ac.avatar_short AS \"avatarShort\",\n  sc.display_name AS \"sceneDisplayName\",\n  COALESCE(sc.description, '') AS \"sceneDescription\",\n  COALESCE(sa.asset_id, pj.metadata->>'selectedAssetId') AS \"selectedAssetId\",\n  sa.bucket AS \"selectedAssetBucket\",\n  sa.object_path AS \"selectedAssetObjectPath\",\n  sa.status AS \"selectedAssetStatus\",\n  sa.review_notes AS \"selectedAssetReviewNotes\",\n  ${sql(JSON.stringify(manualCopyPack))}::jsonb AS \"manualCopyPack\"\nFROM job pj\nLEFT JOIN selected_asset sa ON true\nLEFT JOIN avatar_catalog ac ON ac.avatar = pj.avatar\nLEFT JOIN scene_catalog sc ON sc.avatar = pj.avatar AND sc.scene = pj.scene\nLIMIT 1;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "copy-pack-002",
+      "name": "Build Load Copy Context Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "copy-pack-003",
+      "name": "Load Copy Context",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) { return sql(JSON.stringify(value ?? {})) + '::jsonb'; }\nfunction parseJson(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nfunction toArray(value, fallback = []) {\n  if (Array.isArray(value)) return value.map(String).filter(Boolean);\n  if (typeof value === 'string' && value.trim()) return value.split(/[,;\\n]/).map((x) => x.trim()).filter(Boolean);\n  return fallback;\n}\nfunction normalizeCopyPack(raw, row) {\n  const source = raw && typeof raw === 'object' ? raw : {};\n  const brief = parseJson(row.brief, {});\n  const captionSeeds = toArray(brief.captionSeeds || brief.caption_seeds, []);\n  const selectedAssetId = String(row.selectedAssetId || source.selectedAssetId || '').trim();\n  return {\n    primaryCaption: String(source.primaryCaption || source.primary_caption || source.caption || captionSeeds[0] || brief.captionAngle || '').trim(),\n    captionAlternatives: toArray(source.captionAlternatives || source.caption_alternatives || source.alternatives, captionSeeds.slice(1)).slice(0, 5),\n    hashtags: toArray(source.hashtags, ['#EstefaniaMontealegre', '#LifestyleColombia', '#CoffeeMood', '#SlowLiving']).map((tag) => String(tag).startsWith('#') ? String(tag) : '#' + String(tag).replace(/^#+/, '')).slice(0, 12),\n    storyText: toArray(source.storyText || source.story_text || source.storyFrames, []).slice(0, 5),\n    ctaOptions: toArray(source.ctaOptions || source.cta_options, []).slice(0, 5),\n    publishingNotes: String(source.publishingNotes || source.publishing_notes || 'Manual publishing package for selected Estefanía asset.').trim(),\n    platform: String(source.platform || 'instagram').trim(),\n    tone: String(source.tone || brief.emotionalTone || 'warm, natural, lightly reflective').trim(),\n    language: String(source.language || 'es-CO').trim(),\n    selectedAssetId,\n    selectedAssetObjectPath: row.selectedAssetObjectPath || source.selectedAssetObjectPath || null\n  };\n}\nconst row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f' || !row.publicationJobId) {\n  const error = row.error || 'Publication job not found';\n  return [{ json: { query: `SELECT false AS ok, ${sql(error)} AS error;` } }];\n}\nif (!row.selectedAssetId) {\n  return [{ json: { query: \"SELECT false AS ok, 'Selected asset is required before generating copy pack' AS error;\" } }];\n}\nlet copyPack;\nlet provider = 'manual';\nlet providerMeta = {};\nconst manualCopyPack = row.manualCopyPack && typeof row.manualCopyPack === 'object' ? row.manualCopyPack : null;\nif (manualCopyPack) {\n  copyPack = normalizeCopyPack(manualCopyPack, row);\n} else {\n  provider = 'ai-gateway';\n  try {\n    const gateway = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'http://ai-gateway:8095/publication-copy-pack',\n      headers: {\n        'Content-Type': 'application/json',\n        'X-Request-Id': `publication-copy-${row.publicationJobId}`\n      },\n      body: {\n        job: {\n          publicationJobId: row.publicationJobId,\n          avatar: row.avatar,\n          avatarDisplayName: row.avatarDisplayName,\n          scene: row.scene,\n          sceneDisplayName: row.sceneDisplayName,\n          format: row.format,\n          objective: row.objective,\n          businessProfile: row.businessProfile,\n          assetType: row.assetType\n        },\n        brief: parseJson(row.brief, {}),\n        promptPack: parseJson(row.promptPack, {}),\n        selectedAsset: {\n          assetId: row.selectedAssetId,\n          bucket: row.selectedAssetBucket,\n          objectPath: row.selectedAssetObjectPath,\n          status: row.selectedAssetStatus,\n          reviewNotes: row.selectedAssetReviewNotes\n        },\n        sceneContext: {\n          description: row.sceneDescription\n        }\n      },\n      json: true,\n      timeout: 120000\n    });\n    if (!gateway?.ok || !gateway.copyPack) {\n      const message = gateway?.error || 'AI gateway did not return a copy pack';\n      return [{ json: { query: `SELECT false AS ok, ${sql(message)} AS error;` } }];\n    }\n    copyPack = normalizeCopyPack(gateway.copyPack, row);\n    providerMeta = { provider: gateway.provider || null, model: gateway.model || null, requestId: gateway.requestId || null, latencyMs: gateway.latencyMs || null };\n  } catch (error) {\n    const message = error?.message || 'AI gateway copy request failed';\n    return [{ json: { query: `SELECT false AS ok, ${sql(message)} AS error;` } }];\n  }\n}\nconst query = `\nUPDATE publication_jobs\nSET\n  publishing_pack = ${sqlJson(copyPack)},\n  status = 'copy-ready',\n  error_message = NULL,\n  updated_at = now(),\n  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(\n    'copyPackProvider', ${sql(provider)},\n    'copyPackGeneratedAt', now(),\n    'copyPackProviderMeta', ${sqlJson(providerMeta)}\n  )\nWHERE publication_job_id = ${sql(row.publicationJobId)}::uuid\nRETURNING\n  true AS ok,\n  publication_job_id AS \"publicationJobId\",\n  avatar,\n  scene,\n  format,\n  objective,\n  business_profile AS \"businessProfile\",\n  asset_type AS \"assetType\",\n  status,\n  brief,\n  prompt_pack AS \"promptPack\",\n  publishing_pack AS \"publishingPack\",\n  created_at AS \"createdAt\",\n  updated_at AS \"updatedAt\";\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "copy-pack-004",
+      "name": "Build Save Copy Pack Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "copy-pack-005",
+      "name": "Save Copy Pack",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, error: row.error || 'Copy pack was not generated.' } }];\n}\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nconst brief = parse(row.brief, null);\nconst promptPack = parse(row.promptPack, null);\nconst publishingPack = parse(row.publishingPack, null);\nreturn [{ json: { ok: true, publishingPack, copyPack: publishingPack, job: { publicationJobId: row.publicationJobId, avatar: row.avatar, scene: row.scene, format: row.format, objective: row.objective, businessProfile: row.businessProfile, assetType: row.assetType, status: row.status, brief, promptPack, publishingPack, createdAt: row.createdAt, updatedAt: row.updatedAt } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "copy-pack-006",
+      "name": "Return Copy Pack"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "copy-pack-007",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/generate-copy-pack": {
+      "main": [
+        [
+          {
+            "node": "Build Load Copy Context Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Load Copy Context Query": {
+      "main": [
+        [
+          {
+            "node": "Load Copy Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Copy Context": {
+      "main": [
+        [
+          {
+            "node": "Build Save Copy Pack Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Save Copy Pack Query": {
+      "main": [
+        [
+          {
+            "node": "Save Copy Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Copy Pack": {
+      "main": [
+        [
+          {
+            "node": "Return Copy Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Copy Pack": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "generate-copy-pack-v1",
+  "activeVersionId": "generate-copy-pack-v1",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

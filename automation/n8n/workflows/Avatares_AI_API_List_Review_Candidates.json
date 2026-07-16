@@ -1,0 +1,172 @@
+{
+  "updatedAt": "2026-05-31T20:37:31.839Z",
+  "createdAt": "2026-05-31T20:37:31.839Z",
+  "id": "oqVDpdkqjNWsYgWK",
+  "name": "Avatares AI - API - List Review Candidates",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assets/review-candidates",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2cb6c138-be78-4b22-8df2-ebd734f1a808",
+      "name": "POST /assets/review-candidates",
+      "webhookId": "331a4e71-9d97-4fd1-87cf-e11789d721a7"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $json.body || $json;\n\nconst required = ['avatar', 'scene', 'assetType'];\nconst missing = required.filter(k => !input[k]);\n\nif (missing.length > 0) {\n  throw new Error(`Missing required fields: ${missing.join(', ')}`);\n}\n\nreturn [{\n  json: {\n    avatar: input.avatar,\n    scene: input.scene,\n    assetType: input.assetType,\n    baseUrl: input.baseUrl || 'http://192.168.0.194:9000',\n    limit: input.limit || 50,\n    includeCanonical: input.includeCanonical !== false\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "0558b8a5-6ec2-483f-8bfb-99261df4ac1f",
+      "name": "Normalize Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  version,\n  bucket,\n  object_path,\n  original_filename,\n  mime_type,\n  file_size,\n  extension,\n  sha256,\n  status,\n  is_canonical,\n  canonical_group,\n  review_notes,\n  created_at\nFROM canonical_asset_registry\nWHERE avatar = '{{ $(\"Normalize Request\").first().json.avatar }}'\n  AND scene = '{{ $(\"Normalize Request\").first().json.scene }}'\n  AND asset_type = '{{ $(\"Normalize Request\").first().json.assetType }}'\n  AND (\n    status IN ('raw', 'selected')\n    OR (\n      {{ $(\"Normalize Request\").first().json.includeCanonical }}\n      AND status = 'canonical'\n    )\n  )\nORDER BY created_at DESC\nLIMIT {{ $(\"Normalize Request\").first().json.limit }};\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "3823ee63-befd-4622-a0cc-7b6e8b76b780",
+      "name": "Query Review Candidates",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst params = $('Normalize Request').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.asset_id);\n\nconst candidates = rows.map(r => ({\n  assetId: r.asset_id,\n  avatar: r.avatar,\n  scene: r.scene,\n  assetType: r.asset_type,\n  url: `${params.baseUrl}/${r.bucket}/${r.object_path}`,\n  bucket: r.bucket,\n  objectPath: r.object_path,\n  mimeType: r.mime_type,\n  status: r.status,\n  isCanonical: r.is_canonical,\n  sha256: r.sha256,\n  canonicalGroup: r.canonical_group,\n  reviewNotes: r.review_notes,\n  createdAt: r.created_at\n}));\n\nreturn [{\n  json: {\n    status: 'ok',\n    count: candidates.length,\n    avatar: params.avatar,\n    scene: params.scene,\n    assetType: params.assetType,\n    candidates\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "d6118f45-c04e-46ea-9ab1-0a1cc939836e",
+      "name": "Build Candidates Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "id": "7e84fe27-7b98-47c4-a19f-981b5259b0aa",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /assets/review-candidates": {
+      "main": [
+        [
+          {
+            "node": "Normalize Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Request": {
+      "main": [
+        [
+          {
+            "node": "Query Review Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Review Candidates": {
+      "main": [
+        [
+          {
+            "node": "Build Candidates Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Candidates Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "ffb189a5-4d82-479c-bf45-accf567ed023",
+  "activeVersionId": "ffb189a5-4d82-479c-bf45-accf567ed023",
+  "versionCounter": 53,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-05-31T20:37:31.839Z",
+      "createdAt": "2026-05-31T20:37:31.839Z",
+      "role": "workflow:owner",
+      "workflowId": "oqVDpdkqjNWsYgWK",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "List Review Candidates API v1",
+    "description": "Initial webhook endpoint"
+  }
+}

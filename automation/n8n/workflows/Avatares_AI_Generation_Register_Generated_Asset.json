@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T22:38:03.166Z",
+  "createdAt": "2026-06-09T21:41:03.592Z",
+  "id": "6ezn8ZB5hcfL6zhs",
+  "name": "Avatares AI - Generation - Register Generated Asset",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generation/generated/register",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "5d631f44-0c07-4766-b5b2-fe7d9911b023",
+      "name": "POST /generation/generated/register",
+      "webhookId": "be2c7ff0-dd52-4f0d-aca4-b98076cf4f03"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nconst body = $json.body || {};\n\nconst jobId = String(body.jobId || body.job_id || '').trim();\nconst assetId = String(body.assetId || body.asset_id || '').trim();\n\nconst re = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\n\nif (!re.test(jobId) || !re.test(assetId)) {\n  return {\n    json: {\n      ok: false,\n      skipQuery: true,\n      error: 'jobId and assetId are required UUIDs',\n      jobId,\n      assetId\n    }\n  };\n}\n\nconst query = `\nWITH asset AS (\n  SELECT *\n  FROM canonical_asset_registry\n  WHERE asset_id = ${sql(assetId)}\n  LIMIT 1\n),\nins AS (\n  INSERT INTO generated_assets (\n    generated_asset_id,\n    job_id,\n    asset_id,\n    avatar,\n    scene,\n    asset_type,\n    status,\n    review_notes,\n    metadata,\n    created_at,\n    updated_at\n  )\n  SELECT\n    gen_random_uuid(),\n    ${sql(jobId)}::uuid,\n    asset.asset_id::uuid,\n    asset.avatar,\n    asset.scene,\n    asset.asset_type,\n    'generated',\n    NULL,\n    jsonb_build_object(\n      'source', 'generation-register',\n      'jobId', ${sql(jobId)},\n      'assetId', asset.asset_id,\n      'bucket', asset.bucket,\n      'objectPath', asset.object_path,\n      'mimeType', asset.mime_type,\n      'originalStatus', asset.status,\n      'canonicalRegistryMetadata', asset.metadata\n    ),\n    now(),\n    now()\n  FROM asset\n  ON CONFLICT (asset_id)\n  DO UPDATE SET\n    job_id = EXCLUDED.job_id,\n    status = 'generated',\n    review_notes = NULL,\n    metadata = EXCLUDED.metadata,\n    updated_at = now()\n  RETURNING *\n),\njob_update AS (\n  UPDATE generation_jobs\n  SET status = 'review_required',\n      completed_at = now(),\n      updated_at = now()\n  WHERE job_id = ${sql(jobId)}::uuid\n    AND EXISTS (SELECT 1 FROM ins)\n  RETURNING *\n)\nSELECT\n  COALESCE((SELECT COUNT(*) FROM asset), 0) AS asset_found,\n  COALESCE((SELECT row_to_json(ins) FROM ins LIMIT 1), NULL) AS generated_asset,\n  COALESCE((SELECT row_to_json(job_update) FROM job_update LIMIT 1), NULL) AS job;\n`;\n\nreturn {\n  json: {\n    ok: true,\n    skipQuery: false,\n    query\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "55a63ff9-e74e-462d-8f31-c538308e03e3",
+      "name": "Build Register Generated Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "00b6d8b0-3f12-436f-8659-702affeb8488",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cb9ed1be-1087-41ef-b089-c9cabb4c9a5e",
+      "name": "Register Generated Asset",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row=$input.first()?.json||{}; function parse(v,f){if(v==null)return f;if(typeof v==='string'){try{return JSON.parse(v)}catch{return f}}return v} const ga=parse(row.generated_asset,null); if(!ga)return[{json:{ok:false,registered:false,error:'Asset not found or could not be registered'}}]; return[{json:{ok:true,registered:true,generatedAsset:ga,job:parse(row.job,null)}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "323a8744-5ee4-43db-95f4-ab465e140a73",
+      "name": "Return Registered Generated Asset"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "eac335a9-f3e2-486d-8fd5-cd9c5c110a17",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /generation/generated/register": {
+      "main": [
+        [
+          {
+            "node": "Build Register Generated Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Register Generated Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Register Generated Asset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register Generated Asset": {
+      "main": [
+        [
+          {
+            "node": "Return Registered Generated Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "18ef6264-4e67-4334-96e2-886532d5ebae",
+  "activeVersionId": "18ef6264-4e67-4334-96e2-886532d5ebae",
+  "versionCounter": 47,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:41:03.592Z",
+      "createdAt": "2026-06-09T21:41:03.592Z",
+      "role": "workflow:owner",
+      "workflowId": "6ezn8ZB5hcfL6zhs",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 18ef6264",
+    "description": ""
+  }
+}

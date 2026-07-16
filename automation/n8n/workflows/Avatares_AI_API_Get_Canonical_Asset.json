@@ -1,0 +1,172 @@
+{
+  "updatedAt": "2026-05-31T20:37:06.756Z",
+  "createdAt": "2026-05-31T20:37:06.756Z",
+  "id": "RQRHOxFx851ix3u3",
+  "name": "Avatares AI - API - Get Canonical Asset",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assets/get-canonical",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "6b44a2c7-2624-4914-a161-8f2f6104b904",
+      "name": "POST /assets/get-canonical",
+      "webhookId": "9f4c6850-6ef4-4715-95bd-c93c3cc1a5be"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $json.body || $json;\n\nconst required = ['avatar', 'scene', 'assetType'];\nconst missing = required.filter(k => !input[k]);\n\nif (missing.length > 0) {\n  throw new Error(`Missing required fields: ${missing.join(', ')}`);\n}\n\nreturn [{\n  json: {\n    avatar: input.avatar,\n    scene: input.scene,\n    assetType: input.assetType,\n    baseUrl: input.baseUrl || 'http://192.168.0.194:9000'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "a1d13bba-6d2e-4ab7-a470-f89de24c51bd",
+      "name": "Normalize Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  version,\n  bucket,\n  object_path,\n  original_filename,\n  mime_type,\n  file_size,\n  extension,\n  sha256,\n  status,\n  is_canonical,\n  canonical_group,\n  review_notes,\n  metadata,\n  created_at\nFROM canonical_asset_registry\nWHERE avatar = '{{ $(\"Normalize Query\").first().json.avatar }}'\n  AND scene = '{{ $(\"Normalize Query\").first().json.scene }}'\n  AND asset_type = '{{ $(\"Normalize Query\").first().json.assetType }}'\n  AND status = 'canonical'\n  AND is_canonical = true\nORDER BY created_at DESC\nLIMIT 1;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "c948816e-893d-4b1b-ad4c-d1984a95b3e2",
+      "name": "Query Canonical Asset",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst params = $('Normalize Query').first().json;\nconst asset = $input.first().json;\n\nif (!asset || !asset.asset_id) {\n  return [{\n    json: {\n      found: false,\n      avatar: params.avatar,\n      scene: params.scene,\n      assetType: params.assetType,\n      reason: 'No canonical asset found'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    found: true,\n    assetId: asset.asset_id,\n    avatar: asset.avatar,\n    scene: asset.scene,\n    assetType: asset.asset_type,\n    url: `${params.baseUrl}/${asset.bucket}/${asset.object_path}`,\n    bucket: asset.bucket,\n    objectPath: asset.object_path,\n    mimeType: asset.mime_type,\n    status: asset.status,\n    sha256: asset.sha256,\n    canonicalGroup: asset.canonical_group,\n    reviewNotes: asset.review_notes,\n    createdAt: asset.created_at\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "56e7bd35-c6fe-4c1d-8cac-d6321270c28e",
+      "name": "Build Canonical Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "id": "1b975bfc-5ba3-4964-9460-007a55e87a2c",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /assets/get-canonical": {
+      "main": [
+        [
+          {
+            "node": "Normalize Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Query": {
+      "main": [
+        [
+          {
+            "node": "Query Canonical Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Canonical Asset": {
+      "main": [
+        [
+          {
+            "node": "Build Canonical Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Canonical Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "efc66e98-d077-4bea-afc7-24402007f00d",
+  "activeVersionId": "efc66e98-d077-4bea-afc7-24402007f00d",
+  "versionCounter": 53,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-05-31T20:37:06.756Z",
+      "createdAt": "2026-05-31T20:37:06.756Z",
+      "role": "workflow:owner",
+      "workflowId": "RQRHOxFx851ix3u3",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Get Canonical API v1",
+    "description": "Initial webhook endpoint"
+  }
+}

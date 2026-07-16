@@ -1,0 +1,90 @@
+{
+  "updatedAt": "2026-06-02T16:40:21.812Z",
+  "createdAt": "2026-06-02T16:40:21.812Z",
+  "id": "OfKWDj0EuTnW3cti",
+  "name": "Avatares AI - Admin - Auto Ingest Watcher Status",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/auto-ingest/watcher-status",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a4c5f25b-05e5-404b-a49d-94c7edf75ac2",
+      "name": "POST /admin/auto-ingest/watcher-status",
+      "webhookId": "575f76f6-86e2-40a6-ab10-29c78c0a635d"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const data = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'http://auto-ingest-runner:8090/watcher/status',\n    headers: { 'Content-Type': 'application/json' },\n    body: {},\n    json: true,\n  });\n\n  return { json: { ok: true, ...data } };\n} catch (error) {\n  return { json: { ok: false, message: error.message, error: error.description || error.cause || null } };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        0
+      ],
+      "id": "7720f6e8-4298-43b5-9e69-64965ddadeeb",
+      "name": "Call Watcher Status"
+    }
+  ],
+  "connections": {
+    "POST /admin/auto-ingest/watcher-status": {
+      "main": [
+        [
+          {
+            "node": "Call Watcher Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b37f3e68-a3b0-494a-9fba-8abd1eceb352",
+  "activeVersionId": "b37f3e68-a3b0-494a-9fba-8abd1eceb352",
+  "versionCounter": 49,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-02T16:40:21.812Z",
+      "createdAt": "2026-06-02T16:40:21.812Z",
+      "role": "workflow:owner",
+      "workflowId": "OfKWDj0EuTnW3cti",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version b37f3e68",
+    "description": ""
+  }
+}

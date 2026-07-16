@@ -6,6 +6,7 @@ import LoadingSpinner from "../LoadingSpinner";
 
 type WatcherControlsSectionProps = {
   status: WatcherStatusResponse | null;
+  technicalMode: boolean;
   loading: boolean;
   actionPending: boolean;
   error: string | null;
@@ -18,6 +19,7 @@ type WatcherControlsSectionProps = {
 
 export default function WatcherControlsSection({
   status,
+  technicalMode,
   loading,
   actionPending,
   error,
@@ -43,33 +45,43 @@ export default function WatcherControlsSection({
           >
             {loading ? "Refreshing…" : "Refresh Watcher Status"}
           </button>
-          <button
-            type="button"
-            onClick={onStart}
-            disabled={busy}
-            className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
-          >
-            Start Watcher
-          </button>
-          <button
-            type="button"
-            onClick={onStop}
-            disabled={busy}
-            className="rounded-md bg-red-900/80 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-800 disabled:opacity-50"
-          >
-            Stop Watcher
-          </button>
-          <button
-            type="button"
-            onClick={onRunOnce}
-            disabled={busy}
-            className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {actionPending ? "Running…" : "Run Once"}
-          </button>
+          {technicalMode && (
+            <>
+              <button
+                type="button"
+                onClick={onStart}
+                disabled={busy}
+                className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                Start Watcher
+              </button>
+              <button
+                type="button"
+                onClick={onStop}
+                disabled={busy}
+                className="rounded-md bg-red-900/80 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-800 disabled:opacity-50"
+              >
+                Stop Watcher
+              </button>
+              <button
+                type="button"
+                onClick={onRunOnce}
+                disabled={busy}
+                className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              >
+                {actionPending ? "Running…" : "Run Once"}
+              </button>
+            </>
+          )}
         </>
       }
     >
+      {!technicalMode && (
+        <p className="mb-3 text-sm text-gray-500">
+          Watcher start, stop, and run-once controls are hidden outside technical mode.
+        </p>
+      )}
+
       {loading && !status && (
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <LoadingSpinner className="size-4" label="Loading watcher status…" />
@@ -110,7 +122,6 @@ export default function WatcherControlsSection({
                 <ResultRow label="profileName" value={status.activeProfile.profileName} />
                 <ResultRow label="avatar" value={status.activeProfile.avatar} />
                 <ResultRow label="scene" value={status.activeProfile.scene} />
-                <ResultRow label="assetType" value={status.activeProfile.assetType} />
                 <ResultRow label="workflow" value={status.activeProfile.workflow} />
                 <ResultRow label="model" value={status.activeProfile.model} />
                 <ResultRow label="seed" value={status.activeProfile.seed} />

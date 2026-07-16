@@ -39,7 +39,7 @@ export default function FiltersPanel({
           <span className="ml-2 font-normal normal-case text-gray-500">(loading catalogs…)</span>
         )}
       </h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 xl:items-end">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 xl:items-end">
         <CatalogSelect
           label="Avatar"
           value={filters.avatar}
@@ -61,15 +61,6 @@ export default function FiltersPanel({
           value={filters.scene}
           options={sceneOptions}
           onChange={(scene) => onChange({ ...filters, scene })}
-          disabled={loading}
-          className="min-w-0"
-        />
-
-        <CatalogSelect
-          label="Asset type"
-          value={filters.assetType}
-          options={catalogOptions.assetTypes}
-          onChange={(assetType) => onChange({ ...filters, assetType })}
           disabled={loading}
           className="min-w-0"
         />

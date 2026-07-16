@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AssetCandidate } from "../types/assets";
-import { isCanonicalAsset } from "../utils/candidateFilters";
+import { canSelectAsset, isCanonicalAsset, isSelectedAsset } from "../utils/candidateFilters";
 import { formatDate, shortenId, shortenSha256 } from "../utils/format";
 import CopyButton from "./CopyButton";
 import StatusBadge from "./StatusBadge";
@@ -11,6 +11,7 @@ type AssetCardProps = {
   asset: AssetCandidate;
   onImageClick: (asset: AssetCandidate) => void;
   onPromote: (asset: AssetCandidate) => void;
+  onSelect: (asset: AssetCandidate) => void;
   onReject: (asset: AssetCandidate) => void;
   operationPending: boolean;
 };
@@ -19,11 +20,14 @@ export default function AssetCard({
   asset,
   onImageClick,
   onPromote,
+  onSelect,
   onReject,
   operationPending,
 }: AssetCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const isCanonical = isCanonicalAsset(asset);
+  const isSelected = isSelectedAsset(asset);
+  const canSelect = canSelectAsset(asset);
 
   const openPreview = () => {
     if (!imageFailed) onImageClick(asset);
@@ -73,6 +77,11 @@ export default function AssetCard({
               Canonical
             </span>
           )}
+          {isSelected && (
+            <span className="rounded-full bg-blue-900/40 px-2 py-0.5 text-xs font-medium text-blue-200">
+              Selected
+            </span>
+          )}
         </div>
 
         <dl className="space-y-1.5 text-xs">
@@ -111,20 +120,29 @@ export default function AssetCard({
           <CopyButton value={asset.sha256} label="Copy sha256" />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
             disabled={isCanonical || operationPending}
             onClick={() => onPromote(asset)}
-            className="flex-1 rounded-md bg-emerald-700 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md bg-emerald-700 px-2 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Promote
           </button>
           <button
             type="button"
+            disabled={!canSelect || operationPending}
+            onClick={() => onSelect(asset)}
+            className="rounded-md bg-blue-800 px-2 py-1.5 text-xs font-medium text-blue-50 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            title={isSelected ? "Already selected" : undefined}
+          >
+            Select
+          </button>
+          <button
+            type="button"
             disabled={isCanonical || operationPending}
             onClick={() => onReject(asset)}
-            className="flex-1 rounded-md bg-red-900/80 px-2.5 py-1.5 text-xs font-medium text-red-100 transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md bg-red-900/80 px-2 py-1.5 text-xs font-medium text-red-100 transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reject
           </button>

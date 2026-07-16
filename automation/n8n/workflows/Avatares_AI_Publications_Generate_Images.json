@@ -1,0 +1,148 @@
+{
+  "updatedAt": "2026-07-15T00:00:00.000Z",
+  "createdAt": "2026-07-15T00:00:00.000Z",
+  "id": "AvAIPubImages01",
+  "name": "Avatares AI - Publications - Generate Images",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/generate-images",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b7fd1c70-0001-4dd7-a001-000000000001",
+      "name": "POST /publications/jobs/generate-images",
+      "webhookId": "b7fd1c70-0001-4dd7-a001-000000000099"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst mode = String(body.mode || 'comfy-cloud-api').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst requestPayload = {\n  ...body,\n  source: 'publication-job-generate-images',\n  requestedAt: new Date().toISOString(),\n  mode\n};\nconst query = `\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), validation AS (\n  SELECT\n    CASE\n      WHEN NOT EXISTS (SELECT 1 FROM job) THEN 'Publication job not found'\n      WHEN (SELECT prompt_pack FROM job) IS NULL THEN 'Prompt pack is required before generating images'\n      ELSE NULL\n    END AS error\n), queued AS (\n  INSERT INTO generation_jobs (\n    avatar,\n    scene,\n    asset_type,\n    platform,\n    status,\n    run_mode,\n    prompt_pack,\n    request_payload,\n    started_at,\n    updated_at\n  )\n  SELECT\n    avatar,\n    scene,\n    COALESCE(asset_type, 'raw-image'),\n    'instagram',\n    'running',\n    ${sql(mode)},\n    prompt_pack,\n    ${sqlJson(requestPayload)},\n    now(),\n    now()\n  FROM job\n  WHERE (SELECT error FROM validation) IS NULL\n  RETURNING *\n), updated_publication AS (\n  UPDATE publication_jobs pj\n  SET\n    status = 'generating',\n    error_message = NULL,\n    updated_at = now(),\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'generationJobId', (SELECT job_id FROM queued),\n      'generationRunMode', ${sql(mode)},\n      'generationSubmittedAt', now(),\n      'generationProvider', 'comfy-cloud-api',\n      'generationInstructions', jsonb_build_array(\n        'Submitted to Comfy Cloud API through ai-gateway.',\n        'Wait for Comfy Cloud output metadata.',\n        'Run or trigger ingest to register generated assets.',\n        'US-005 links outputs back to the publication job.'\n      )\n    )\n  WHERE pj.publication_job_id = (SELECT publication_job_id FROM job)\n    AND EXISTS (SELECT 1 FROM queued)\n  RETURNING\n    pj.publication_job_id AS \"publicationJobId\",\n    pj.avatar,\n    pj.scene,\n    pj.format,\n    pj.objective,\n    pj.business_profile AS \"businessProfile\",\n    pj.asset_type AS \"assetType\",\n    pj.status,\n    pj.brief,\n    pj.prompt_pack AS \"promptPack\",\n    pj.created_at AS \"createdAt\",\n    pj.updated_at AS \"updatedAt\"\n)\nSELECT\n  CASE WHEN (SELECT error FROM validation) IS NULL THEN true ELSE false END AS ok,\n  (SELECT error FROM validation) AS error,\n  (SELECT row_to_json(updated_publication) FROM updated_publication) AS job,\n  (SELECT jsonb_build_object(\n    'generationJobId', job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'assetType', asset_type,\n    'platform', platform,\n    'status', status,\n    'runMode', run_mode,\n    'startedAt', started_at,\n    'promptPack', prompt_pack,\n    'instructions', jsonb_build_array(\n      'Submitted to Comfy Cloud API through ai-gateway.',\n      'Wait for Comfy Cloud output metadata.',\n      'Run or trigger ingest to register generated assets.',\n      'US-005 will link generated outputs back to this publication job.'\n    )\n  ) FROM queued) AS generation;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "b7fd1c70-0001-4dd7-a001-000000000002",
+      "name": "Build Generate Images Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "b7fd1c70-0001-4dd7-a001-000000000003",
+      "name": "Submit Generation Job",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, error: row.error || 'Image generation was not submitted.' } }];\n}\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nconst job = parse(row.job, null);\nconst generation = parse(row.generation, null);\nif (!job || !generation) {\n  return [{ json: { ok: false, error: 'Generation submission did not return job metadata.' } }];\n}\n\nconst promptPack = generation.promptPack || job.promptPack || {};\nconst referenceImages = Array.isArray(promptPack.referenceImages) ? promptPack.referenceImages : [];\nconst referenceImage = referenceImages[0]?.comfyImage || referenceImages[0]?.fileName || referenceImages[0]?.objectPath || null;\n\ntry {\n  const gateway = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://ai-gateway:8095/comfy/publication-submit',\n    headers: {\n      'Content-Type': 'application/json',\n      'X-Request-Id': `publication-comfy-${job.publicationJobId}`\n    },\n    body: {\n      job,\n      promptPack,\n      generationJobId: generation.generationJobId,\n      referenceImage,\n      dryRun: false\n    },\n    json: true,\n    timeout: 120000\n  });\n\n  if (!gateway?.ok) {\n    return [{\n      json: {\n        ok: false,\n        submitted: false,\n        error: gateway?.error || 'Comfy Cloud submission failed.',\n        job,\n        generation: {\n          ...generation,\n          status: 'error',\n          runMode: 'comfy-cloud-api',\n          provider: 'comfy-cloud',\n          providerRequestId: gateway?.requestId || null,\n          providerError: gateway || null\n        }\n      }\n    }];\n  }\n\n  return [{\n    json: {\n      ok: true,\n      submitted: true,\n      job,\n      generation: {\n        ...generation,\n        runMode: 'comfy-cloud-api',\n        provider: 'comfy-cloud',\n        providerRequestId: gateway.requestId || null,\n        providerResponse: gateway.response || null,\n        patched: gateway.patched || null\n      }\n    }\n  }];\n} catch (error) {\n  return [{\n    json: {\n      ok: false,\n      submitted: false,\n      error: error?.message || 'Comfy Cloud gateway request failed.',\n      job,\n      generation: {\n        ...generation,\n        status: 'error',\n        runMode: 'comfy-cloud-api',\n        provider: 'comfy-cloud'\n      }\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "b7fd1c70-0001-4dd7-a001-000000000004",
+      "name": "Return Generation Submission"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "b7fd1c70-0001-4dd7-a001-000000000005",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/generate-images": {
+      "main": [
+        [
+          {
+            "node": "Build Generate Images Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Generate Images Query": {
+      "main": [
+        [
+          {
+            "node": "Submit Generation Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Generation Job": {
+      "main": [
+        [
+          {
+            "node": "Return Generation Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Generation Submission": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b7fd1c70-0001-4dd7-a001-000000000010",
+  "activeVersionId": "b7fd1c70-0001-4dd7-a001-000000000010",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

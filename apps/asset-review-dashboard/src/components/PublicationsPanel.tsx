@@ -1,0 +1,957 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  createPublicationJob,
+  generatePublicationBrief,
+  generatePublicationCopyPack,
+  generatePublicationImages,
+  generatePublicationPromptPack,
+  ingestComfyOutput,
+  listPublicationJobs,
+  selectPublicationAsset,
+} from "../api/publicationsApi";
+import { defaultFilters } from "../data/catalogs";
+import type { CatalogOptionsBundle } from "../types/catalogs";
+import type {
+  PublicationBrief,
+  PublicationCopyPack,
+  PublicationFormat,
+  PublicationGenerationSubmission,
+  IngestComfyOutputResult,
+  PublicationAssetSummary,
+  PublicationJobLoadItem,
+  PublicationJob,
+  PublicationPromptPack,
+} from "../types/publications";
+import { findAvatarShort, optionLabel, scenesForAvatar } from "../utils/catalogNormalize";
+import CatalogSelect from "./CatalogSelect";
+import LoadingSpinner from "./LoadingSpinner";
+import SectionPanel from "./SectionPanel";
+
+type PublicationsPanelProps = {
+  catalogOptions: CatalogOptionsBundle;
+  catalogOptionsLoading?: boolean;
+};
+
+const inputClass =
+  "rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-100 outline-none focus:border-accent disabled:opacity-50";
+
+const formatOptions: { value: PublicationFormat; label: string }[] = [
+  { value: "feed-post", label: "Feed post" },
+  { value: "story", label: "Story" },
+];
+
+export default function PublicationsPanel({
+  catalogOptions,
+  catalogOptionsLoading = false,
+}: PublicationsPanelProps) {
+  const [avatar, setAvatar] = useState<string>(defaultFilters.avatar);
+  const [scene, setScene] = useState<string>(defaultFilters.scene);
+  const [format, setFormat] = useState<PublicationFormat>("feed-post");
+  const [objective, setObjective] = useState(
+    "Crear una publicación lifestyle orgánica para validar engagement de Estefanía.",
+  );
+  const [createdJob, setCreatedJob] = useState<PublicationJob | null>(null);
+  const [briefText, setBriefText] = useState("");
+  const [briefBusy, setBriefBusy] = useState(false);
+  const [briefMessage, setBriefMessage] = useState<string | null>(null);
+  const [promptPackText, setPromptPackText] = useState("");
+  const [promptPackBusy, setPromptPackBusy] = useState(false);
+  const [promptPackMessage, setPromptPackMessage] = useState<string | null>(null);
+  const [generation, setGeneration] = useState<PublicationGenerationSubmission | null>(null);
+  const [generationBusy, setGenerationBusy] = useState(false);
+  const [generationMessage, setGenerationMessage] = useState<string | null>(null);
+  const [comfyOutputUrl, setComfyOutputUrl] = useState("");
+  const [ingestBusy, setIngestBusy] = useState(false);
+  const [ingestResult, setIngestResult] = useState<IngestComfyOutputResult | null>(null);
+  const [latestAsset, setLatestAsset] = useState<PublicationAssetSummary | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<PublicationAssetSummary | null>(null);
+  const [selectAssetBusy, setSelectAssetBusy] = useState(false);
+  const [copyPackText, setCopyPackText] = useState("");
+  const [copyPackBusy, setCopyPackBusy] = useState(false);
+  const [copyPackMessage, setCopyPackMessage] = useState<string | null>(null);
+  const [loadJobId, setLoadJobId] = useState("");
+  const [recentJobs, setRecentJobs] = useState<PublicationJobLoadItem[]>([]);
+  const [loadBusy, setLoadBusy] = useState(false);
+  const [loadMessage, setLoadMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const sceneOptions = useMemo(
+    () => scenesForAvatar(catalogOptions.scenes, avatar),
+    [catalogOptions.scenes, avatar],
+  );
+
+  useEffect(() => {
+    const nextAvatar = catalogOptions.avatars.some((option) => option.value === avatar)
+      ? avatar
+      : catalogOptions.avatars[0]?.value ?? defaultFilters.avatar;
+    const nextSceneOptions = scenesForAvatar(catalogOptions.scenes, nextAvatar);
+    const nextScene = nextSceneOptions.some((option) => option.value === scene)
+      ? scene
+      : nextSceneOptions[0]?.value ?? defaultFilters.scene;
+
+    if (nextAvatar !== avatar) {
+      setAvatar(nextAvatar);
+    }
+    if (nextScene !== scene) {
+      setScene(nextScene);
+    }
+  }, [avatar, catalogOptions.avatars, catalogOptions.scenes, scene]);
+
+  const avatarShort = findAvatarShort(catalogOptions, avatar);
+  const canCreate = Boolean(avatar && scene && format && objective.trim());
+
+  function applyLoadedJob(item: PublicationJobLoadItem) {
+    const job = item.job;
+    setCreatedJob(job);
+    setAvatar(job.avatar || defaultFilters.avatar);
+    setScene(job.scene || defaultFilters.scene);
+    setFormat((job.format as PublicationFormat) || "feed-post");
+    setObjective(job.objective || "");
+    setBriefText(job.brief ? JSON.stringify(job.brief, null, 2) : "");
+    setBriefMessage(null);
+    setPromptPackText(job.promptPack ? JSON.stringify(job.promptPack, null, 2) : "");
+    setPromptPackMessage(null);
+    setCopyPackText(job.publishingPack ? JSON.stringify(job.publishingPack, null, 2) : "");
+    setCopyPackMessage(null);
+    setGeneration(item.generation || null);
+    setGenerationMessage("Publication job loaded.");
+    setComfyOutputUrl("");
+    setLatestAsset(item.latestAsset || null);
+    setSelectedAsset(item.selectedAsset || null);
+    setIngestResult(
+      item.latestAsset?.assetId
+        ? {
+            assetId: item.latestAsset.assetId,
+            publicationJobId: job.publicationJobId,
+            generationJobId: item.generation?.generationJobId || null,
+            publicationStatus: job.status,
+            generationStatus: item.generation?.status || null,
+            objectPath: item.latestAsset.objectPath || null,
+            bucket: item.latestAsset.bucket || null,
+          }
+        : null,
+    );
+  }
+
+  async function handleLoadJobById() {
+    const publicationJobId = loadJobId.trim();
+    if (!publicationJobId) return;
+    setLoadBusy(true);
+    setError(null);
+    setLoadMessage(null);
+    try {
+      const jobs = await listPublicationJobs({ publicationJobId, limit: 1 });
+      if (!jobs[0]) {
+        throw new Error("Publication job was not found.");
+      }
+      applyLoadedJob(jobs[0]);
+      setLoadMessage("Existing publication job loaded.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load publication job");
+    } finally {
+      setLoadBusy(false);
+    }
+  }
+
+  async function handleLoadRecentJobs() {
+    setLoadBusy(true);
+    setError(null);
+    setLoadMessage(null);
+    try {
+      const jobs = await listPublicationJobs({
+        avatar,
+        scene,
+        limit: 8,
+      });
+      setRecentJobs(jobs);
+      setLoadMessage(jobs.length ? "Recent jobs loaded." : "No recent jobs found.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load recent publication jobs");
+    } finally {
+      setLoadBusy(false);
+    }
+  }
+
+  async function handleCreate() {
+    if (!canCreate) return;
+    setBusy(true);
+    setError(null);
+    setCreatedJob(null);
+    setBriefText("");
+    setBriefMessage(null);
+    setPromptPackText("");
+    setPromptPackMessage(null);
+    setCopyPackText("");
+    setCopyPackMessage(null);
+    setGeneration(null);
+    setGenerationMessage(null);
+    setComfyOutputUrl("");
+    setIngestResult(null);
+    setLatestAsset(null);
+    setSelectedAsset(null);
+    try {
+      const job = await createPublicationJob({
+        avatar,
+        scene,
+        format,
+        objective: objective.trim(),
+      });
+      setCreatedJob(job);
+      if (job.brief) {
+        setBriefText(JSON.stringify(job.brief, null, 2));
+      }
+      if (job.promptPack) {
+        setPromptPackText(JSON.stringify(job.promptPack, null, 2));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create publication job");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleGenerateBrief(options: { saveEdited: boolean }) {
+    if (!createdJob?.publicationJobId) return;
+    setBriefBusy(true);
+    setError(null);
+    setBriefMessage(null);
+
+    try {
+      let editedBrief: PublicationBrief | undefined;
+      if (options.saveEdited) {
+        editedBrief = JSON.parse(briefText) as PublicationBrief;
+      }
+
+      const result = await generatePublicationBrief({
+        publicationJobId: createdJob.publicationJobId,
+        ...(editedBrief ? { brief: editedBrief } : {}),
+      });
+
+      setCreatedJob(result.job);
+      setBriefText(JSON.stringify(result.brief, null, 2));
+      if (result.job.promptPack) {
+        setPromptPackText(JSON.stringify(result.job.promptPack, null, 2));
+      }
+      setBriefMessage(options.saveEdited ? "Brief saved." : "Brief generated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate publication brief");
+    } finally {
+      setBriefBusy(false);
+    }
+  }
+
+  async function handleGeneratePromptPack(options: { saveEdited: boolean }) {
+    if (!createdJob?.publicationJobId) return;
+    setPromptPackBusy(true);
+    setError(null);
+    setPromptPackMessage(null);
+
+    try {
+      let editedPromptPack: PublicationPromptPack | undefined;
+      if (options.saveEdited) {
+        editedPromptPack = JSON.parse(promptPackText) as PublicationPromptPack;
+      }
+
+      const result = await generatePublicationPromptPack({
+        publicationJobId: createdJob.publicationJobId,
+        ...(editedPromptPack ? { promptPack: editedPromptPack } : {}),
+      });
+
+      setCreatedJob(result.job);
+      setPromptPackText(JSON.stringify(result.promptPack, null, 2));
+      setGeneration(null);
+      setGenerationMessage(null);
+      setComfyOutputUrl("");
+      setIngestResult(null);
+      setLatestAsset(null);
+      setSelectedAsset(null);
+      setCopyPackText("");
+      setCopyPackMessage(null);
+      setPromptPackMessage(options.saveEdited ? "Prompt pack saved." : "Prompt pack generated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate publication prompt pack");
+    } finally {
+      setPromptPackBusy(false);
+    }
+  }
+
+  async function handleGenerateImages() {
+    if (!createdJob?.publicationJobId) return;
+    setGenerationBusy(true);
+    setError(null);
+    setGenerationMessage(null);
+
+    try {
+      const result = await generatePublicationImages({
+        publicationJobId: createdJob.publicationJobId,
+        mode: "comfy-cloud-api",
+      });
+      setCreatedJob(result.job);
+      setGeneration(result.generation);
+      setIngestResult(null);
+      setLatestAsset(null);
+      setSelectedAsset(null);
+      setCopyPackText("");
+      setCopyPackMessage(null);
+      setGenerationMessage("Generation job submitted.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit image generation");
+    } finally {
+      setGenerationBusy(false);
+    }
+  }
+
+  async function handleIngestComfyOutput() {
+    if (!createdJob?.publicationJobId || !generation?.generationJobId || !comfyOutputUrl.trim()) {
+      return;
+    }
+    setIngestBusy(true);
+    setError(null);
+    setGenerationMessage(null);
+
+    try {
+      const result = await ingestComfyOutput({
+        publicationJobId: createdJob.publicationJobId,
+        generationJobId: generation.generationJobId,
+        outputUrl: comfyOutputUrl.trim(),
+      });
+      setIngestResult(result);
+      setLatestAsset({
+        assetId: result.assetId,
+        objectPath: result.objectPath,
+        bucket: result.bucket,
+        status: "raw",
+      });
+      setSelectedAsset(null);
+      setGeneration((current) =>
+        current
+          ? {
+              ...current,
+              status: result.generationStatus || current.status,
+              assetId: result.assetId,
+              generatedAssetId: result.generatedAssetId,
+              objectPath: result.objectPath,
+            }
+          : current,
+      );
+      setCreatedJob((current) =>
+        current
+          ? {
+              ...current,
+              status: result.publicationStatus || "review-ready",
+            }
+          : current,
+      );
+      setGenerationMessage("Comfy output ingested.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to ingest Comfy output");
+    } finally {
+      setIngestBusy(false);
+    }
+  }
+
+  async function handleSelectPublicationAsset() {
+    if (!createdJob?.publicationJobId || !latestAsset?.assetId) {
+      return;
+    }
+    setSelectAssetBusy(true);
+    setError(null);
+    setGenerationMessage(null);
+
+    try {
+      const result = await selectPublicationAsset({
+        publicationJobId: createdJob.publicationJobId,
+        assetId: latestAsset.assetId,
+        reviewNotes: "Selected for publication job via Avatares AI Console",
+      });
+      setSelectedAsset(result.asset || latestAsset);
+      if (result.job) {
+        setCreatedJob(result.job);
+      } else {
+        setCreatedJob((current) =>
+          current
+            ? {
+                ...current,
+                status: result.publicationStatus || "assets-ready",
+              }
+            : current,
+        );
+      }
+      setLatestAsset((current) =>
+        current
+          ? {
+              ...current,
+              status: "selected",
+            }
+          : current,
+      );
+      setIngestResult((current) =>
+        current
+          ? {
+              ...current,
+              publicationStatus: result.publicationStatus,
+            }
+          : current,
+      );
+      setGenerationMessage("Publication asset selected.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to select publication asset");
+    } finally {
+      setSelectAssetBusy(false);
+    }
+  }
+
+  async function handleGenerateCopyPack(options: { saveEdited: boolean }) {
+    if (!createdJob?.publicationJobId) return;
+    setCopyPackBusy(true);
+    setError(null);
+    setCopyPackMessage(null);
+
+    try {
+      let editedCopyPack: PublicationCopyPack | undefined;
+      if (options.saveEdited) {
+        editedCopyPack = JSON.parse(copyPackText) as PublicationCopyPack;
+      }
+
+      const result = await generatePublicationCopyPack({
+        publicationJobId: createdJob.publicationJobId,
+        ...(editedCopyPack ? { copyPack: editedCopyPack } : {}),
+      });
+      setCreatedJob(result.job);
+      setCopyPackText(JSON.stringify(result.copyPack, null, 2));
+      setCopyPackMessage(options.saveEdited ? "Copy pack saved." : "Copy pack generated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate publication copy pack");
+    } finally {
+      setCopyPackBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {catalogOptionsLoading && (
+        <p className="text-sm text-gray-500">Loading catalog options...</p>
+      )}
+
+      <SectionPanel
+        title="Continue Existing Job"
+        description="Load a previous Estefania publication workflow without creating a duplicate."
+        actions={
+          <button
+            type="button"
+            onClick={() => void handleLoadRecentJobs()}
+            disabled={loadBusy}
+            className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs font-medium text-gray-200 hover:border-gray-500 disabled:opacity-50"
+          >
+            {loadBusy ? "Loading..." : "Load recent"}
+          </button>
+        }
+      >
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-gray-400">publicationJobId</span>
+            <input
+              value={loadJobId}
+              onChange={(event) => setLoadJobId(event.target.value)}
+              disabled={loadBusy}
+              placeholder="dc539e40-c15f-47bb-9d7f-68ca901334e2"
+              className={inputClass}
+            />
+          </label>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={() => void handleLoadJobById()}
+              disabled={loadBusy || !loadJobId.trim()}
+              className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {loadBusy ? "Loading..." : "Load job"}
+            </button>
+          </div>
+        </div>
+
+        {loadMessage && (
+          <p className="mt-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+            {loadMessage}
+          </p>
+        )}
+
+        {recentJobs.length > 0 && (
+          <div className="mt-4 overflow-x-auto rounded-md border border-border">
+            <table className="min-w-full divide-y divide-border text-sm">
+              <thead className="bg-surface">
+                <tr className="text-left text-xs uppercase text-gray-500">
+                  <th className="px-3 py-2 font-medium">Job</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Scene</th>
+                  <th className="px-3 py-2 font-medium">Generation</th>
+                  <th className="px-3 py-2 font-medium">Updated</th>
+                  <th className="px-3 py-2 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {recentJobs.map((item) => (
+                  <tr key={item.job.publicationJobId} className="text-gray-300">
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {item.job.publicationJobId.slice(0, 8)}...
+                    </td>
+                    <td className="px-3 py-2">{item.job.status}</td>
+                    <td className="px-3 py-2">{optionLabel(sceneOptions, item.job.scene)}</td>
+                    <td className="px-3 py-2">{item.generation?.status || "none"}</td>
+                    <td className="px-3 py-2">{item.job.updatedAt}</td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          applyLoadedJob(item);
+                          setLoadMessage("Existing publication job loaded.");
+                        }}
+                        className="rounded-md border border-border bg-surface-overlay px-2 py-1 text-xs text-gray-200 hover:border-gray-500"
+                      >
+                        Load
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionPanel>
+
+      <SectionPanel
+        title="Create Publication Job"
+        description="Start an Estefania influencer publication workflow."
+        actions={
+          <button
+            type="button"
+            onClick={() => void handleCreate()}
+            disabled={busy || !canCreate}
+            className="flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            {busy ? <LoadingSpinner className="size-4" label="Creating..." /> : null}
+            {busy ? "Creating..." : "Create job"}
+          </button>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <CatalogSelect
+            label="Avatar"
+            value={avatar}
+            options={catalogOptions.avatars}
+            onChange={(nextAvatar) => {
+              setAvatar(nextAvatar);
+              const nextScenes = scenesForAvatar(catalogOptions.scenes, nextAvatar);
+              setScene(nextScenes[0]?.value ?? defaultFilters.scene);
+            }}
+            disabled={busy}
+          />
+
+          <CatalogSelect
+            label="Scene"
+            value={scene}
+            options={sceneOptions}
+            onChange={setScene}
+            disabled={busy}
+          />
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-gray-400">Format</span>
+            <select
+              value={format}
+              onChange={(event) => setFormat(event.target.value as PublicationFormat)}
+              disabled={busy}
+              className={inputClass}
+            >
+              {formatOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-gray-400">Business profile</span>
+            <input
+              value="influencer-brand"
+              readOnly
+              disabled
+              className={`${inputClass} opacity-80`}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm md:col-span-2 xl:col-span-4">
+            <span className="text-gray-400">Objective</span>
+            <textarea
+              value={objective}
+              onChange={(event) => setObjective(event.target.value)}
+              disabled={busy}
+              rows={4}
+              className={`${inputClass} min-h-[110px] resize-y`}
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 rounded-md border border-border bg-surface px-3 py-2 text-xs text-gray-500">
+          Internal defaults: avatarShort={avatarShort || "n/a"}, assetType=raw-image,
+          status=draft.
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-md border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+            {error}
+          </div>
+        )}
+
+        {createdJob && (
+          <div className="mt-4 rounded-md border border-emerald-800/50 bg-emerald-950/30 p-4">
+            <p className="text-sm font-medium text-emerald-200">Publication job created</p>
+            <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <dt className="text-xs text-gray-500">publicationJobId</dt>
+                <dd className="mt-0.5 font-mono text-gray-200">{createdJob.publicationJobId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">status</dt>
+                <dd className="mt-0.5 text-gray-200">{createdJob.status}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">format</dt>
+                <dd className="mt-0.5 text-gray-200">{createdJob.format}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">avatar</dt>
+                <dd className="mt-0.5 text-gray-200">
+                  {optionLabel(catalogOptions.avatars, createdJob.avatar)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">scene</dt>
+                <dd className="mt-0.5 text-gray-200">
+                  {optionLabel(sceneOptions, createdJob.scene)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">createdAt</dt>
+                <dd className="mt-0.5 text-gray-200">{createdJob.createdAt}</dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </SectionPanel>
+
+      {createdJob && (
+        <SectionPanel
+          title="Publication Brief"
+          description="Generate or edit the creative brief before prompt-pack generation."
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => void handleGenerateBrief({ saveEdited: false })}
+                disabled={briefBusy}
+                className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              >
+                {briefBusy ? "Working..." : briefText ? "Regenerate brief" : "Generate brief"}
+              </button>
+              {briefText && (
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateBrief({ saveEdited: true })}
+                  disabled={briefBusy}
+                  className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs font-medium text-gray-200 hover:border-gray-500 disabled:opacity-50"
+                >
+                  Save edited brief
+                </button>
+              )}
+            </>
+          }
+        >
+          {briefMessage && (
+            <p className="mb-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+              {briefMessage}
+            </p>
+          )}
+
+          {briefText ? (
+            <textarea
+              value={briefText}
+              onChange={(event) => {
+                setBriefText(event.target.value);
+                setBriefMessage(null);
+              }}
+              rows={18}
+              disabled={briefBusy}
+              className={`${inputClass} w-full resize-y font-mono text-xs leading-relaxed`}
+            />
+          ) : (
+            <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
+              No brief generated yet.
+            </div>
+          )}
+        </SectionPanel>
+      )}
+
+      {createdJob && briefText && (
+        <SectionPanel
+          title="Prompt Pack"
+          description="Create the Comfy-ready prompt pack from the approved publication brief."
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => void handleGeneratePromptPack({ saveEdited: false })}
+                disabled={promptPackBusy}
+                className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              >
+                {promptPackBusy
+                  ? "Working..."
+                  : promptPackText
+                    ? "Regenerate prompt pack"
+                    : "Generate prompt pack"}
+              </button>
+              {promptPackText && (
+                <button
+                  type="button"
+                  onClick={() => void handleGeneratePromptPack({ saveEdited: true })}
+                  disabled={promptPackBusy}
+                  className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs font-medium text-gray-200 hover:border-gray-500 disabled:opacity-50"
+                >
+                  Save edited prompt pack
+                </button>
+              )}
+            </>
+          }
+        >
+          {promptPackMessage && (
+            <p className="mb-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+              {promptPackMessage}
+            </p>
+          )}
+
+          {promptPackText ? (
+            <textarea
+              value={promptPackText}
+              onChange={(event) => {
+                setPromptPackText(event.target.value);
+                setPromptPackMessage(null);
+              }}
+              rows={20}
+              disabled={promptPackBusy}
+              className={`${inputClass} w-full resize-y font-mono text-xs leading-relaxed`}
+            />
+          ) : (
+            <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
+              No prompt pack generated yet.
+            </div>
+          )}
+        </SectionPanel>
+      )}
+
+      {createdJob && promptPackText && (
+        <SectionPanel
+          title="Image Generation"
+          description="Submit the prompt pack to the image-generation stage."
+          actions={
+            <button
+              type="button"
+              onClick={() => void handleGenerateImages()}
+              disabled={generationBusy}
+              className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {generationBusy ? "Submitting..." : generation ? "Submit again" : "Generate images"}
+            </button>
+          }
+        >
+          {generationMessage && (
+            <p className="mb-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+              {generationMessage}
+            </p>
+          )}
+
+          {generation ? (
+            <div className="space-y-4">
+              <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-gray-500">generationJobId</dt>
+                  <dd className="mt-0.5 font-mono text-gray-200">{generation.generationJobId}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">status</dt>
+                  <dd className="mt-0.5 text-gray-200">{generation.status}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">runMode</dt>
+                  <dd className="mt-0.5 text-gray-200">{generation.runMode}</dd>
+                </div>
+              </dl>
+              {generation.instructions && generation.instructions.length > 0 && (
+                <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-400">
+                  {generation.instructions.map((instruction) => (
+                    <li key={instruction}>{instruction}</li>
+                  ))}
+                </ol>
+              )}
+
+              <div className="rounded-md border border-border bg-surface p-4">
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-gray-400">Comfy output URL</span>
+                    <input
+                      value={comfyOutputUrl}
+                      onChange={(event) => setComfyOutputUrl(event.target.value)}
+                      disabled={ingestBusy}
+                      placeholder="https://cloud.comfy.org/api/view?filename=..."
+                      className={inputClass}
+                    />
+                  </label>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => void handleIngestComfyOutput()}
+                      disabled={ingestBusy || !comfyOutputUrl.trim()}
+                      className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                    >
+                      {ingestBusy ? "Ingesting..." : "Ingest output"}
+                    </button>
+                  </div>
+                </div>
+
+                {ingestResult && (
+                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <dt className="text-xs text-gray-500">assetId</dt>
+                      <dd className="mt-0.5 font-mono text-gray-200">{ingestResult.assetId}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-gray-500">publicationStatus</dt>
+                      <dd className="mt-0.5 text-gray-200">{ingestResult.publicationStatus}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-gray-500">generationStatus</dt>
+                      <dd className="mt-0.5 text-gray-200">{ingestResult.generationStatus}</dd>
+                    </div>
+                    {ingestResult.objectPath && (
+                      <div className="sm:col-span-2 lg:col-span-3">
+                        <dt className="text-xs text-gray-500">objectPath</dt>
+                        <dd className="mt-0.5 break-all font-mono text-gray-200">
+                          {ingestResult.objectPath}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+
+                {latestAsset?.assetId && (
+                  <div className="mt-4 rounded-md border border-border bg-surface-overlay p-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-200">Publication asset</p>
+                        <p className="mt-1 break-all font-mono text-xs text-gray-500">
+                          {latestAsset.assetId}
+                        </p>
+                        {selectedAsset?.assetId === latestAsset.assetId && (
+                          <p className="mt-2 text-sm text-emerald-200">
+                            Selected for this publication job.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleSelectPublicationAsset()}
+                        disabled={
+                          selectAssetBusy ||
+                          selectedAsset?.assetId === latestAsset.assetId ||
+                          !latestAsset.assetId
+                        }
+                        className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                      >
+                        {selectAssetBusy
+                          ? "Selecting..."
+                          : selectedAsset?.assetId === latestAsset.assetId
+                            ? "Selected"
+                            : "Select for publication"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
+              No generation job submitted yet.
+            </div>
+          )}
+        </SectionPanel>
+      )}
+
+      {createdJob && selectedAsset?.assetId && (
+        <SectionPanel
+          title="Caption / Copy Pack"
+          description="Generate or edit the manual publishing copy for the selected asset."
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => void handleGenerateCopyPack({ saveEdited: false })}
+                disabled={copyPackBusy}
+                className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              >
+                {copyPackBusy
+                  ? "Working..."
+                  : copyPackText
+                    ? "Regenerate copy"
+                    : "Generate copy"}
+              </button>
+              {copyPackText && (
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateCopyPack({ saveEdited: true })}
+                  disabled={copyPackBusy}
+                  className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs font-medium text-gray-200 hover:border-gray-500 disabled:opacity-50"
+                >
+                  Save edited copy
+                </button>
+              )}
+            </>
+          }
+        >
+          {copyPackMessage && (
+            <p className="mb-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+              {copyPackMessage}
+            </p>
+          )}
+
+          {copyPackText ? (
+            <textarea
+              value={copyPackText}
+              onChange={(event) => {
+                setCopyPackText(event.target.value);
+                setCopyPackMessage(null);
+              }}
+              rows={18}
+              disabled={copyPackBusy}
+              className={`${inputClass} w-full resize-y font-mono text-xs leading-relaxed`}
+            />
+          ) : (
+            <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
+              No copy pack generated yet.
+            </div>
+          )}
+        </SectionPanel>
+      )}
+
+      <SectionPanel title="Next Steps" description="Wave 1 publication flow">
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-400">
+          <li>Generate a structured brief with DeepSeek.</li>
+          <li>Create a Comfy Cloud prompt pack.</li>
+          <li>Generate images and ingest outputs.</li>
+          <li>Review candidates and select a publication asset.</li>
+          <li>Generate caption/copy and export the publishing pack.</li>
+        </ol>
+      </SectionPanel>
+    </div>
+  );
+}

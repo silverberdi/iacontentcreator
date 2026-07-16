@@ -8,6 +8,8 @@ import {
   staticFallbackOptions,
 } from "./catalogNormalize";
 
+const DEFAULT_ASSET_TYPE = NEW_PROFILE_DEFAULTS.assetType;
+
 export function readProfileId(
   profile: Partial<IngestProfile> & Record<string, unknown>,
 ): string | undefined {
@@ -28,8 +30,7 @@ export function generateProfileName(
   const sceneLabel =
     optionLabel(scenesForAvatar(catalogOptions.scenes, fields.avatar), fields.scene) ||
     fields.scene;
-  const assetTypeLabel =
-    optionLabel(catalogOptions.assetTypes, fields.assetType) || fields.assetType;
+  const assetTypeLabel = optionLabel(catalogOptions.assetTypes, DEFAULT_ASSET_TYPE) || "Raw Image";
   return `${avatarLabel} / ${sceneLabel} / ${assetTypeLabel}`;
 }
 
@@ -48,7 +49,6 @@ export function newProfileDraft(catalogOptions?: CatalogOptionsBundle): IngestPr
   const avatar = options.avatars[0]?.value ?? NEW_PROFILE_DEFAULTS.avatar;
   const avatarScenes = scenesForAvatar(options.scenes, avatar);
   const scene = avatarScenes[0]?.value ?? NEW_PROFILE_DEFAULTS.scene;
-  const assetType = options.assetTypes[0]?.value ?? NEW_PROFILE_DEFAULTS.assetType;
   const workflow = options.workflows[0]?.value ?? NEW_PROFILE_DEFAULTS.workflow;
   const model = options.models[0]?.value ?? NEW_PROFILE_DEFAULTS.model;
 
@@ -57,7 +57,7 @@ export function newProfileDraft(catalogOptions?: CatalogOptionsBundle): IngestPr
     avatar,
     avatarShort: findAvatarShort(options, avatar) || NEW_PROFILE_DEFAULTS.avatarShort,
     scene,
-    assetType,
+    assetType: DEFAULT_ASSET_TYPE,
     workflow,
     model,
   };
@@ -74,7 +74,7 @@ export function profileToDraft(profile: Partial<IngestProfile> | null | undefine
     avatar: profile.avatar ?? NEW_PROFILE_DEFAULTS.avatar,
     avatarShort: profile.avatarShort ?? NEW_PROFILE_DEFAULTS.avatarShort,
     scene: profile.scene ?? NEW_PROFILE_DEFAULTS.scene,
-    assetType: profile.assetType ?? NEW_PROFILE_DEFAULTS.assetType,
+    assetType: DEFAULT_ASSET_TYPE,
     workflow: profile.workflow ?? NEW_PROFILE_DEFAULTS.workflow,
     model: profile.model ?? NEW_PROFILE_DEFAULTS.model,
     seed: String(profile.seed ?? NEW_PROFILE_DEFAULTS.seed),
@@ -95,7 +95,7 @@ export function profileToDraftWithCatalog(
     avatar: profile.avatar ?? NEW_PROFILE_DEFAULTS.avatar,
     avatarShort: profile.avatarShort ?? NEW_PROFILE_DEFAULTS.avatarShort,
     scene: profile.scene ?? NEW_PROFILE_DEFAULTS.scene,
-    assetType: profile.assetType ?? NEW_PROFILE_DEFAULTS.assetType,
+    assetType: DEFAULT_ASSET_TYPE,
     workflow: profile.workflow ?? NEW_PROFILE_DEFAULTS.workflow,
     model: profile.model ?? NEW_PROFILE_DEFAULTS.model,
     seed: String(profile.seed ?? NEW_PROFILE_DEFAULTS.seed),
@@ -116,7 +116,7 @@ export function draftToProfile(draft: IngestProfileDraft): IngestProfile {
     avatar: draft.avatar.trim(),
     avatarShort: draft.avatarShort.trim(),
     scene: draft.scene.trim(),
-    assetType: draft.assetType.trim(),
+    assetType: DEFAULT_ASSET_TYPE,
     workflow: draft.workflow.trim(),
     model: draft.model.trim(),
     seed: Number.isFinite(seed) ? seed : 847362,
@@ -132,23 +132,37 @@ export function normalizeProfiles(profiles: IngestProfile[] | undefined): Ingest
 
   return profiles.map((profile, index) => {
     const raw = profile as Partial<IngestProfile> & Record<string, unknown>;
+    const profileName =
+      (typeof profile.profileName === "string" && profile.profileName.trim()) ||
+      (typeof raw.profile_name === "string" && raw.profile_name.trim()) ||
+      `unnamed-profile-${index + 1}`;
+    const avatarShort =
+      profile.avatarShort ??
+      (typeof raw.avatar_short === "string" ? raw.avatar_short : undefined) ??
+      "";
     return {
-    profileId: readProfileId(raw),
-    profileName: profile.profileName?.trim() || `unnamed-profile-${index + 1}`,
-    avatar: profile.avatar ?? "",
-    avatarShort: profile.avatarShort ?? "",
-    scene: profile.scene ?? "",
-    assetType: profile.assetType ?? "",
-    workflow: profile.workflow ?? "",
-    model: profile.model ?? "",
-    seed: typeof profile.seed === "number" ? profile.seed : 847362,
-    version: typeof profile.version === "number" ? profile.version : 1,
-    autoPromoteLatest: profile.autoPromoteLatest ?? false,
-    setActive: profile.setActive ?? false,
-    isEnabled: profile.isEnabled ?? true,
-    updatedAt: profile.updatedAt,
-    isActive: profile.isActive ?? false,
-  };
+      profileId: readProfileId(raw),
+      profileName,
+      avatar: profile.avatar ?? "",
+      avatarShort,
+      scene: profile.scene ?? "",
+      assetType: profile.assetType ?? (typeof raw.asset_type === "string" ? raw.asset_type : DEFAULT_ASSET_TYPE),
+      workflow: profile.workflow ?? "",
+      model: profile.model ?? "",
+      seed: typeof profile.seed === "number" ? profile.seed : 847362,
+      version: typeof profile.version === "number" ? profile.version : 1,
+      autoPromoteLatest: profile.autoPromoteLatest ?? false,
+      setActive: profile.setActive ?? false,
+      isEnabled:
+        profile.isEnabled ??
+        (typeof raw.is_enabled === "boolean" ? raw.is_enabled : true),
+      updatedAt:
+        profile.updatedAt ??
+        (typeof raw.updated_at === "string" ? raw.updated_at : undefined),
+      isActive:
+        profile.isActive ??
+        (typeof raw.is_active === "boolean" ? raw.is_active : false),
+    };
   });
 }
 

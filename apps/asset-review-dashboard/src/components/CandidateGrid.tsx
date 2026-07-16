@@ -10,6 +10,7 @@ type CandidateGridProps = {
   showCanonicalInCandidates: boolean;
   onImageClick: (asset: AssetCandidate) => void;
   onPromote: (asset: AssetCandidate) => void;
+  onSelect: (asset: AssetCandidate) => void;
   onReject: (asset: AssetCandidate) => void;
   operationPending: boolean;
 };
@@ -22,6 +23,7 @@ export default function CandidateGrid({
   showCanonicalInCandidates,
   onImageClick,
   onPromote,
+  onSelect,
   onReject,
   operationPending,
 }: CandidateGridProps) {
@@ -66,6 +68,7 @@ export default function CandidateGrid({
               asset={asset}
               onImageClick={onImageClick}
               onPromote={onPromote}
+              onSelect={onSelect}
               onReject={onReject}
               operationPending={operationPending}
             />

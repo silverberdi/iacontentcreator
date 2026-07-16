@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-08T23:33:00.644Z",
+  "createdAt": "2026-06-08T21:18:43.230Z",
+  "id": "NBfnzkfpEYsAicPp",
+  "name": "Avatares AI - API - Resolve Asset",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assets/resolve",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1456,
+        304
+      ],
+      "id": "cd2dbea3-5a36-4e99-b228-9e90dabd4f8c",
+      "name": "POST /assets/resolve",
+      "webhookId": "bcca8bc5-7cd0-4bdb-b21c-07c0615c771e"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nconst body = $json.body || {};\nconst avatar = String(body.avatar || '').trim();\nconst scene = String(body.scene || '').trim();\nconst assetType = String(body.assetType || body.asset_type || 'raw-image').trim();\nconst status = String(body.status || '').trim();\nconst baseUrl = String(body.baseUrl || body.base_url || 'http://192.168.0.194:9000').replace(/\\/$/, '');\n\nconst slugRegex = /^[a-z0-9][a-z0-9-]*$/i;\n\nif (!slugRegex.test(avatar) || !slugRegex.test(scene) || !slugRegex.test(assetType)) {\n  return {\n    json: {\n      skipQuery: true,\n      ok: false,\n      resolved: false,\n      statusCode: 400,\n      error: 'avatar, scene and assetType are required and must be slug-like values',\n      request: { avatar: avatar || null, scene: scene || null, assetType: assetType || null }\n    }\n  };\n}\n\nconst statusPredicate = status\n  ? `status = ${sql(status)}`\n  : `COALESCE(status, '') IN ('canonical', 'selected', 'raw')`;\n\nconst query = `\nSELECT\n  asset_id,\n  sha256,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  is_canonical,\n  canonical_group,\n  review_notes,\n  metadata,\n  created_at\nFROM canonical_asset_registry\nWHERE avatar = ${sql(avatar)}\n  AND scene = ${sql(scene)}\n  AND asset_type = ${sql(assetType)}\n  AND ${statusPredicate}\nORDER BY\n  CASE\n    WHEN COALESCE(is_canonical, false) = true OR status = 'canonical' THEN 1\n    WHEN status = 'selected' THEN 2\n    WHEN status = 'raw' THEN 3\n    ELSE 4\n  END,\n  created_at DESC\nLIMIT 1;\n`;\n\nreturn {\n  json: {\n    skipQuery: false,\n    query,\n    avatar,\n    scene,\n    assetType,\n    status,\n    baseUrl\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        304
+      ],
+      "id": "c6c95d28-29bf-4d36-b12e-a04e10e7f78e",
+      "name": "Build Resolve Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-resolve",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -976,
+        304
+      ],
+      "id": "8f3824bd-8d0c-4df7-9948-bad20017b6c5",
+      "name": "Is Valid Resolve Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -736,
+        176
+      ],
+      "id": "2f0fa71e-173b-4feb-b218-497ed66f2265",
+      "name": "Resolve Asset",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $('Build Resolve Query').first().json;\nconst row = $input.first()?.json ?? {};\n\nif (!row.asset_id || !row.bucket || !row.object_path) {\n  return [{\n    json: {\n      ok: false,\n      resolved: false,\n      statusCode: 404,\n      error: 'No asset found for requested avatar, scene and assetType',\n      request: {\n        avatar: params.avatar,\n        scene: params.scene,\n        assetType: params.assetType,\n        status: params.status || null\n      }\n    }\n  }];\n}\n\nconst baseUrl = (params.baseUrl || 'http://192.168.0.194:9000').replace(/\\/$/, '');\n\nconst asset = {\n  assetId: row.asset_id,\n  avatar: row.avatar,\n  scene: row.scene,\n  assetType: row.asset_type,\n  status: row.status,\n  isCanonical: row.is_canonical,\n  canonicalGroup: row.canonical_group,\n  bucket: row.bucket,\n  objectPath: row.object_path,\n  url: `${baseUrl}/${row.bucket}/${row.object_path}`,\n  mimeType: row.mime_type,\n  sha256: row.sha256,\n  reviewNotes: row.review_notes,\n  metadata: row.metadata,\n  createdAt: row.created_at\n};\n\nreturn [{\n  json: {\n    ok: true,\n    resolved: true,\n    statusCode: 200,\n    asset,\n    ...asset\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        176
+      ],
+      "id": "d9679b9e-8109-48ac-a747-d6bf46111997",
+      "name": "Return Resolve Asset"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        416
+      ],
+      "id": "58427fbf-8c32-4df4-b334-e0a256747bed",
+      "name": "Return Invalid Resolve Request"
+    }
+  ],
+  "connections": {
+    "POST /assets/resolve": {
+      "main": [
+        [
+          {
+            "node": "Build Resolve Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Resolve Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Resolve Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Resolve Request": {
+      "main": [
+        [
+          {
+            "node": "Resolve Asset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Resolve Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Asset": {
+      "main": [
+        [
+          {
+            "node": "Return Resolve Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "a157ec16-d8fe-427c-8f61-c2d483fc8c65",
+  "activeVersionId": "a157ec16-d8fe-427c-8f61-c2d483fc8c65",
+  "versionCounter": 60,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-08T21:18:43.230Z",
+      "createdAt": "2026-06-08T21:18:43.230Z",
+      "role": "workflow:owner",
+      "workflowId": "NBfnzkfpEYsAicPp",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version a157ec16",
+    "description": ""
+  }
+}

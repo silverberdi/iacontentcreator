@@ -1,0 +1,148 @@
+{
+  "updatedAt": "2026-07-15T00:00:00.000Z",
+  "createdAt": "2026-07-15T00:00:00.000Z",
+  "id": "AvAIPubSelectAsset01",
+  "name": "Avatares AI - Publications - Select Asset",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/select-asset",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "select-publication-asset-001",
+      "name": "POST /publications/jobs/select-asset",
+      "webhookId": "select-publication-asset-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst assetId = String(body.assetId || body.asset_id || '').trim();\nconst reviewNotes = String(body.reviewNotes || body.review_notes || 'Selected for publication job via Avatares AI Console').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId) || !assetId) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId must be a valid UUID and assetId is required' AS error;\" } }];\n}\nconst query = `\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), asset AS (\n  SELECT *\n  FROM canonical_asset_registry\n  WHERE asset_id = ${sql(assetId)}\n  LIMIT 1\n), validation AS (\n  SELECT CASE\n    WHEN NOT EXISTS (SELECT 1 FROM job) THEN 'Publication job not found'\n    WHEN NOT EXISTS (SELECT 1 FROM asset) THEN 'Asset not found'\n    WHEN (SELECT avatar FROM asset) <> (SELECT avatar FROM job) THEN 'Asset avatar does not match publication job'\n    WHEN (SELECT scene FROM asset) <> (SELECT scene FROM job) THEN 'Asset scene does not match publication job'\n    ELSE NULL\n  END AS error\n), selected_asset AS (\n  UPDATE canonical_asset_registry car\n  SET\n    status = 'selected',\n    is_canonical = false,\n    review_notes = ${sql(reviewNotes)},\n    metadata = COALESCE(car.metadata, '{}'::jsonb) || jsonb_build_object(\n      'status', 'selected',\n      'isCanonical', false,\n      'selectedForPublicationJobId', ${sql(publicationJobId)},\n      'selectedForPublicationAt', now()\n    )\n  WHERE car.asset_id = ${sql(assetId)}\n    AND (SELECT error FROM validation) IS NULL\n  RETURNING car.*\n), publication_update AS (\n  UPDATE publication_jobs pj\n  SET\n    status = 'assets-ready',\n    error_message = NULL,\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'selectedAssetId', (SELECT asset_id FROM selected_asset LIMIT 1),\n      'selectedAssetObjectPath', (SELECT object_path FROM selected_asset LIMIT 1),\n      'selectedAssetBucket', (SELECT bucket FROM selected_asset LIMIT 1),\n      'selectedAssetSha256', (SELECT sha256 FROM selected_asset LIMIT 1),\n      'selectedAssetAt', now(),\n      'selectedAssetReviewNotes', ${sql(reviewNotes)}\n    ),\n    updated_at = now()\n  WHERE pj.publication_job_id = ${sql(publicationJobId)}::uuid\n    AND EXISTS (SELECT 1 FROM selected_asset)\n  RETURNING pj.*\n), generated_update AS (\n  UPDATE generated_assets ga\n  SET\n    status = 'approved',\n    review_notes = ${sql(reviewNotes)},\n    metadata = COALESCE(ga.metadata, '{}'::jsonb) || jsonb_build_object(\n      'selectedForPublicationJobId', ${sql(publicationJobId)},\n      'selectedForPublicationAt', now()\n    ),\n    updated_at = now()\n  WHERE ga.asset_id = ${sql(assetId)}\n  RETURNING ga.*\n)\nSELECT\n  CASE WHEN (SELECT error FROM validation) IS NULL THEN true ELSE false END AS ok,\n  (SELECT error FROM validation) AS error,\n  (SELECT jsonb_build_object(\n    'assetId', asset_id,\n    'avatar', avatar,\n    'scene', scene,\n    'assetType', asset_type,\n    'status', status,\n    'isCanonical', is_canonical,\n    'bucket', bucket,\n    'objectPath', object_path,\n    'mimeType', mime_type,\n    'sha256', sha256,\n    'reviewNotes', review_notes,\n    'createdAt', created_at\n  ) FROM selected_asset LIMIT 1) AS asset,\n  (SELECT jsonb_build_object(\n    'publicationJobId', publication_job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'format', format,\n    'objective', objective,\n    'businessProfile', business_profile,\n    'assetType', asset_type,\n    'status', status,\n    'brief', brief,\n    'promptPack', prompt_pack,\n    'createdAt', created_at,\n    'updatedAt', updated_at\n  ) FROM publication_update LIMIT 1) AS job,\n  (SELECT generated_asset_id FROM generated_update LIMIT 1) AS \"generatedAssetId\";\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "select-publication-asset-002",
+      "name": "Build Select Publication Asset Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "select-publication-asset-003",
+      "name": "Select Publication Asset",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function parse(value) {\n  if (value == null) return null;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return null; }\n  }\n  return value;\n}\nconst row = $input.first()?.json || {};\nconst ok = row.ok === true || row.ok === 't';\nif (!ok) {\n  return [{ json: { ok: false, selected: false, error: row.error || 'Publication asset was not selected.' } }];\n}\nconst asset = parse(row.asset);\nconst job = parse(row.job);\nif (!asset?.assetId || !job?.publicationJobId) {\n  return [{ json: { ok: false, selected: false, error: 'Selection did not return asset/job metadata.' } }];\n}\nreturn [{\n  json: {\n    ok: true,\n    selected: true,\n    asset,\n    job,\n    assetId: asset.assetId,\n    publicationJobId: job.publicationJobId,\n    publicationStatus: job.status,\n    generatedAssetId: row.generatedAssetId || null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "select-publication-asset-004",
+      "name": "Return Selection Result"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "select-publication-asset-005",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/select-asset": {
+      "main": [
+        [
+          {
+            "node": "Build Select Publication Asset Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Select Publication Asset Query": {
+      "main": [
+        [
+          {
+            "node": "Select Publication Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Publication Asset": {
+      "main": [
+        [
+          {
+            "node": "Return Selection Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Selection Result": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "select-publication-asset-v1",
+  "activeVersionId": "select-publication-asset-v1",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

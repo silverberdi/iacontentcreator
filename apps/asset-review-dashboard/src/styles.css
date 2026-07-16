@@ -7,3 +7,22 @@
     @apply bg-surface text-gray-100 antialiased;
   }
 }
+
+.json-debug-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(75 85 99) rgb(17 24 39);
+}
+
+.json-debug-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.json-debug-scroll::-webkit-scrollbar-track {
+  background: rgb(17 24 39);
+}
+
+.json-debug-scroll::-webkit-scrollbar-thumb {
+  background: rgb(75 85 99);
+  border-radius: 3px;
+}

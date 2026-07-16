@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T21:35:08.672Z",
+  "createdAt": "2026-06-09T21:35:08.672Z",
+  "id": "UxvEYJd6hnxHrTQr",
+  "name": "Avatares AI - Content - Generate Post Brief",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content/generate-post-brief",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "906d919a-3744-40aa-be35-4aab37ab99d7",
+      "name": "POST /content/generate-post-brief",
+      "webhookId": "22827469-6450-4b11-9c22-794a6481e1e6"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\nfunction slug(value, fallback = '') { return String(value || fallback || '').trim(); }\nconst body=$json.body||{}; const avatar=slug(body.avatar); const scene=slug(body.scene); const platform=slug(body.platform,'instagram'); const re=/^[a-z0-9][a-z0-9-]*$/i;\nif(!re.test(avatar)||!re.test(scene)||!re.test(platform)) return {json:{ok:false,skipQuery:true,error:'avatar, scene and platform are required slug-like values',request:{avatar,scene,platform}}};\nconst query=`SELECT ac.avatar, ac.display_name AS avatar_display_name, ac.avatar_short, sc.scene, sc.display_name AS scene_display_name, ${sql(platform)} AS platform, COALESCE(sb.visual_intent, sc.description, sc.display_name, sc.scene) AS visual_intent, COALESCE(sb.allowed_mood,'natural, warm, cinematic') AS allowed_mood, COALESCE(sb.content_angle,'') AS content_angle, COALESCE(sb.prompt_notes,'') AS prompt_notes FROM avatar_catalog ac JOIN scene_catalog sc ON sc.avatar=ac.avatar LEFT JOIN scene_brief_catalog sb ON sb.avatar=ac.avatar AND sb.scene=sc.scene WHERE ac.avatar=${sql(avatar)} AND sc.scene=${sql(scene)} AND COALESCE(ac.is_enabled,true)=true AND COALESCE(sc.is_enabled,true)=true LIMIT 1;`;\nreturn {json:{ok:true,skipQuery:false,query}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "d2fcf924-24d4-4ae2-96c1-b387ec7ed9d3",
+      "name": "Build Post Brief Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "bf3a0c0b-261f-4b30-8cc9-4fbbc3bc49f0",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "75abe201-461f-4a69-a691-205678d49a10",
+      "name": "Load Post Brief Context",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row=$input.first()?.json||{}; if(!row.avatar) return [{json:{ok:false,error:'Post brief context not found'}}];\nconst sceneName=row.scene_display_name||row.scene; const visualDirection=row.visual_intent||`${row.avatar_display_name} in ${sceneName}`;\nconst captionIdea=`Una pausa en ${sceneName.toLowerCase()}: movimiento natural, presencia y una historia que apenas empieza.`;\nreturn [{json:{ok:true,avatar:row.avatar,scene:row.scene,platform:row.platform,captionIdea,visualDirection,promptIntent:`${visualDirection}. ${row.prompt_notes||''}`.trim(),emotion:row.allowed_mood,cta:row.platform==='instagram'?'¿Con cuál versión te quedas?':'Share your first impression.',contentAngle:row.content_angle||null}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "81c692bc-6d12-494e-8db2-f86667458130",
+      "name": "Return Generated Post Brief"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "dbc696ec-f65f-4483-baef-289e1605ad12",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /content/generate-post-brief": {
+      "main": [
+        [
+          {
+            "node": "Build Post Brief Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Post Brief Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Load Post Brief Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Post Brief Context": {
+      "main": [
+        [
+          {
+            "node": "Return Generated Post Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "20915d1b-dce0-48de-b07c-59ef513fddc3",
+  "activeVersionId": "20915d1b-dce0-48de-b07c-59ef513fddc3",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:35:08.672Z",
+      "createdAt": "2026-06-09T21:35:08.672Z",
+      "role": "workflow:owner",
+      "workflowId": "UxvEYJd6hnxHrTQr",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 20915d1b",
+    "description": ""
+  }
+}

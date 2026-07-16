@@ -2,6 +2,7 @@ import SectionPanel from "../SectionPanel";
 import LoadingSpinner from "../LoadingSpinner";
 
 type ManualPipelineSectionProps = {
+  technicalMode: boolean;
   loading: boolean;
   error: string | null;
   successMessage: string | null;
@@ -9,6 +10,7 @@ type ManualPipelineSectionProps = {
 };
 
 export default function ManualPipelineSection({
+  technicalMode,
   loading,
   error,
   successMessage,
@@ -31,18 +33,24 @@ export default function ManualPipelineSection({
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={onRun}
-        disabled={loading}
-        className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? (
-          <LoadingSpinner className="size-4" label="Running pipeline…" />
-        ) : (
-          "Run Full Auto Ingest Pipeline"
-        )}
-      </button>
+      {technicalMode ? (
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={loading}
+          className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? (
+            <LoadingSpinner className="size-4" label="Running pipeline…" />
+          ) : (
+            "Run Full Auto Ingest Pipeline"
+          )}
+        </button>
+      ) : (
+        <p className="text-sm text-gray-500">
+          Manual pipeline execution is hidden outside technical mode.
+        </p>
+      )}
     </SectionPanel>
   );
 }

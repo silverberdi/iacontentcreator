@@ -1,0 +1,90 @@
+{
+  "updatedAt": "2026-06-02T14:57:56.194Z",
+  "createdAt": "2026-06-02T14:57:56.194Z",
+  "id": "7biS4Lr0oZn6YGgA",
+  "name": "Avatares AI - Admin - Auto Ingest Run",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/auto-ingest/run",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "bd8418cc-3e6d-452a-9e32-610d47f42ff6",
+      "name": "POST /admin/auto-ingest/run",
+      "webhookId": "57a59d71-dea3-4a29-b90f-8f6518640e63"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const body = $json.body || {};\n  const ingest = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://auto-ingest-runner:8090/ingest/run',\n    headers: { 'Content-Type': 'application/json' },\n    body,\n    json: true\n  });\n  return { json: { ok: true, ingest, nextStep: ingest.movedCount > 0 ? 'Run existing workflow: Avatares AI - Asset Pipeline Orchestrator - Manifest Catalog Validation' : 'No files to ingest' } };\n} catch (error) {\n  return { json: { ok: false, message: error.message, error: error.description || error.cause || null } };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        0
+      ],
+      "id": "3489a487-7f59-4202-bf66-67b799d5d28a",
+      "name": "Call Auto Ingest Runner - Run"
+    }
+  ],
+  "connections": {
+    "POST /admin/auto-ingest/run": {
+      "main": [
+        [
+          {
+            "node": "Call Auto Ingest Runner - Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "f2413d99-453f-4e98-86b1-85b46f98e324",
+  "activeVersionId": "f2413d99-453f-4e98-86b1-85b46f98e324",
+  "versionCounter": 49,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-02T14:57:56.194Z",
+      "createdAt": "2026-06-02T14:57:56.194Z",
+      "role": "workflow:owner",
+      "workflowId": "7biS4Lr0oZn6YGgA",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version f2413d99",
+    "description": ""
+  }
+}

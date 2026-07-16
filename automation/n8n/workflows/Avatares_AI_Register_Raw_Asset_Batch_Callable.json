@@ -1,0 +1,610 @@
+{
+  "updatedAt": "2026-06-04T02:10:43.250Z",
+  "createdAt": "2026-05-31T05:31:11.816Z",
+  "id": "AfxD9EeNMHktFrld",
+  "name": "Avatares AI - Register Raw Asset Batch - Callable",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        0
+      ],
+      "id": "96dc981d-7b0f-4693-903a-a1ed4e903894",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bd854d14-7b14-4ba7-af36-9eaa54e055a3",
+              "name": "inputDir",
+              "value": "={{ $json.inputDir || '/home/node/.n8n-files/inbox' }}",
+              "type": "string"
+            },
+            {
+              "id": "f853adae-07a9-4dda-bc04-e788af082dc7",
+              "name": "processedDir",
+              "value": "={{ $json.processedDir || '/home/node/.n8n-files/processed' }}",
+              "type": "string"
+            },
+            {
+              "id": "58d82939-3153-4750-8242-d9af73a7f985",
+              "name": "duplicatesDir",
+              "value": "={{ $json.duplicatesDir || '/home/node/.n8n-files/duplicates' }}",
+              "type": "string"
+            },
+            {
+              "id": "ace9103c-af19-4dca-9fcb-9ebc3efa624f",
+              "name": "failedDir",
+              "value": "={{ $json.failedDir || '/home/node/.n8n-files/failed' }}",
+              "type": "string"
+            },
+            {
+              "id": "0a8a1240-fbf6-4ae7-9bfe-fc71ab85d0ae",
+              "name": "baseUrl",
+              "value": "={{ $json.baseUrl || 'http://192.168.0.194:9000' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        432
+      ],
+      "id": "867a4d0e-aa48-41a7-8ef5-e402b54b6617",
+      "name": "Set batch variables"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.inputDir }}/*.png",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        432
+      ],
+      "id": "67565030-355f-4140-9f49-ee01e8570b72",
+      "name": "Read PNG files from inbox"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst items = $input.all();\n\nfor (let i = 0; i < items.length; i++) {\n  const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n  const binary = items[i].binary.data;\n\n  items[i].json = {\n    ...items[i].json,\n    sourceFileName: binary.fileName,\n    sourceDirectory: binary.directory,\n    mimeType: binary.mimeType,\n    fileType: binary.fileType,\n    fileExtension: binary.fileExtension,\n    fileSize: binary.fileSize,\n    byteLength: buffer.length,\n    sha256: crypto\n      .createHash('sha256')\n      .update(buffer)\n      .digest('hex')\n  };\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        432
+      ],
+      "id": "72ff6ecb-8113-4585-a40e-92546398f4a2",
+      "name": "SHA256"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ff436a5-6572-4034-9ac2-d3b53762356d",
+              "name": "avatar",
+              "value": "={{ $('Set batch variables').first().json.avatar || $json.avatar || 'estefania-montealegre' }}",
+              "type": "string"
+            },
+            {
+              "id": "2f1daf91-6b66-45ae-b93e-dd0e77ac9e69",
+              "name": "workflow",
+              "value": "={{ $('Set batch variables').first().json.workflow || $json.workflow || 'flux-krea-dev' }}",
+              "type": "string"
+            },
+            {
+              "id": "07763423-e39b-4a68-9278-aae01da04407",
+              "name": "model",
+              "value": "={{ $('Set batch variables').first().json.model || $json.model || 'flux-krea-dev' }}",
+              "type": "string"
+            },
+            {
+              "id": "be6752e2-b30d-40eb-8eb1-8ee7a996c89e",
+              "name": "seed",
+              "value": "={{ Number($('Set batch variables').first().json.seed || $json.seed || 847362) }}",
+              "type": "number"
+            },
+            {
+              "id": "25ea4619-3df6-4935-b234-e68beae1b036",
+              "name": "assetType",
+              "value": "={{ $('Set batch variables').first().json.assetType || $json.assetType || 'raw-image' }}",
+              "type": "string"
+            },
+            {
+              "id": "65d58f1a-07d9-4f91-91c7-aa6d6625e841",
+              "name": "avatarShort",
+              "value": "={{ $('Set batch variables').first().json.avatarShort || $json.avatarShort || 'estefania' }}",
+              "type": "string"
+            },
+            {
+              "id": "37459a21-9429-42d6-a30c-0c767a7771d3",
+              "name": "scene",
+              "value": "={{ $('Set batch variables').first().json.scene || $json.scene || 'UNSET_SCENE' }}",
+              "type": "string"
+            },
+            {
+              "id": "3ab41086-e746-436d-822f-3a71b71c96af",
+              "name": "version",
+              "value": "={{ Number($('Set batch variables').first().json.version || $json.version || 1) }}",
+              "type": "number"
+            },
+            {
+              "id": "1dcbe3dd-b34a-47ba-b1a7-4b9482ff03a3",
+              "name": "parentAssetId",
+              "value": "={{ $('Set batch variables').first().json.parentAssetId || $json.parentAssetId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "metadata-source-fix-v3",
+              "name": "metadataSource",
+              "value": "manifest-via-set-batch-variables",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        432
+      ],
+      "id": "b342778f-9c83-4c6a-9bd4-49f945634e15",
+      "name": "Set asset variables"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item, index) => {\n  const data = item.json;\n  const binary = item.binary.data;\n\n  const extension = binary.fileExtension || data.fileExtension || 'png';\n\n  const timestamp = new Date()\n    .toISOString()\n    .replace(/[-:]/g, '')\n    .replace(/\\.\\d{3}Z$/, `-${index + 1}Z`);\n\n  const assetFileName =\n    `${data.avatarShort}-${data.assetType}-${data.scene}-${timestamp}.${extension}`;\n\n  return {\n    json: {\n      ...data,\n      assetFileName\n    },\n    binary: item.binary\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        432
+      ],
+      "id": "98ed5e44-5055-47a5-9c20-7aeabdab5915",
+      "name": "Build asset filename"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nreturn $input.all().map(item => {\n  const imageBinary = item.binary.data;\n  const data = item.json;\n\n\n  if (!data.scene || data.scene === 'UNSET_SCENE') {\n    throw new Error('Missing manifest scene in Register Raw Asset Batch. Refusing to use a hardcoded fallback.');\n  }\n\n  const assetId = crypto.randomUUID();\n\n  const storagePath = `avatars/${data.avatar}/${data.assetType}/`;\n  const objectPath = `${storagePath}${data.assetFileName}`;\n\n  const fileSize = imageBinary.fileSize\n    ? Math.round(parseFloat(imageBinary.fileSize) * 1024 * 1024)\n    : 0;\n\n  const canonicalGroup = `${data.avatar}:${data.scene}:${data.assetType}`;\n\n  const sourceFile = {\n    name: imageBinary.fileName,\n    directory: imageBinary.directory\n  };\n\n  const runtime = {\n    inputDir: data.inputDir || '/home/node/.n8n-files/inbox',\n    processedDir: data.processedDir || '/home/node/.n8n-files/processed',\n    duplicatesDir: data.duplicatesDir || '/home/node/.n8n-files/duplicates',\n    failedDir: data.failedDir || '/home/node/.n8n-files/failed',\n    baseUrl: data.baseUrl || 'http://192.168.0.194:9000'\n  };\n\n  const metadata = {\n    assetId,\n    sha256: data.sha256,\n\n    avatar: data.avatar,\n    assetType: data.assetType,\n    scene: data.scene,\n    version: data.version,\n\n    status: 'raw',\n    reviewNotes: null,\n    isCanonical: false,\n    canonicalGroup,\n\n    workflow: data.workflow,\n    model: data.model,\n    seed: data.seed,\n\n    createdAt: new Date().toISOString(),\n    metadataSource: data.metadataSource || 'manifest-via-set-batch-variables',\n\n    sourceFile,\n    runtime,\n\n    // Top-level copies used by SQL and move nodes.\n    source_file_directory: sourceFile.directory,\n    source_file_name: sourceFile.name,\n    processed_dir: runtime.processedDir,\n    duplicates_dir: runtime.duplicatesDir,\n    failed_dir: runtime.failedDir,\n    base_url: runtime.baseUrl,\n\n    file: {\n      name: data.assetFileName,\n      mimeType: imageBinary.mimeType,\n      size: fileSize,\n      extension: imageBinary.fileExtension || data.fileExtension || 'png'\n    },\n\n    storage: {\n      bucket: 'iacontentcreator-assets',\n      path: storagePath\n    },\n\n    objectPath,\n\n    generation: {\n      tool: 'ComfyUI',\n      workflowVersion: 'v1',\n      prompt: '',\n      negativePrompt: '',\n      sampler: '',\n      steps: null,\n      cfg: null\n    },\n\n    tags: [\n      data.avatarShort,\n      data.scene,\n      data.assetType\n    ]\n  };\n\n  return {\n    json: metadata,\n    binary: item.binary\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        432
+      ],
+      "id": "8c17004b-0dab-4ba8-b32f-674d8d6d9359",
+      "name": "Create image metadata"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  EXISTS (\n    SELECT 1\n    FROM canonical_asset_registry\n    WHERE sha256 = '{{ $json.sha256 }}'\n  ) AS duplicated_in_db;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1600,
+        432
+      ],
+      "id": "a97adb78-c5a2-40ca-ac65-a84a0151e2f5",
+      "name": "Check duplicate by sha256",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1840,
+        432
+      ],
+      "id": "61dd202c-19ba-426e-879c-5f753c7e9d45",
+      "name": "Merge duplicate check"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\n\nreturn $input.all().map(item => {\n  const data = item.json;\n\n  const duplicatedInDb = data.duplicated_in_db === true;\n  const duplicatedInBatch = seen.has(data.sha256);\n\n  if (!duplicatedInBatch) {\n    seen.add(data.sha256);\n  }\n\n  const duplicated = duplicatedInDb || duplicatedInBatch;\n\n  return {\n    json: {\n      ...data,\n      duplicated,\n      duplicateReason: duplicatedInDb\n        ? 'database'\n        : duplicatedInBatch\n          ? 'batch'\n          : null\n    },\n    binary: item.binary\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        432
+      ],
+      "id": "67095199-43bb-47df-8692-fe66696fa5ad",
+      "name": "Resolve duplicate status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b60cdae2-a8cb-4ac7-bc8a-657a53adbf03",
+              "leftValue": "={{ $json.duplicated === true }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2320,
+        432
+      ],
+      "id": "ff2710ef-0850-467a-a61d-54a3ca37584c",
+      "name": "is duplicated",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\n\nconst isMissing = value =>\n  !value || value === 'undefined' || value === undefined || value === null;\n\nfunction uniqueTargetPath(targetDir, sourceName) {\n  const parsed = path.parse(sourceName);\n  let candidate = path.join(targetDir, sourceName);\n  let index = 1;\n\n  while (fs.existsSync(candidate)) {\n    candidate = path.join(targetDir, `${parsed.name}-${index}${parsed.ext}`);\n    index++;\n  }\n\n  return candidate;\n}\n\nfunction moveFile(sourcePath, targetPath) {\n  try {\n    fs.renameSync(sourcePath, targetPath);\n  } catch (error) {\n    if (error && error.code === 'EXDEV') {\n      fs.copyFileSync(sourcePath, targetPath);\n      fs.unlinkSync(sourcePath);\n    } else {\n      throw error;\n    }\n  }\n}\n\nreturn $input.all().map(item => {\n  const sourceDir =\n    item.json.source_file_directory ||\n    item.json.sourceFile?.directory;\n\n  const sourceName =\n    item.json.source_file_name ||\n    item.json.sourceFile?.name;\n\n  const targetDir =\n    !isMissing(item.json.duplicates_dir) ? item.json.duplicates_dir :\n    !isMissing(item.json.runtime?.duplicatesDir) ? item.json.runtime?.duplicatesDir :\n    '/home/node/.n8n-files/duplicates';\n\n  if (isMissing(sourceDir) || isMissing(sourceName)) {\n    return {\n      json: {\n        ...item.json,\n        moveStatus: 'skipped',\n        moveReason: 'Missing source file metadata',\n        sourceDir,\n        sourceName\n      }\n    };\n  }\n\n  fs.mkdirSync(targetDir, { recursive: true });\n\n  const sourcePath = path.join(sourceDir, sourceName);\n  const targetPath = uniqueTargetPath(targetDir, sourceName);\n\n  if (fs.existsSync(sourcePath)) {\n    moveFile(sourcePath, targetPath);\n    return {\n      json: {\n        ...item.json,\n        moveStatus: 'duplicate',\n        movedFrom: sourcePath,\n        movedTo: targetPath\n      }\n    };\n  }\n\n  return {\n    json: {\n      ...item.json,\n      moveStatus: 'skipped',\n      moveReason: 'Source file not found',\n      attemptedSource: sourcePath\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        256
+      ],
+      "id": "28cc14eb-3e44-450d-90a7-3661c898aaac",
+      "name": "Move duplicate file"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "iacontentcreator-assets",
+        "fileName": "={{ $json.objectPath }}",
+        "binaryData": "={{ true }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        2560,
+        560
+      ],
+      "id": "6282395b-5e85-4b99-8e0d-81d5ebc829fc",
+      "name": "Upload a file",
+      "credentials": {
+        "s3": {
+          "id": "UGwowBESbJkf7t97",
+          "name": "S3 account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2800,
+        560
+      ],
+      "id": "63973d18-23ca-4b98-8a77-2c2f85c660d3",
+      "name": "Merge upload result"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH inserted AS (\n  INSERT INTO canonical_asset_registry (\n      asset_id,\n      sha256,\n      avatar,\n      asset_type,\n      scene,\n      version,\n      workflow,\n      model,\n      seed,\n      bucket,\n      object_path,\n      original_filename,\n      mime_type,\n      file_size,\n      extension,\n      prompt,\n      negative_prompt,\n      sampler,\n      steps,\n      cfg,\n      tags,\n      metadata,\n      status,\n      review_notes,\n      is_canonical,\n      canonical_group\n  )\n  VALUES (\n      '{{ $json.assetId }}',\n      '{{ $json.sha256 }}',\n      '{{ $json.avatar }}',\n      '{{ $json.assetType }}',\n      '{{ $json.scene }}',\n      {{ $json.version }},\n      '{{ $json.workflow }}',\n      '{{ $json.model }}',\n      {{ $json.seed }},\n      '{{ $json.storage.bucket }}',\n      '{{ $json.objectPath }}',\n      '{{ $json.file.name }}',\n      '{{ $json.file.mimeType }}',\n      {{ $json.file.size }},\n      '{{ $json.file.extension }}',\n      '{{ $json.generation.prompt }}',\n      '{{ $json.generation.negativePrompt }}',\n      '{{ $json.generation.sampler }}',\n      NULL,\n      NULL,\n      '{{ JSON.stringify($json.tags) }}'::jsonb,\n      '{{ JSON.stringify($json) }}'::jsonb,\n      'raw',\n      NULL,\n      false,\n      '{{ $json.canonicalGroup }}'\n  )\n  ON CONFLICT (sha256)\n  DO NOTHING\n  RETURNING\n      asset_id,\n      sha256,\n      avatar,\n      asset_type,\n      scene,\n      asset_type AS asset_type_returned,\n      object_path,\n      status,\n      canonical_group\n)\nSELECT * FROM inserted;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3040,
+        560
+      ],
+      "id": "de74e83f-ef2a-4425-ab12-6fc26ddbf93a",
+      "name": "Insert SQL",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\n\nconst isMissing = value =>\n  !value || value === 'undefined' || value === undefined || value === null;\n\nfunction uniqueTargetPath(targetDir, sourceName) {\n  const parsed = path.parse(sourceName);\n  let candidate = path.join(targetDir, sourceName);\n  let index = 1;\n\n  while (fs.existsSync(candidate)) {\n    candidate = path.join(targetDir, `${parsed.name}-${index}${parsed.ext}`);\n    index++;\n  }\n\n  return candidate;\n}\n\nfunction moveFile(sourcePath, targetPath) {\n  try {\n    fs.renameSync(sourcePath, targetPath);\n  } catch (error) {\n    if (error && error.code === 'EXDEV') {\n      fs.copyFileSync(sourcePath, targetPath);\n      fs.unlinkSync(sourcePath);\n    } else {\n      throw error;\n    }\n  }\n}\n\nreturn $input.all().map(item => {\n  const sourceDir =\n    item.json.source_file_directory ||\n    item.json.sourceFile?.directory;\n\n  const sourceName =\n    item.json.source_file_name ||\n    item.json.sourceFile?.name;\n\n  const targetDir =\n    !isMissing(item.json.processed_dir) ? item.json.processed_dir :\n    !isMissing(item.json.runtime?.processedDir) ? item.json.runtime?.processedDir :\n    '/home/node/.n8n-files/processed';\n\n  if (isMissing(sourceDir) || isMissing(sourceName)) {\n    return {\n      json: {\n        ...item.json,\n        moveStatus: 'skipped',\n        moveReason: 'Missing source file metadata',\n        sourceDir,\n        sourceName\n      }\n    };\n  }\n\n  fs.mkdirSync(targetDir, { recursive: true });\n\n  const sourcePath = path.join(sourceDir, sourceName);\n  const targetPath = uniqueTargetPath(targetDir, sourceName);\n\n  if (fs.existsSync(sourcePath)) {\n    moveFile(sourcePath, targetPath);\n    return {\n      json: {\n        ...item.json,\n        moveStatus: 'processed',\n        movedFrom: sourcePath,\n        movedTo: targetPath\n      }\n    };\n  }\n\n  return {\n    json: {\n      ...item.json,\n      moveStatus: 'skipped',\n      moveReason: 'Source file not found',\n      attemptedSource: sourcePath\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        560
+      ],
+      "id": "b680ffb0-5959-4d9b-a3f6-ad0ddf212f0d",
+      "name": "Move processed file"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3280,
+        560
+      ],
+      "id": "8d9017c4-f44c-4083-8f5a-6f75248bc31f",
+      "name": "Merge insert result"
+    }
+  ],
+  "connections": {
+    "Set batch variables": {
+      "main": [
+        [
+          {
+            "node": "Read PNG files from inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read PNG files from inbox": {
+      "main": [
+        [
+          {
+            "node": "SHA256",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256": {
+      "main": [
+        [
+          {
+            "node": "Set asset variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set asset variables": {
+      "main": [
+        [
+          {
+            "node": "Build asset filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build asset filename": {
+      "main": [
+        [
+          {
+            "node": "Create image metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create image metadata": {
+      "main": [
+        [
+          {
+            "node": "Check duplicate by sha256",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge duplicate check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check duplicate by sha256": {
+      "main": [
+        [
+          {
+            "node": "Merge duplicate check",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge duplicate check": {
+      "main": [
+        [
+          {
+            "node": "Resolve duplicate status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve duplicate status": {
+      "main": [
+        [
+          {
+            "node": "is duplicated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is duplicated": {
+      "main": [
+        [
+          {
+            "node": "Move duplicate file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upload a file",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge upload result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload a file": {
+      "main": [
+        [
+          {
+            "node": "Merge upload result",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge upload result": {
+      "main": [
+        [
+          {
+            "node": "Insert SQL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge insert result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert SQL": {
+      "main": [
+        [
+          {
+            "node": "Merge insert result",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge insert result": {
+      "main": [
+        [
+          {
+            "node": "Move processed file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set batch variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "3c4d87be-8de6-4cc1-8d28-851242f0f9f3",
+  "activeVersionId": "3c4d87be-8de6-4cc1-8d28-851242f0f9f3",
+  "versionCounter": 77,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-05-31T05:31:11.816Z",
+      "createdAt": "2026-05-31T05:31:11.816Z",
+      "role": "workflow:owner",
+      "workflowId": "AfxD9EeNMHktFrld",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 3c4d87be",
+    "description": ""
+  }
+}

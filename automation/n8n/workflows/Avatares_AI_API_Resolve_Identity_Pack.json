@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T22:19:16.976Z",
+  "createdAt": "2026-06-09T21:30:35.973Z",
+  "id": "VhMF1c0zePBVMjQi",
+  "name": "Avatares AI - API - Resolve Identity Pack",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "identity/resolve-pack",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "26c08303-d4a1-4112-9ee7-1b635c5f7edb",
+      "name": "POST /identity/resolve-pack",
+      "webhookId": "00427795-9129-42dd-a302-8d8c59cc5362"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\n\nfunction slug(value, fallback = '') {\n  return String(value || fallback || '').trim();\n}\n\nconst body = $json.body || {};\nconst avatar = slug(body.avatar);\n\nconst slugRegex = /^[a-z0-9][a-z0-9-]*$/i;\n\nif (!slugRegex.test(avatar)) {\n  return {\n    json: {\n      ok: false,\n      skipQuery: true,\n      error: 'avatar is required and must be a slug-like value',\n      request: { avatar }\n    }\n  };\n}\n\nconst baseUrl = slug(\n  body.baseUrl || body.base_url,\n  'http://192.168.0.194:9000'\n).replace(/\\/$/, '');\n\nconst query = `\nWITH canonical AS (\n  SELECT *\n  FROM canonical_asset_registry\n  WHERE avatar = ${sql(avatar)}\n    AND COALESCE(status, '') IN ('canonical', 'selected')\n    AND (\n      COALESCE(is_canonical, false) = true\n      OR status = 'canonical'\n    )\n  ORDER BY created_at DESC\n  LIMIT 12\n),\nselected AS (\n  SELECT *\n  FROM canonical_asset_registry\n  WHERE avatar = ${sql(avatar)}\n    AND COALESCE(status, '') = 'selected'\n    AND COALESCE(is_canonical, false) = false\n  ORDER BY created_at DESC\n  LIMIT 24\n)\nSELECT\n  ${sql(avatar)} AS avatar,\n  COALESCE(\n    (\n      SELECT jsonb_agg(\n        jsonb_build_object(\n          'assetId', asset_id,\n          'avatar', avatar,\n          'scene', scene,\n          'assetType', asset_type,\n          'status', status,\n          'isCanonical', is_canonical,\n          'bucket', bucket,\n          'objectPath', object_path,\n          'url', ${sql(baseUrl)} || '/' || bucket || '/' || object_path,\n          'mimeType', mime_type,\n          'metadata', metadata,\n          'createdAt', created_at\n        )\n      )\n      FROM canonical\n    ),\n    '[]'::jsonb\n  ) AS canonical_assets,\n  COALESCE(\n    (\n      SELECT jsonb_agg(\n        jsonb_build_object(\n          'assetId', asset_id,\n          'avatar', avatar,\n          'scene', scene,\n          'assetType', asset_type,\n          'status', status,\n          'isCanonical', is_canonical,\n          'bucket', bucket,\n          'objectPath', object_path,\n          'url', ${sql(baseUrl)} || '/' || bucket || '/' || object_path,\n          'mimeType', mime_type,\n          'metadata', metadata,\n          'createdAt', created_at\n        )\n      )\n      FROM selected\n    ),\n    '[]'::jsonb\n  ) AS selected_assets;\n`;\n\nreturn {\n  json: {\n    ok: true,\n    skipQuery: false,\n    query\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "36f99fa2-35db-4488-bcff-93e558d173f8",
+      "name": "Build Identity Pack Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "923183c1-194a-4107-83e3-d29270dd9428",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0ef016e6-4b59-48bb-8855-6ac8cd26db37",
+      "name": "Resolve Identity Pack",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\n\nfunction parse(value, fallback) {\n  if (value === undefined || value === null) return fallback;\n  if (typeof value === 'string') {\n    try {\n      return JSON.parse(value);\n    } catch {\n      return fallback;\n    }\n  }\n  return value;\n}\n\nconst avatar = row.avatar;\nconst canonicalAssets = parse(row.canonical_assets, []);\nconst selectedAssets = parse(row.selected_assets, []);\n\nconst identity = {\n  displayName: 'Estefanía Montealegre',\n  avatar,\n  identityPrompt:\n    'Estefanía Montealegre, Colombian woman, warm natural beauty, trigueña skin, natural curly hair, olive-green eyes, elegant but approachable presence, realistic skin texture, cinematic lifestyle photography, consistent identity.',\n  consistencyRules: [\n    'Keep the same facial identity across scenes.',\n    'Use natural curly hair unless the scene explicitly requires a styled variation.',\n    'Avoid exaggerated luxury, plastic skin, overprocessed makeup, or unrealistic body proportions.',\n    'Prefer candid lifestyle realism over fashion campaign posing.'\n  ],\n  visualAnchors: [\n    'trigueña skin',\n    'natural curly hair',\n    'olive-green eyes',\n    'warm confident expression',\n    'natural cinematic realism'\n  ]\n};\n\nreturn [\n  {\n    json: {\n      ok: true,\n      resolved: true,\n      avatar,\n      identity,\n      canonicalAssets,\n      selectedAssets,\n      assetCount: {\n        canonical: canonicalAssets.length,\n        selected: selectedAssets.length\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "c711b53e-2c34-4315-9f13-04f59ef754f5",
+      "name": "Return Identity Pack"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "5a652393-a8f0-40a6-903c-0829cc90c9d0",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /identity/resolve-pack": {
+      "main": [
+        [
+          {
+            "node": "Build Identity Pack Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Identity Pack Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Resolve Identity Pack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Identity Pack": {
+      "main": [
+        [
+          {
+            "node": "Return Identity Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "c999a66f-af14-43d1-a278-2de95c25400e",
+  "activeVersionId": "c999a66f-af14-43d1-a278-2de95c25400e",
+  "versionCounter": 45,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:30:35.973Z",
+      "createdAt": "2026-06-09T21:30:35.973Z",
+      "role": "workflow:owner",
+      "workflowId": "VhMF1c0zePBVMjQi",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version c999a66f",
+    "description": ""
+  }
+}

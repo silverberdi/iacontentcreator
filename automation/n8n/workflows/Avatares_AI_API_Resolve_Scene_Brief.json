@@ -1,0 +1,210 @@
+{
+  "updatedAt": "2026-06-09T21:34:48.291Z",
+  "createdAt": "2026-06-09T21:34:48.291Z",
+  "id": "hH6dbg2uCUV8eFkw",
+  "name": "Avatares AI - API - Resolve Scene Brief",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "scenes/resolve-brief",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        128
+      ],
+      "id": "2efc3477-53ef-4b12-bc4b-076fb3418776",
+      "name": "POST /scenes/resolve-brief",
+      "webhookId": "a1397445-5f9a-40f9-9da6-bdfd4685316b"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || value === '') return 'NULL';\n  return `'${String(value).replace(/'/g, \"''\")}'`;\n}\nfunction sqlJson(value) {\n  return `${sql(JSON.stringify(value ?? {}))}::jsonb`;\n}\nfunction slug(value, fallback = '') { return String(value || fallback || '').trim(); }\nconst body=$json.body||{}; const avatar=slug(body.avatar); const scene=slug(body.scene); const re=/^[a-z0-9][a-z0-9-]*$/i;\nif(!re.test(avatar)||!re.test(scene)) return {json:{ok:false,skipQuery:true,error:'avatar and scene are required slug-like values',request:{avatar,scene}}};\nconst query=`SELECT sc.avatar, sc.scene, sc.display_name, COALESCE(sb.visual_intent,sc.description,sc.display_name,sc.scene) AS visual_intent, COALESCE(sb.allowed_mood,'natural, cinematic, emotionally warm') AS allowed_mood, COALESCE(sb.avoid,'[]'::jsonb) AS avoid, COALESCE(sb.prompt_notes,sc.notes,'') AS prompt_notes, COALESCE(sb.content_angle,'') AS content_angle FROM scene_catalog sc LEFT JOIN scene_brief_catalog sb ON sb.avatar=sc.avatar AND sb.scene=sc.scene WHERE sc.avatar=${sql(avatar)} AND sc.scene=${sql(scene)} AND COALESCE(sc.is_enabled,true)=true AND COALESCE(sc.is_active,COALESCE(sc.is_enabled,true))=true LIMIT 1;`;\nreturn {json:{ok:true,skipQuery:false,query,avatar,scene}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "d7c9f5df-ba06-49e5-beef-412011ae1f05",
+      "name": "Build Scene Brief Query"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.skipQuery }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "6cfcfcfb-f855-46ba-90bc-4a04341defeb",
+      "name": "Is Valid Request"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "57216f96-0330-4853-9051-2fbfebdc3066",
+      "name": "Resolve Scene Brief",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst p=$('Build Scene Brief Query').first().json; const row=$input.first()?.json||{};\nif(!row.scene) return [{json:{ok:false,resolved:false,error:'Scene brief not found or inactive',avatar:p.avatar,scene:p.scene}}];\nlet avoid=row.avoid||[]; if(typeof avoid==='string'){try{avoid=JSON.parse(avoid)}catch{avoid=[]}}\nreturn [{json:{ok:true,resolved:true,avatar:row.avatar,scene:row.scene,displayName:row.display_name,visualIntent:row.visual_intent,allowedMood:row.allowed_mood,avoid,promptNotes:row.prompt_notes,contentAngle:row.content_angle}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "c908087f-4474-4799-9e13-262bad714d24",
+      "name": "Return Scene Brief"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "f269d2af-f747-4647-af6c-b9a1caae5624",
+      "name": "Return Invalid Request"
+    }
+  ],
+  "connections": {
+    "POST /scenes/resolve-brief": {
+      "main": [
+        [
+          {
+            "node": "Build Scene Brief Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Scene Brief Query": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Resolve Scene Brief",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Scene Brief": {
+      "main": [
+        [
+          {
+            "node": "Return Scene Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "96bb74ef-356c-43d4-b69a-60f519a93e03",
+  "activeVersionId": "96bb74ef-356c-43d4-b69a-60f519a93e03",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-09T21:34:48.291Z",
+      "createdAt": "2026-06-09T21:34:48.291Z",
+      "role": "workflow:owner",
+      "workflowId": "hH6dbg2uCUV8eFkw",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 96bb74ef",
+    "description": ""
+  }
+}

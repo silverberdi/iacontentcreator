@@ -1,0 +1,121 @@
+{
+  "updatedAt": "2026-06-02T19:18:42.849Z",
+  "createdAt": "2026-06-02T19:11:58.592Z",
+  "id": "ggd0ekHSb3H4wuMc",
+  "name": "Avatares AI - Admin - Get Active Ingest Profile",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/ingest-profiles/active",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "6e7537b9-e16b-455a-8003-973f4634a850",
+      "name": "POST /admin/ingest-profiles/active",
+      "webhookId": "b2b889ed-719d-4eb4-a671-e96223a1cee0"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  profile_id AS \"profileId\",\n  profile_name AS \"profileName\",\n  avatar,\n  avatar_short AS \"avatarShort\",\n  scene,\n  asset_type AS \"assetType\",\n  workflow,\n  model,\n  seed,\n  version,\n  auto_promote_latest AS \"autoPromoteLatest\",\n  is_active AS \"isActive\",\n  is_enabled AS \"isEnabled\",\n  created_at AS \"createdAt\",\n  updated_at AS \"updatedAt\"\nFROM ingest_profiles\nWHERE is_active = true AND is_enabled = true\nORDER BY updated_at DESC\nLIMIT 1;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        320,
+        0
+      ],
+      "id": "ec7ee5cf-b04a-40f5-9d69-c6dea02073a9",
+      "name": "Get Active Ingest Profile",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (!items.length) {\n  return [{\n    json: {\n      ok: true,\n      found: false,\n      profile: null\n    }\n  }];\n}\n\nconst row = items[0].json;\n\nreturn [{\n  json: {\n    ok: true,\n    found: true,\n    profile: {\n      profileId: row.profileId,\n      profileName: row.profileName,\n      avatar: row.avatar,\n      avatarShort: row.avatarShort,\n      scene: row.scene,\n      assetType: row.assetType,\n      workflow: row.workflow,\n      model: row.model,\n      seed: row.seed,\n      version: row.version,\n      autoPromoteLatest: row.autoPromoteLatest,\n      isActive: row.isActive,\n      isEnabled: row.isEnabled,\n      createdAt: row.createdAt,\n      updatedAt: row.updatedAt\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "2195fb05-ea94-4248-9c12-0ba5b356887b",
+      "name": "Normalize Active Profile"
+    }
+  ],
+  "connections": {
+    "POST /admin/ingest-profiles/active": {
+      "main": [
+        [
+          {
+            "node": "Get Active Ingest Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Ingest Profile": {
+      "main": [
+        [
+          {
+            "node": "Normalize Active Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "ae6cb1e2-9b18-48c3-99b0-93c84585ecab",
+  "activeVersionId": "ae6cb1e2-9b18-48c3-99b0-93c84585ecab",
+  "versionCounter": 53,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-02T19:11:58.592Z",
+      "createdAt": "2026-06-02T19:11:58.592Z",
+      "role": "workflow:owner",
+      "workflowId": "ggd0ekHSb3H4wuMc",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version ae6cb1e2",
+    "description": ""
+  }
+}

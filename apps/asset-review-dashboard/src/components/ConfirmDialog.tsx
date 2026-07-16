@@ -3,14 +3,15 @@ import type { ConfirmAction } from "../types/assets";
 import { shortenId } from "../utils/format";
 import LoadingSpinner from "./LoadingSpinner";
 
-const DEFAULT_PROMOTE_NOTES = "Selected via Asset Review Dashboard";
+const DEFAULT_PROMOTE_NOTES = "Promoted to canonical via Asset Review Dashboard";
+const DEFAULT_SELECT_NOTES = "Marked as selected via Asset Review Dashboard";
 const DEFAULT_REJECT_NOTES = "Rejected during dashboard review";
 
 type ConfirmDialogProps = {
   action: ConfirmAction | null;
   reviewNotes: string;
   pending: boolean;
-  operationType: "promote" | "reject" | null;
+  operationType: "promote" | "select" | "reject" | null;
   onReviewNotesChange: (notes: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -41,16 +42,21 @@ export default function ConfirmDialog({
   if (!action) return null;
 
   const isPromote = action.type === "promote";
+  const isSelect = action.type === "select";
   const title = isPromote
     ? "Promote this asset as canonical?"
-    : "Reject this asset?";
+    : isSelect
+      ? "Mark this asset as selected?"
+      : "Reject this asset?";
 
   const pendingLabel =
     operationType === "promote"
       ? "Promoting…"
-      : operationType === "reject"
-        ? "Rejecting…"
-        : "Processing…";
+      : operationType === "select"
+        ? "Selecting…"
+        : operationType === "reject"
+          ? "Rejecting…"
+          : "Processing…";
 
   return (
     <dialog
@@ -98,13 +104,17 @@ export default function ConfirmDialog({
             className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${
               isPromote
                 ? "bg-emerald-700 hover:bg-emerald-600"
-                : "bg-red-900/80 hover:bg-red-800"
+                : isSelect
+                  ? "bg-blue-700 hover:bg-blue-600"
+                  : "bg-red-900/80 hover:bg-red-800"
             }`}
           >
             {pending ? (
               <LoadingSpinner className="size-4" label={pendingLabel} />
             ) : isPromote ? (
               "Promote"
+            ) : isSelect ? (
+              "Select"
             ) : (
               "Reject"
             )}
@@ -115,4 +125,4 @@ export default function ConfirmDialog({
   );
 }
 
-export { DEFAULT_PROMOTE_NOTES, DEFAULT_REJECT_NOTES };
+export { DEFAULT_PROMOTE_NOTES, DEFAULT_SELECT_NOTES, DEFAULT_REJECT_NOTES };

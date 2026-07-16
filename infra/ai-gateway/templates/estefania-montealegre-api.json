@@ -1,0 +1,368 @@
+{
+  "9": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "112:8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "47": {
+    "inputs": {
+      "image": "a10896be84303d5fff2b22aeb68ba2c35bb4364b5d0cc6ed05d0e60269cefbf0.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "112:57:44": {
+    "inputs": {
+      "conditioning": [
+        "112:6",
+        0
+      ],
+      "latent": [
+        "112:51",
+        0
+      ]
+    },
+    "class_type": "ReferenceLatent",
+    "_meta": {
+      "title": "ReferenceLatent"
+    }
+  },
+  "112:57:35": {
+    "inputs": {
+      "guidance": 3.5,
+      "conditioning": [
+        "112:57:41",
+        0
+      ]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "FluxGuidance"
+    }
+  },
+  "112:57:41": {
+    "inputs": {
+      "reference_latents_method": "uxo/uno",
+      "conditioning": [
+        "112:57:44",
+        0
+      ]
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Edit Model Reference Method"
+    }
+  },
+  "112:30": {
+    "inputs": {
+      "ckpt_name": "flux1-dev-fp8.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "112:40": {
+    "inputs": {
+      "clip_name": "sigclip_vision_patch14_384.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": {
+      "title": "Load CLIP Vision"
+    }
+  },
+  "112:39": {
+    "inputs": {
+      "name": "uso-flux1-projector-v1.safetensors"
+    },
+    "class_type": "ModelPatchLoader",
+    "_meta": {
+      "title": "ModelPatchLoader"
+    }
+  },
+  "112:43": {
+    "inputs": {
+      "lora_name": "uso-flux1-dit-lora-v1.safetensors",
+      "strength_model": 1,
+      "model": [
+        "112:30",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "112:51": {
+    "inputs": {
+      "pixels": [
+        "112:109",
+        0
+      ],
+      "vae": [
+        "112:30",
+        2
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "112:48": {
+    "inputs": {
+      "conditioning": [
+        "112:6",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "112:8": {
+    "inputs": {
+      "samples": [
+        "112:31",
+        0
+      ],
+      "vae": [
+        "112:30",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "112:109": {
+    "inputs": {
+      "upscale_method": "area",
+      "largest_size": 512,
+      "image": [
+        "47",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToMaxDimension",
+    "_meta": {
+      "title": "Scale Image to Max Dimension"
+    }
+  },
+  "112:55:117": {
+    "inputs": {
+      "crop": "center",
+      "clip_vision": [
+        "112:40",
+        0
+      ]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "CLIP Vision Encode"
+    }
+  },
+  "112:55:118": {
+    "inputs": {
+      "model": [
+        "112:43",
+        0
+      ],
+      "model_patch": [
+        "112:39",
+        0
+      ],
+      "clip_vision_output": [
+        "112:55:117",
+        0
+      ]
+    },
+    "class_type": "USOStyleReference",
+    "_meta": {
+      "title": "USOStyleReference"
+    }
+  },
+  "112:56:119": {
+    "inputs": {
+      "crop": "center",
+      "clip_vision": [
+        "112:40",
+        0
+      ]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "CLIP Vision Encode"
+    }
+  },
+  "112:56:120": {
+    "inputs": {
+      "model": [
+        "112:43",
+        0
+      ],
+      "model_patch": [
+        "112:39",
+        0
+      ],
+      "clip_vision_output": [
+        "112:56:119",
+        0
+      ]
+    },
+    "class_type": "USOStyleReference",
+    "_meta": {
+      "title": "USOStyleReference"
+    }
+  },
+  "112:6": {
+    "inputs": {
+      "text": "A cozy, candid 35mm photograph of Estefanía at home. She is sitting comfortably on a soft armchair, (reading a physical hardcover book with a genuine, relaxed smile:1.3). The setting is a living room with warm, ambient lighting from a floor lamp, soft textures of a wool blanket draped over her lap. (Focus on the intimacy of the moment, authentic skin texture and freckles, soft curly hair messy in a natural, lived-in way:1.2). Shallow depth of field, background showing a quiet, blurred bookshelf and a cup of tea on a side table, cinematic interior lighting, amateur photography aesthetic, unposed.",
+      "clip": [
+        "112:30",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "112:110": {
+    "inputs": {
+      "width": 896,
+      "height": 1152,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "112:31": {
+    "inputs": {
+      "seed": 849243805138031,
+      "steps": 30,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "112:43",
+        0
+      ],
+      "positive": [
+        "112:57:35",
+        0
+      ],
+      "negative": [
+        "112:48",
+        0
+      ],
+      "latent_image": [
+        "112:110",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "112:122": {
+    "inputs": {
+      "guide_size": 512,
+      "guide_size_for": true,
+      "max_size": 1024,
+      "seed": 965173925572608,
+      "steps": 20,
+      "cfg": 8,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "112:8",
+        0
+      ],
+      "model": [
+        "112:43",
+        0
+      ],
+      "bbox_detector": [
+        "112:123",
+        0
+      ],
+      "sam_model_opt": [
+        "112:124",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "FaceDetailer"
+    }
+  },
+  "112:123": {
+    "inputs": {
+      "model_name": "face_yolov8n.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "112:124": {
+    "inputs": {
+      "model_name": "sam_hq_vit_l.pth",
+      "device_mode": "AUTO"
+    },
+    "class_type": "SAMLoader",
+    "_meta": {
+      "title": "SAMLoader (Impact)"
+    }
+  },
+  "112:125": {
+    "inputs": {
+      "images": [
+        "112:122",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  }
+}

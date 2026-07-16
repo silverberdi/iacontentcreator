@@ -21,7 +21,11 @@ function SuccessBadge({ success }: { success: boolean }) {
   );
 }
 
-export default function BackupsPanel() {
+type BackupsPanelProps = {
+  technicalMode: boolean;
+};
+
+export default function BackupsPanel({ technicalMode }: BackupsPanelProps) {
   const [health, setHealth] = useState<BackupHealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
@@ -192,17 +196,19 @@ export default function BackupsPanel() {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setActionMessage(null);
-            setCreateDialogOpen(true);
-          }}
-          disabled={busy}
-          className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Create Backup
-        </button>
+        {technicalMode && (
+          <button
+            type="button"
+            onClick={() => {
+              setActionMessage(null);
+              setCreateDialogOpen(true);
+            }}
+            disabled={busy}
+            className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Create Backup
+          </button>
+        )}
 
         <button
           type="button"

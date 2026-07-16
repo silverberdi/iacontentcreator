@@ -1,0 +1,121 @@
+{
+  "updatedAt": "2026-06-04T05:38:24.958Z",
+  "createdAt": "2026-06-03T15:35:48.444Z",
+  "id": "C96f9iDSUzw1IBgs",
+  "name": "Avatares AI - Admin - Catalog Options",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/catalogs/options",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7ce829dc-3dff-4583-a286-0f87d1e59271",
+      "name": "POST /admin/catalogs/options",
+      "webhookId": "be891734-ade1-48ca-81ba-dbf18709e733"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT jsonb_build_object(\n  'avatars', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', avatar_id,\n      'value', avatar,\n      'label', display_name,\n      'avatar', avatar,\n      'avatarShort', avatar_short,\n      'displayName', display_name,\n      'avatarKind', avatar_kind,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM avatar_catalog\n    WHERE is_enabled = true\n  ), '[]'::jsonb),\n\n  'scenes', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', scene_id,\n      'value', scene,\n      'label', display_name,\n      'avatar', avatar,\n      'scene', scene,\n      'displayName', display_name,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'isActive', COALESCE(is_active, is_enabled),\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY avatar, display_name)\n    FROM scene_catalog\n    WHERE is_enabled = true\n  ), '[]'::jsonb),\n\n  'assetTypes', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', asset_type_id,\n      'value', asset_type,\n      'label', display_name,\n      'assetType', asset_type,\n      'displayName', display_name,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM asset_type_catalog\n    WHERE is_enabled = true\n  ), '[]'::jsonb),\n\n  'workflows', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', generation_workflow_id,\n      'value', workflow,\n      'label', display_name,\n      'workflow', workflow,\n      'displayName', display_name,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM generation_workflow_catalog\n    WHERE is_enabled = true\n  ), '[]'::jsonb),\n\n  'models', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', generation_model_id,\n      'value', model,\n      'label', display_name,\n      'model', model,\n      'displayName', display_name,\n      'provider', provider,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM generation_model_catalog\n    WHERE is_enabled = true\n  ), '[]'::jsonb)\n) AS result;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        304,
+        0
+      ],
+      "id": "8c41fd95-30d7-4d99-8bb8-588e524af1d9",
+      "name": "Get Catalog Options",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst result = typeof row.result === 'string' ? JSON.parse(row.result) : row.result;\n\nreturn [{\n  json: {\n    ok: true,\n    ...result\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        0
+      ],
+      "id": "0ec102cc-d966-411a-9621-6a1536e0043a",
+      "name": "Return Catalog Options"
+    }
+  ],
+  "connections": {
+    "POST /admin/catalogs/options": {
+      "main": [
+        [
+          {
+            "node": "Get Catalog Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Catalog Options": {
+      "main": [
+        [
+          {
+            "node": "Return Catalog Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "93e8dbea-27b7-4cd0-a00e-92ddeac150ee",
+  "activeVersionId": "93e8dbea-27b7-4cd0-a00e-92ddeac150ee",
+  "versionCounter": 52,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-03T15:35:48.444Z",
+      "createdAt": "2026-06-03T15:35:48.444Z",
+      "role": "workflow:owner",
+      "workflowId": "C96f9iDSUzw1IBgs",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 93e8dbea",
+    "description": ""
+  }
+}

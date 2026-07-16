@@ -147,7 +147,11 @@ export const DEFAULT_SCENE_AVATAR = "estefania-montealegre";
 export const CATALOG_KINDS: { id: CatalogKind; label: string; description: string }[] = [
   { id: "avatars", label: "Avatars", description: "Characters / avatars available for ingest and review." },
   { id: "scenes", label: "Scenes", description: "Scene slugs tied to avatar content sets." },
-  { id: "assetTypes", label: "Asset types", description: "Asset categories such as raw-image or generated." },
+  {
+    id: "assetTypes",
+    label: "Asset types",
+    description: "Asset categories such as raw-image, reference-image, post-image, story-image, or training-image.",
+  },
   {
     id: "workflows",
     label: "Workflows",

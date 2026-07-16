@@ -5,7 +5,6 @@ type HeaderProps = {
   filterPills?: {
     avatarLabel: string;
     sceneLabel: string;
-    assetTypeLabel: string;
   } | null;
 };
 
@@ -28,9 +27,6 @@ export default function Header({ subtitle, filterPills }: HeaderProps) {
             </span>
             <span className="rounded-md border border-border bg-surface-overlay px-3 py-1.5 text-gray-300">
               {filterPills.sceneLabel}
-            </span>
-            <span className="rounded-md border border-border bg-surface-overlay px-3 py-1.5 text-gray-300">
-              {filterPills.assetTypeLabel}
             </span>
           </div>
         )}

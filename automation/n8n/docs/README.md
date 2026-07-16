@@ -7,9 +7,11 @@ automation/
 └── n8n/
     ├── docs/
     │   ├── asset-pipeline-orchestrator.md
+    │   ├── admin-console-dead-code-audit-2026-07-14.md
     │   ├── batch-manifest-contract.md
     │   ├── asset-catalog-validation.md
     │   ├── asset-review-api.md
+    │   ├── reality-sync-2026-07-14.md
     │   └── review-notes-api-pending.md
     ├── workflows/
     │   ├── Avatares_AI_Asset_Pipeline_Orchestrator_manifest_catalog_validation_v1.json
@@ -19,7 +21,8 @@ automation/
     │   ├── Avatares_AI_API_List_Review_Candidates_v1.json
     │   ├── Avatares_AI_API_Get_Canonical_Asset_v1.json
     │   ├── Avatares_AI_API_Promote_Canonical_Asset_v1.json
-    │   └── Avatares_AI_API_Reject_Asset_v1.json
+    │   ├── Avatares_AI_API_Reject_Asset_v1.json
+    │   └── Avatares_AI_API_Select_Asset_v1.json
     └── sql/
         ├── 001_asset_catalogs.sql
         └── 002_seed_asset_catalogs.sql
@@ -53,6 +56,7 @@ Avatares AI - API - List Review Candidates
 Avatares AI - API - Get Canonical Asset
 Avatares AI - API - Promote Canonical Asset
 Avatares AI - API - Reject Asset
+Avatares AI - API - Select Asset
 ```
 
 Endpoints:
@@ -62,6 +66,7 @@ POST /webhook/assets/review-candidates
 POST /webhook/assets/get-canonical
 POST /webhook/assets/promote-canonical
 POST /webhook/assets/reject
+POST /webhook/assets/select
 ```
 
 ## Decisiones vigentes

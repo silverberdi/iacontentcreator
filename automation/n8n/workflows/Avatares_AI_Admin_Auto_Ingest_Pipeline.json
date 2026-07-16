@@ -1,0 +1,221 @@
+{
+  "updatedAt": "2026-06-02T15:48:49.803Z",
+  "createdAt": "2026-06-02T15:36:05.506Z",
+  "id": "3rfBJqcTC1rCspjN",
+  "name": "Avatares AI - Admin - Auto Ingest Pipeline",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/auto-ingest/run-pipeline",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        112
+      ],
+      "id": "9fe97be6-f3d3-4f7c-b6fc-2ab2989195a8",
+      "name": "POST /admin/auto-ingest/run-pipeline",
+      "webhookId": "6e963f76-70a1-49ee-854f-c819f865f48a"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const body = $json.body || {};\n\n  const ingest = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://auto-ingest-runner:8090/ingest/run',\n    headers: { 'Content-Type': 'application/json' },\n    body: {\n      avatar: body.avatar,\n      avatarShort: body.avatarShort,\n      scene: body.scene,\n      assetType: body.assetType,\n      workflow: body.workflow,\n      model: body.model,\n      seed: body.seed,\n      version: body.version,\n      autoPromoteLatest: body.autoPromoteLatest,\n      baseUrl: body.baseUrl,\n    },\n    json: true,\n  });\n\n  return {\n    json: {\n      ok: true,\n      stage: 'auto-ingest',\n      ingest,\n      pipelineRequested: ingest.movedCount > 0,\n    },\n  };\n} catch (error) {\n  return {\n    json: {\n      ok: false,\n      stage: 'auto-ingest',\n      message: error.message,\n      error: error.description || error.cause || null,\n    },\n  };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        112
+      ],
+      "id": "3a433dc8-49c8-49c7-816b-62ae03b4f2eb",
+      "name": "Call Auto Ingest Runner - Run"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "01b4bf94-229d-4272-9fcc-f526b8ea0e1b",
+              "leftValue": "={{ $json.ingest.movedCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        112
+      ],
+      "id": "d1cc3008-2d38-41da-b11c-b8d374719193",
+      "name": "Has files to process?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "QYrnExGiwozPNByR",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/QYrnExGiwozPNByR",
+          "cachedResultName": "Avatares AI - Asset Pipeline Orchestrator - Manifest Catalog Validation"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "64ae3993-01d1-420e-8c5f-c776e6d568d4",
+      "name": "Execute Asset Pipeline Orchestrator"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    ok: true,\n    stage: 'complete',\n    status: 'pipeline-executed',\n    message: 'Auto ingest completed and asset pipeline orchestrator was executed.',\n    pipelineExecuted: true,\n    pipelineResult: $json,\n  },\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        0
+      ],
+      "id": "4d063f6e-4cf0-4e6c-af45-b8aaf97be5f2",
+      "name": "Return Pipeline Result"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    ok: true,\n    stage: 'complete',\n    status: 'no-files',\n    message: 'No files were moved from comfy-output. Pipeline was not executed.',\n    ingest: $json.ingest,\n    pipelineExecuted: false,\n  },\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        224
+      ],
+      "id": "7aed8a14-f74a-4481-a03e-5d9f23074fb7",
+      "name": "Return No Files"
+    }
+  ],
+  "connections": {
+    "POST /admin/auto-ingest/run-pipeline": {
+      "main": [
+        [
+          {
+            "node": "Call Auto Ingest Runner - Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Auto Ingest Runner - Run": {
+      "main": [
+        [
+          {
+            "node": "Has files to process?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has files to process?": {
+      "main": [
+        [
+          {
+            "node": "Execute Asset Pipeline Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return No Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Asset Pipeline Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Return Pipeline Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "cf106035-8279-4a81-952a-4ecf1e3da801",
+  "activeVersionId": "cf106035-8279-4a81-952a-4ecf1e3da801",
+  "versionCounter": 52,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-02T15:36:05.506Z",
+      "createdAt": "2026-06-02T15:36:05.506Z",
+      "role": "workflow:owner",
+      "workflowId": "3rfBJqcTC1rCspjN",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version cf106035",
+    "description": ""
+  }
+}

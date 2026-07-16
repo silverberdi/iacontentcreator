@@ -1,0 +1,170 @@
+{
+  "updatedAt": "2026-05-31T05:27:26.750Z",
+  "createdAt": "2026-05-31T05:27:26.750Z",
+  "id": "HEXeD4rNuwmjNI0v",
+  "name": "Avatares AI - Promote Canonical Asset - Callable",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "14fbe7cd-215b-49dc-9bb0-f70aabb29b1d",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const data = item.json || {};\n  return {\n    json: {\n      assetId: data.assetId || data.asset_id,\n      baseUrl: data.baseUrl || data.base_url || 'http://192.168.0.194:9000'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "25b4b703-253f-415e-b060-9775bcb27772",
+      "name": "Normalize Promote Params"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH selected AS (\n  SELECT *\n  FROM canonical_asset_registry\n  WHERE asset_id = '{{ $json.assetId }}'\n  LIMIT 1\n), demoted AS (\n  UPDATE canonical_asset_registry\n  SET\n    is_canonical = false,\n    status = 'selected',\n    metadata = jsonb_set(\n      jsonb_set(\n        jsonb_set(metadata, '{status}', '\"selected\"'),\n        '{isCanonical}', 'false'\n      ),\n      '{reviewNotes}', '\"Demoted by canonical promotion\"'\n    )\n  WHERE canonical_group = (SELECT canonical_group FROM selected)\n    AND is_canonical = true\n    AND asset_id <> (SELECT asset_id FROM selected)\n  RETURNING asset_id\n), promoted AS (\n  UPDATE canonical_asset_registry\n  SET\n    is_canonical = true,\n    status = 'canonical',\n    review_notes = 'Promoted to canonical',\n    metadata = jsonb_set(\n      jsonb_set(\n        jsonb_set(\n          jsonb_set(metadata, '{status}', '\"canonical\"'),\n          '{isCanonical}', 'true'\n        ),\n        '{reviewNotes}', '\"Promoted to canonical\"'\n      ),\n      '{canonicalGroup}', to_jsonb((SELECT canonical_group FROM selected))\n    )\n  WHERE asset_id = (SELECT asset_id FROM selected)\n  RETURNING\n    asset_id,\n    sha256,\n    avatar,\n    asset_type,\n    scene,\n    version,\n    bucket,\n    object_path,\n    original_filename,\n    mime_type,\n    file_size,\n    extension,\n    status,\n    is_canonical,\n    canonical_group,\n    metadata,\n    created_at\n)\nSELECT\n  promoted.*,\n  (SELECT count(*) FROM demoted) AS demoted_count\nFROM promoted;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "b190fafc-efda-47df-a694-5a001b7ff367",
+      "name": "Promote Canonical Asset",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "0b0e853c-6f6b-4456-b164-6f2fb7bea638",
+      "name": "Merge Promote Params"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const data = item.json || {};\n  const baseUrl = data.baseUrl || data.base_url || 'http://192.168.0.194:9000';\n\n  if (!data.asset_id || !data.object_path || !data.bucket) {\n    return {\n      json: {\n        ...data,\n        promoted: false,\n        url: null,\n        reason: 'Asset not found or missing bucket/object_path'\n      }\n    };\n  }\n\n  return {\n    json: {\n      promoted: true,\n      assetId: data.asset_id,\n      avatar: data.avatar,\n      scene: data.scene,\n      assetType: data.asset_type,\n      url: `${baseUrl}/${data.bucket}/${data.object_path}`,\n      bucket: data.bucket,\n      objectPath: data.object_path,\n      mimeType: data.mime_type,\n      status: data.status,\n      isCanonical: data.is_canonical,\n      canonicalGroup: data.canonical_group,\n      demotedCount: data.demoted_count,\n      sha256: data.sha256,\n      createdAt: data.created_at\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "id": "b224e64c-ab6a-4bcd-9a67-64d7bc000259",
+      "name": "Build Canonical URL"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Normalize Promote Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Promote Params": {
+      "main": [
+        [
+          {
+            "node": "Promote Canonical Asset",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Promote Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Promote Canonical Asset": {
+      "main": [
+        [
+          {
+            "node": "Merge Promote Params",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Promote Params": {
+      "main": [
+        [
+          {
+            "node": "Build Canonical URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "615ad104-cae3-458e-8ad0-81c76dc5bb41",
+  "activeVersionId": "615ad104-cae3-458e-8ad0-81c76dc5bb41",
+  "versionCounter": 49,
+  "triggerCount": 0,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-05-31T05:27:26.750Z",
+      "createdAt": "2026-05-31T05:27:26.750Z",
+      "role": "workflow:owner",
+      "workflowId": "HEXeD4rNuwmjNI0v",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 615ad104",
+    "description": ""
+  }
+}

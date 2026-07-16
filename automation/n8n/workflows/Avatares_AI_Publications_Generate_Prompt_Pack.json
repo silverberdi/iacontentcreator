@@ -1,0 +1,206 @@
+{
+  "updatedAt": "2026-07-15T00:00:00.000Z",
+  "createdAt": "2026-07-15T00:00:00.000Z",
+  "id": "AvAIPubPrompt01",
+  "name": "Avatares AI - Publications - Generate Prompt Pack",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/generate-prompt-pack",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "946f3e11-0001-44ba-a001-000000000001",
+      "name": "POST /publications/jobs/generate-prompt-pack",
+      "webhookId": "946f3e11-0001-44ba-a001-000000000099"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst manualPromptPack = body.promptPack && typeof body.promptPack === 'object' ? body.promptPack : null;\nconst query = `\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), refs AS (\n  SELECT\n    car.asset_id,\n    car.bucket,\n    car.object_path,\n    car.status,\n    car.is_canonical,\n    car.created_at\n  FROM canonical_asset_registry car\n  JOIN job pj ON pj.avatar = car.avatar\n  WHERE car.scene = (SELECT scene FROM job)\n    AND car.asset_type = 'raw-image'\n    AND COALESCE(car.status, '') IN ('canonical', 'selected', 'raw')\n  ORDER BY\n    CASE\n      WHEN COALESCE(car.is_canonical, false) = true OR car.status = 'canonical' THEN 1\n      WHEN car.status = 'selected' THEN 2\n      WHEN car.status = 'raw' THEN 3\n      ELSE 4\n    END,\n    car.created_at DESC\n  LIMIT 6\n)\nSELECT\n  true AS ok,\n  pj.publication_job_id AS \"publicationJobId\",\n  pj.avatar,\n  pj.scene,\n  pj.format,\n  pj.objective,\n  pj.business_profile AS \"businessProfile\",\n  pj.asset_type AS \"assetType\",\n  pj.status,\n  pj.brief,\n  pj.prompt_pack AS \"promptPack\",\n  pj.created_at AS \"createdAt\",\n  pj.updated_at AS \"updatedAt\",\n  ac.display_name AS \"avatarDisplayName\",\n  ac.avatar_short AS \"avatarShort\",\n  sc.display_name AS \"sceneDisplayName\",\n  COALESCE(sc.description, '') AS \"sceneDescription\",\n  COALESCE(sb.visual_intent, '') AS \"sceneVisualIntent\",\n  COALESCE(sb.allowed_mood, '') AS \"sceneAllowedMood\",\n  COALESCE(sb.avoid, '[]'::jsonb) AS \"sceneAvoidRules\",\n  COALESCE(sb.content_angle, '') AS \"sceneContentAngle\",\n  COALESCE(sb.prompt_notes, '') AS \"scenePromptNotes\",\n  COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'assetId', asset_id,\n      'status', status,\n      'isCanonical', COALESCE(is_canonical, false),\n      'objectPath', object_path,\n      'url', '/minio/' || bucket || '/' || object_path\n    ))\n    FROM refs\n  ), '[]'::jsonb) AS \"referenceImages\",\n  ${sql(JSON.stringify(manualPromptPack))}::jsonb AS \"manualPromptPack\"\nFROM job pj\nLEFT JOIN avatar_catalog ac ON ac.avatar = pj.avatar\nLEFT JOIN scene_catalog sc ON sc.avatar = pj.avatar AND sc.scene = pj.scene\nLEFT JOIN scene_brief_catalog sb ON sb.avatar = pj.avatar AND sb.scene = pj.scene\nLIMIT 1;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "946f3e11-0001-44ba-a001-000000000002",
+      "name": "Build Load Prompt Job Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "946f3e11-0001-44ba-a001-000000000003",
+      "name": "Load Prompt Job Context",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nfunction parseJson(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nfunction toArray(value, fallback = []) {\n  if (Array.isArray(value)) return value.map(String).filter(Boolean);\n  if (typeof value === 'string' && value.trim()) return value.split(/[,;\\n]/).map((x) => x.trim()).filter(Boolean);\n  return fallback;\n}\nfunction unique(values) {\n  return [...new Set(values.filter(Boolean).map(String))];\n}\nfunction normalizePromptPack(raw, row) {\n  const source = raw && typeof raw === 'object' ? raw : {};\n  const brief = parseJson(row.brief, {});\n  const sceneAvoidRules = toArray(parseJson(row.sceneAvoidRules, []), []);\n  const briefAvoidRules = toArray(brief.avoidRules || brief.avoid_rules, []);\n  const referenceImages = parseJson(row.referenceImages, []);\n  const identityReminders = unique(source.identityReminders || [\n    `${row.avatarDisplayName || row.avatar} must remain visually consistent with approved reference images`,\n    'photorealistic Colombian lifestyle creator',\n    'natural expression, believable candid presence, warm approachable energy',\n    'elegant without luxury obsession or artificial influencer stiffness'\n  ]);\n  const sceneDetails = String(source.sceneDetails || [\n    brief.visualIntent || row.sceneVisualIntent || row.sceneDescription,\n    brief.sceneNotes || row.scenePromptNotes,\n    brief.captionAngle || row.sceneContentAngle\n  ].filter(Boolean).join(' ')).trim();\n  const visualAvoidRules = unique([\n    ...(source.visualAvoidRules || []),\n    ...briefAvoidRules,\n    ...sceneAvoidRules,\n    'cartoon, anime, illustration, CGI look',\n    'plastic skin, distorted face, wrong identity',\n    'extra fingers, bad hands, bad anatomy',\n    'overprocessed beauty filter, fake luxury, product-ad stiffness'\n  ]);\n  const positivePrompt = String(source.positivePrompt || [\n    row.avatarDisplayName || row.avatar,\n    brief.visualIntent || row.sceneVisualIntent || row.sceneDescription,\n    sceneDetails,\n    brief.emotionalTone || row.sceneAllowedMood,\n    'photorealistic, candid lifestyle photography, natural skin texture, consistent identity, soft realistic light, high quality'\n  ].filter(Boolean).join(', ')).trim();\n  const negativePrompt = String(source.negativePrompt || visualAvoidRules.join(', ')).trim();\n  return {\n    positivePrompt,\n    negativePrompt,\n    identityReminders,\n    sceneDetails,\n    visualAvoidRules,\n    referenceImages,\n    suggestedFormat: String(source.suggestedFormat || brief.suggestedFormat || row.format || 'feed-post'),\n    comfyHints: {\n      aspectRatio: source.comfyHints?.aspectRatio || (row.format === 'story' ? '9:16' : '4:5'),\n      outputIntent: source.comfyHints?.outputIntent || 'publication-candidate',\n      assetType: 'raw-image'\n    },\n    source: {\n      publicationJobId: row.publicationJobId,\n      generatedFrom: 'publication-brief',\n      generator: 'n8n-publication-prompt-pack-v1'\n    }\n  };\n}\nconst row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f' || !row.publicationJobId) {\n  const error = row.error || 'Publication job not found';\n  return [{ json: { query: `SELECT false AS ok, ${sql(error)} AS error;` } }];\n}\nif (!row.brief && !row.manualPromptPack) {\n  return [{ json: { query: \"SELECT false AS ok, 'Publication brief is required before generating a prompt pack' AS error;\" } }];\n}\nconst manualPromptPack = row.manualPromptPack && typeof row.manualPromptPack === 'object' ? row.manualPromptPack : null;\nconst promptPack = normalizePromptPack(manualPromptPack, row);\nconst provider = manualPromptPack ? 'manual' : 'n8n-template';\nconst query = `\nUPDATE publication_jobs\nSET\n  prompt_pack = ${sqlJson(promptPack)},\n  status = 'prompt-ready',\n  error_message = NULL,\n  updated_at = now(),\n  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(\n    'promptPackProvider', ${sql(provider)},\n    'promptPackGeneratedAt', now()\n  )\nWHERE publication_job_id = ${sql(row.publicationJobId)}::uuid\nRETURNING\n  true AS ok,\n  publication_job_id AS \"publicationJobId\",\n  avatar,\n  scene,\n  format,\n  objective,\n  business_profile AS \"businessProfile\",\n  asset_type AS \"assetType\",\n  status,\n  brief,\n  prompt_pack AS \"promptPack\",\n  created_at AS \"createdAt\",\n  updated_at AS \"updatedAt\";\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "946f3e11-0001-44ba-a001-000000000004",
+      "name": "Build Save Prompt Pack Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "946f3e11-0001-44ba-a001-000000000005",
+      "name": "Save Prompt Pack",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, error: row.error || 'Prompt pack was not generated.' } }];\n}\nconst brief = typeof row.brief === 'string' ? JSON.parse(row.brief) : row.brief;\nconst promptPack = typeof row.promptPack === 'string' ? JSON.parse(row.promptPack) : row.promptPack;\nreturn [{\n  json: {\n    ok: true,\n    brief,\n    promptPack,\n    job: {\n      publicationJobId: row.publicationJobId,\n      avatar: row.avatar,\n      scene: row.scene,\n      format: row.format,\n      objective: row.objective,\n      businessProfile: row.businessProfile,\n      assetType: row.assetType,\n      status: row.status,\n      brief,\n      promptPack,\n      createdAt: row.createdAt,\n      updatedAt: row.updatedAt\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "946f3e11-0001-44ba-a001-000000000006",
+      "name": "Return Prompt Pack"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "946f3e11-0001-44ba-a001-000000000007",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/generate-prompt-pack": {
+      "main": [
+        [
+          {
+            "node": "Build Load Prompt Job Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Load Prompt Job Query": {
+      "main": [
+        [
+          {
+            "node": "Load Prompt Job Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Prompt Job Context": {
+      "main": [
+        [
+          {
+            "node": "Build Save Prompt Pack Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Save Prompt Pack Query": {
+      "main": [
+        [
+          {
+            "node": "Save Prompt Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Prompt Pack": {
+      "main": [
+        [
+          {
+            "node": "Return Prompt Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Prompt Pack": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "946f3e11-0001-44ba-a001-000000000010",
+  "activeVersionId": "946f3e11-0001-44ba-a001-000000000010",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

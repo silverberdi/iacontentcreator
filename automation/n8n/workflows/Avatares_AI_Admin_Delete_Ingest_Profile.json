@@ -1,0 +1,97 @@
+{
+  "updatedAt": "2026-06-04T02:46:10.113Z",
+  "createdAt": "2026-06-04T02:46:10.113Z",
+  "id": "vFPrcgCWfQIv1Cf1",
+  "name": "Avatares AI - Admin - Delete Ingest Profile",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/ingest-profiles/delete",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f1014501-b05e-48ab-8a9e-a2366bd17683",
+      "name": "POST /admin/ingest-profiles/delete",
+      "webhookId": "d52fc895-388c-4106-b716-80e8a0eee811"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nWITH input AS (\n  SELECT NULLIF('{{ String($json.body?.profileId || $json.body?.profile_id || \"\").replace(/'/g, \"''\") }}', '') AS profile_id_text\n),\ntarget AS (\n  SELECT p.*\n  FROM ingest_profiles p\n  JOIN input i ON p.profile_id::text = i.profile_id_text\n  LIMIT 1\n),\nasset_check AS (\n  SELECT COUNT(*)::int AS asset_count\n  FROM canonical_asset_registry a\n  JOIN target t\n    ON a.avatar = t.avatar\n   AND a.scene = t.scene\n   AND a.asset_type = t.asset_type\n),\ndeleted AS (\n  DELETE FROM ingest_profiles p\n  USING target t, asset_check ac\n  WHERE p.profile_id = t.profile_id\n    AND ac.asset_count = 0\n  RETURNING p.*\n)\nSELECT\n  CASE\n    WHEN (SELECT profile_id_text FROM input) IS NULL THEN false\n    WHEN NOT EXISTS (SELECT 1 FROM target) THEN false\n    WHEN (SELECT asset_count FROM asset_check) > 0 THEN false\n    WHEN EXISTS (SELECT 1 FROM deleted) THEN true\n    ELSE false\n  END AS ok,\n\n  CASE\n    WHEN (SELECT profile_id_text FROM input) IS NULL THEN 'Missing profileId'\n    WHEN NOT EXISTS (SELECT 1 FROM target) THEN 'Profile not found'\n    WHEN (SELECT asset_count FROM asset_check) > 0 THEN\n      'This profile cannot be deleted because assets already exist for it.'\n    WHEN EXISTS (SELECT 1 FROM deleted) THEN NULL\n    ELSE 'Profile could not be deleted'\n  END AS error,\n\n  COALESCE((SELECT asset_count FROM asset_check), 0) AS asset_count,\n\n  (\n    SELECT jsonb_build_object(\n      'profileId', profile_id,\n      'profileName', profile_name,\n      'avatar', avatar,\n      'avatarShort', avatar_short,\n      'scene', scene,\n      'assetType', asset_type,\n      'workflow', workflow,\n      'model', model,\n      'seed', seed,\n      'version', version,\n      'autoPromoteLatest', auto_promote_latest,\n      'isActive', is_active,\n      'isEnabled', is_enabled,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    )\n    FROM target\n    LIMIT 1\n  ) AS profile,\n\n  (\n    SELECT jsonb_build_object(\n      'profileId', profile_id,\n      'profileName', profile_name,\n      'avatar', avatar,\n      'scene', scene,\n      'assetType', asset_type\n    )\n    FROM deleted\n    LIMIT 1\n  ) AS deleted_profile;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        304,
+        0
+      ],
+      "id": "2975bc89-85b0-49b2-9358-77fad529b599",
+      "name": "Delete Ingest Profile If Unused",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "POST /admin/ingest-profiles/delete": {
+      "main": [
+        [
+          {
+            "node": "Delete Ingest Profile If Unused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "4482f425-7129-4a3f-bff7-27bbf3aa916b",
+  "activeVersionId": "4482f425-7129-4a3f-bff7-27bbf3aa916b",
+  "versionCounter": 48,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-04T02:46:10.113Z",
+      "createdAt": "2026-06-04T02:46:10.113Z",
+      "role": "workflow:owner",
+      "workflowId": "vFPrcgCWfQIv1Cf1",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 4482f425",
+    "description": ""
+  }
+}

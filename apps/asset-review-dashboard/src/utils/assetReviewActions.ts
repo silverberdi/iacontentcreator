@@ -1,7 +1,7 @@
-import { promoteCanonical, rejectAsset } from "../api/assetReviewApi";
-import type { AssetCandidate } from "../types/assets";
+import { promoteCanonical, rejectAsset, selectAsset } from "../api/assetReviewApi";
+import type { AssetCandidate, ReviewActionType } from "../types/assets";
 
-export type ReviewActionType = "promote" | "reject";
+export type { ReviewActionType };
 
 export type ReviewActionResult = {
   ok: boolean;
@@ -21,6 +21,20 @@ export async function executeReviewAction(
     return {
       ok: true,
       message: `Asset ${asset.assetId.slice(0, 8)}… promoted as canonical.`,
+    };
+  }
+
+  if (type === "select") {
+    const result = await selectAsset(asset.assetId, reviewNotes.trim());
+    if (!result.selected) {
+      return {
+        ok: false,
+        message: result.error ?? result.reason ?? "Selection failed",
+      };
+    }
+    return {
+      ok: true,
+      message: `Asset ${asset.assetId.slice(0, 8)}… marked as selected.`,
     };
   }
 

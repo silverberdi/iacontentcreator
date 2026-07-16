@@ -37,8 +37,9 @@ import {
   parseActiveIngestProfileResponse,
   parseDeleteIngestProfileResponse,
   parseListIngestProfilesResponse,
+  parseSetActiveIngestProfileResponse,
+  parseUpsertIngestProfileResponse,
 } from "../utils/ingestProfileResponses";
-import { formatValidationErrors } from "../utils/validationErrors";
 import AutoIngestSubTabs, { type AutoIngestSubTab } from "./auto-ingest/AutoIngestSubTabs";
 import ProfilesTab from "./auto-ingest/ProfilesTab";
 import DeleteIngestProfileDialog from "./DeleteIngestProfileDialog";
@@ -48,6 +49,7 @@ import WatcherControlsSection from "./auto-ingest/WatcherControlsSection";
 
 type AutoIngestPanelProps = {
   catalogOptions: CatalogOptionsBundle;
+  technicalMode: boolean;
   catalogOptionsLoading?: boolean;
   onRefreshAssetReview: () => void | Promise<void>;
   onCatalogOptionsRefresh?: () => void | Promise<void>;
@@ -55,6 +57,7 @@ type AutoIngestPanelProps = {
 
 export default function AutoIngestPanel({
   catalogOptions,
+  technicalMode,
   catalogOptionsLoading = false,
   onRefreshAssetReview,
   onCatalogOptionsRefresh,
@@ -192,8 +195,8 @@ export default function AutoIngestPanel({
     setProfilesLoading(true);
 
     try {
-      const listResult = await listIngestProfiles();
-      const parsed = parseListIngestProfilesResponse(listResult, true, 200);
+      const { httpOk, httpStatus, body, rawText } = await listIngestProfiles();
+      const parsed = parseListIngestProfilesResponse(body, rawText, httpOk, httpStatus);
 
       if (!parsed.succeeded) {
         setProfilesLoadSucceeded(false);
@@ -223,8 +226,8 @@ export default function AutoIngestPanel({
       setActiveProfileLoading(true);
 
       try {
-        const { httpOk, httpStatus, body } = await getActiveIngestProfile();
-        const parsed = parseActiveIngestProfileResponse(body, httpOk, httpStatus);
+        const { httpOk, httpStatus, body, rawText } = await getActiveIngestProfile();
+        const parsed = parseActiveIngestProfileResponse(body, rawText, httpOk, httpStatus);
 
         if (parsed.found && parsed.profile) {
           setActiveProfile(parsed.profile);
@@ -407,63 +410,74 @@ export default function AutoIngestPanel({
 
     try {
       const payload = draftToProfile(draft);
-      const result = await upsertIngestProfileValidated(payload);
-      if (result.ok === false || !result.profile) {
-        const validationMessage = formatValidationErrors(result);
-        if (validationMessage) {
-          setValidationErrors(validationMessage);
-          return;
+      const fetchResult = await upsertIngestProfileValidated(payload);
+      const parsed = parseUpsertIngestProfileResponse(
+        fetchResult.body,
+        fetchResult.rawText,
+        fetchResult.httpOk,
+        fetchResult.httpStatus,
+        payload,
+      );
+
+      if (!parsed.succeeded) {
+        if (parsed.validationError) {
+          setValidationErrors(parsed.validationError);
+        } else {
+          setProfilesError(parsed.error ?? "Failed to save profile");
         }
-        throw new Error(result.message ?? result.reason ?? "Failed to save profile");
+        return;
       }
 
-      const saved = result.profile;
+      const saved = parsed.profile ?? payload;
       const savedName = saved.profileName;
-      let profileId = readProfileId(saved as IngestProfile & Record<string, unknown>);
-
       setIsCreatingNew(false);
       applyProfileSelection(saved);
 
-      const listAfterSave = await refreshProfiles();
+      let listAfterSave = await refreshProfiles();
+      let profileId = readProfileId(saved as IngestProfile & Record<string, unknown>);
       if (!profileId) {
-        profileId =
-          listAfterSave.find((p) => p.profileName === savedName)?.profileId ??
-          readProfileId(
-            (listAfterSave.find((p) => p.profileName === savedName) ??
-              {}) as IngestProfile & Record<string, unknown>,
-          );
+        const match = listAfterSave.find((p) => p.profileName === savedName);
+        profileId = match?.profileId;
       }
 
       let setActiveError: string | null = null;
       if (draft.setActive) {
         if (!profileId) {
+          listAfterSave = await refreshProfiles();
+          const match = listAfterSave.find((p) => p.profileName === savedName);
+          profileId = match?.profileId;
+        }
+        if (!profileId) {
           setActiveError =
             "Profile was saved, but could not be set as active (missing profileId in response).";
         } else {
-          const setResult = await setActiveIngestProfile(profileId);
-          if (setResult.ok === false) {
-            const detail =
-              setResult.error ??
-              setResult.message ??
-              setResult.reason ??
-              "Unknown error";
-            setActiveError = `Profile was saved, but could not be set as active. ${detail}`;
+          const activateFetch = await setActiveIngestProfile(profileId);
+          const activateParsed = parseSetActiveIngestProfileResponse(
+            activateFetch.body,
+            activateFetch.rawText,
+            activateFetch.httpOk,
+            activateFetch.httpStatus,
+            profileId,
+          );
+          if (!activateParsed.succeeded) {
+            setActiveError = `Profile was saved, but could not be set as active. ${activateParsed.error ?? "Unknown error"}`;
           }
         }
       }
 
-      await refreshActiveProfile(draft.setActive && !setActiveError);
+      await refreshActiveProfile(true);
       await refreshProfiles();
       await refreshWatcherStatus();
       await onCatalogOptionsRefresh?.();
+
+      setValidationErrors(null);
+      setActiveProfileError(null);
 
       if (setActiveError) {
         setProfilesError(setActiveError);
         setProfilesSuccess(`Profile "${savedName}" saved.`);
       } else {
         setProfilesError(null);
-        setValidationErrors(null);
-        setActiveProfileError(null);
         setProfilesSuccess(
           draft.setActive
             ? `Profile "${savedName}" saved and set as active.`
@@ -491,14 +505,19 @@ export default function AutoIngestPanel({
     setValidationErrors(null);
 
     try {
-      const result = await setActiveIngestProfile(profileId);
-      if (result.ok === false) {
-        throw new Error(
-          result.error ?? result.message ?? result.reason ?? "Failed to set active profile",
-        );
+      const fetchResult = await setActiveIngestProfile(profileId);
+      const parsed = parseSetActiveIngestProfileResponse(
+        fetchResult.body,
+        fetchResult.rawText,
+        fetchResult.httpOk,
+        fetchResult.httpStatus,
+        profileId,
+      );
+      if (!parsed.succeeded) {
+        throw new Error(parsed.error ?? "Failed to set active profile");
       }
 
-      const displayName = activeProfileDisplayName(result.profile, rowProfile);
+      const displayName = activeProfileDisplayName(parsed.profile ?? rowProfile, rowProfile);
       applyProfileSelection(rowProfile);
       await reconcileAfterMutation(`Profile "${displayName}" is now active.`, {
         syncFormToActive: true,
@@ -572,6 +591,10 @@ export default function AutoIngestPanel({
         clearActiveProfileUi();
       }
 
+      setProfilesError(null);
+      setValidationErrors(null);
+      setActiveProfileError(null);
+      setProfilesSuccess("Profile deleted.");
       await reconcileAfterMutation("Profile deleted.");
     } catch (err) {
       setProfilesError(err instanceof Error ? err.message : "Failed to delete profile");
@@ -710,6 +733,7 @@ export default function AutoIngestPanel({
       {autoIngestSubTab === "runner" && (
         <WatcherControlsSection
           status={watcherStatus}
+          technicalMode={technicalMode}
           loading={watcherLoading}
           actionPending={watcherActionPending}
           error={watcherError}
@@ -724,6 +748,7 @@ export default function AutoIngestPanel({
       {autoIngestSubTab === "preview" && (
         <>
           <ManualPipelineSection
+            technicalMode={technicalMode}
             loading={pipelineLoading}
             error={pipelineError}
             successMessage={pipelineSuccess}

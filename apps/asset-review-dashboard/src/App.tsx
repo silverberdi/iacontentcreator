@@ -6,6 +6,7 @@ import AssetPreviewModal from "./components/AssetPreviewModal";
 import ConfirmDialog, {
   DEFAULT_PROMOTE_NOTES,
   DEFAULT_REJECT_NOTES,
+  DEFAULT_SELECT_NOTES,
 } from "./components/ConfirmDialog";
 import ApiKeyWarning from "./components/ApiKeyWarning";
 import FiltersPanel from "./components/FiltersPanel";
@@ -13,10 +14,15 @@ import Header from "./components/Header";
 import AutoIngestPanel from "./components/AutoIngestPanel";
 import BackupsPanel from "./components/BackupsPanel";
 import CatalogsPanel from "./components/CatalogsPanel";
+import ContentCyclePanel from "./components/content-cycle/ContentCyclePanel";
 import DashboardTabs, { type DashboardTab } from "./components/DashboardTabs";
 import PageContainer from "./components/PageContainer";
+import PublicationsPanel from "./components/PublicationsPanel";
+import UserAccessPanel from "./components/UserAccessPanel";
+import { logout } from "./api/authApi";
 import { defaultFilters } from "./data/catalogs";
 import { useCatalogOptions } from "./hooks/useCatalogOptions";
+import type { AuthUser } from "./types/auth";
 import type {
   AssetCandidate,
   CanonicalAsset,
@@ -31,7 +37,20 @@ import {
 } from "./utils/assetReviewActions";
 import { filterCandidates } from "./utils/candidateFilters";
 
-export default function App() {
+type OpsSection = "auto-ingest" | "backups" | "catalogs" | "access";
+const DEFAULT_ASSET_TYPE = defaultFilters.assetType;
+
+const BASE_OPS_SECTIONS: { id: OpsSection; label: string }[] = [
+  { id: "auto-ingest", label: "Auto Ingest" },
+  { id: "backups", label: "Backups" },
+  { id: "catalogs", label: "Catalogs" },
+];
+
+type AppProps = {
+  currentUser: AuthUser;
+};
+
+export default function App({ currentUser }: AppProps) {
   const {
     options: catalogOptions,
     loading: catalogOptionsLoading,
@@ -40,6 +59,8 @@ export default function App() {
   } = useCatalogOptions();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>("review");
+  const [activeOpsSection, setActiveOpsSection] = useState<OpsSection>("auto-ingest");
+  const [technicalMode, setTechnicalMode] = useState(false);
   const [filters, setFilters] = useState<ReviewFilters>({ ...defaultFilters });
   const [candidates, setCandidates] = useState<AssetCandidate[]>([]);
   const [candidateCount, setCandidateCount] = useState<number | null>(null);
@@ -52,7 +73,9 @@ export default function App() {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [operationPending, setOperationPending] = useState(false);
-  const [operationType, setOperationType] = useState<"promote" | "reject" | null>(null);
+  const [operationType, setOperationType] = useState<"promote" | "select" | "reject" | null>(
+    null,
+  );
   const [operationMessage, setOperationMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -60,7 +83,9 @@ export default function App() {
   const [selectedAssetIndex, setSelectedAssetIndex] = useState<number | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalActionLoading, setModalActionLoading] = useState(false);
-  const [modalActionType, setModalActionType] = useState<"promote" | "reject" | null>(null);
+  const [modalActionType, setModalActionType] = useState<"promote" | "select" | "reject" | null>(
+    null,
+  );
 
   useEffect(() => {
     setFilters((prev) => {
@@ -78,14 +103,10 @@ export default function App() {
           avatarScenes,
           avatarScenes[0]?.value ?? defaultFilters.scene,
         ),
-        assetType: ensureFilterValue(
-          prev.assetType,
-          catalogOptions.assetTypes,
-          defaultFilters.assetType,
-        ),
+        assetType: DEFAULT_ASSET_TYPE,
       };
     });
-  }, [catalogOptions.avatars, catalogOptions.scenes, catalogOptions.assetTypes]);
+  }, [catalogOptions.avatars, catalogOptions.scenes]);
 
   const apiFilters: ApiFilters = useMemo(
     () => ({
@@ -109,6 +130,20 @@ export default function App() {
   const isImageModalOpen = selectedAssetIndex !== null;
   const selectedAsset =
     selectedAssetIndex !== null ? (filteredCandidates[selectedAssetIndex] ?? null) : null;
+  const canUseTechnicalMode = currentUser.technicalMode === true;
+  const opsSections = useMemo(
+    () =>
+      currentUser.canApproveUsers
+        ? [...BASE_OPS_SECTIONS, { id: "access" as const, label: "Access" }]
+        : BASE_OPS_SECTIONS,
+    [currentUser.canApproveUsers],
+  );
+
+  useEffect(() => {
+    if (!canUseTechnicalMode && technicalMode) {
+      setTechnicalMode(false);
+    }
+  }, [canUseTechnicalMode, technicalMode]);
 
   useEffect(() => {
     if (selectedAssetIndex === null) return;
@@ -129,22 +164,21 @@ export default function App() {
         ? {
             avatarLabel: optionLabel(catalogOptions.avatars, filters.avatar),
             sceneLabel: optionLabel(catalogOptions.scenes, filters.scene),
-            assetTypeLabel: optionLabel(catalogOptions.assetTypes, filters.assetType),
           }
         : null,
-    [activeTab, catalogOptions, filters.avatar, filters.assetType, filters.scene],
+    [activeTab, catalogOptions, filters.avatar, filters.scene],
   );
 
   const headerSubtitle = useMemo(() => {
     switch (activeTab) {
       case "review":
         return "Review, promote, and reject generated avatar assets";
-      case "auto-ingest":
-        return "Manage ingest profiles, watcher, and pipeline runs";
-      case "backups":
-        return "Backup and restore operations";
-      case "catalogs":
-        return "Manage avatars, scenes, asset types, workflows, and models";
+      case "publications":
+        return "Create and track Estefania influencer publication jobs";
+      case "content-cycle":
+        return "Flujo guiado de contenido y publicación";
+      case "ops":
+        return "Operational controls, catalogs, ingest runner, and backups";
       default:
         return undefined;
     }
@@ -200,7 +234,7 @@ export default function App() {
     setOperationMessage(null);
     setSelectedAssetIndex(null);
     setModalError(null);
-    setFilters(next);
+    setFilters({ ...next, assetType: DEFAULT_ASSET_TYPE });
   };
 
   const openImageModal = (asset: AssetCandidate) => {
@@ -223,6 +257,12 @@ export default function App() {
     setOperationMessage(null);
     setConfirmAction({ type: "promote", asset });
     setReviewNotes(DEFAULT_PROMOTE_NOTES);
+  };
+
+  const openSelectDialog = (asset: AssetCandidate) => {
+    setOperationMessage(null);
+    setConfirmAction({ type: "select", asset });
+    setReviewNotes(DEFAULT_SELECT_NOTES);
   };
 
   const openRejectDialog = (asset: AssetCandidate) => {
@@ -281,7 +321,7 @@ export default function App() {
 
   const runReviewAction = useCallback(
     async (
-      type: "promote" | "reject",
+      type: "promote" | "select" | "reject",
       asset: AssetCandidate,
       notes: string,
       options: { fromModal: boolean },
@@ -344,6 +384,11 @@ export default function App() {
     void runReviewAction("promote", selectedAsset, reviewNotes, { fromModal: true });
   };
 
+  const handleModalSelect = () => {
+    if (!selectedAsset) return;
+    void runReviewAction("select", selectedAsset, reviewNotes, { fromModal: true });
+  };
+
   const handleModalReject = () => {
     if (!selectedAsset) return;
     void runReviewAction("reject", selectedAsset, reviewNotes, { fromModal: true });
@@ -357,9 +402,23 @@ export default function App() {
 
       <main>
         <PageContainer className="space-y-6 py-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-raised px-3 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-gray-200">{currentUser.name}</p>
+              <p className="truncate font-mono text-xs text-gray-500">{currentUser.email}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void logout().then(() => window.location.assign("/"))}
+              className="rounded-md border border-border bg-surface-overlay px-3 py-1.5 text-xs text-gray-200 hover:border-gray-500"
+            >
+              Sign out
+            </button>
+          </div>
+
           <ApiKeyWarning />
 
-          {catalogOptionsError && activeTab !== "catalogs" && (
+          {catalogOptionsError && activeTab !== "ops" && (
             <p className="text-sm text-amber-200/90" role="status">
               Catalog options unavailable ({catalogOptionsError}). Using static fallback lists.
             </p>
@@ -413,32 +472,98 @@ export default function App() {
                 showCanonicalInCandidates={filters.showCanonicalInCandidates}
                 onImageClick={openImageModal}
                 onPromote={openPromoteDialog}
+                onSelect={openSelectDialog}
                 onReject={openRejectDialog}
                 operationPending={operationPending}
               />
             </div>
           )}
 
-          {activeTab === "auto-ingest" && (
+          {activeTab === "publications" && (
             <div role="tabpanel">
-              <AutoIngestPanel
+              <PublicationsPanel
                 catalogOptions={catalogOptions}
                 catalogOptionsLoading={catalogOptionsLoading}
-                onRefreshAssetReview={() => loadData(apiFilters)}
-                onCatalogOptionsRefresh={() => refreshCatalogOptions()}
               />
             </div>
           )}
 
-          {activeTab === "backups" && (
+          {activeTab === "content-cycle" && (
             <div role="tabpanel">
-              <BackupsPanel />
+              <ContentCyclePanel />
             </div>
           )}
 
-          {activeTab === "catalogs" && (
-            <div role="tabpanel">
-              <CatalogsPanel onCatalogsChanged={() => void refreshCatalogOptions()} />
+          {activeTab === "ops" && (
+            <div role="tabpanel" className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-raised p-3">
+                <div className="flex flex-wrap gap-1">
+                  {opsSections.map((section) => {
+                    const isActive = activeOpsSection === section.id;
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => setActiveOpsSection(section.id)}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                          isActive
+                            ? "bg-accent text-white"
+                            : "bg-surface-overlay text-gray-300 hover:text-white"
+                        }`}
+                      >
+                        {section.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {canUseTechnicalMode ? (
+                  <label className="flex items-center gap-2 text-xs text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={technicalMode}
+                      onChange={(event) => setTechnicalMode(event.target.checked)}
+                      className="size-4 accent-accent"
+                    />
+                    Technical mode
+                  </label>
+                ) : (
+                  <span className="text-xs text-gray-500">Admin mode</span>
+                )}
+              </div>
+
+              {!technicalMode && (
+                <p className="text-sm text-gray-500">
+                  Mutating operations such as watcher start/stop, manual pipeline runs,
+                  catalog initialization, and backup creation are hidden until technical
+                  mode is enabled.
+                </p>
+              )}
+
+              {activeOpsSection === "auto-ingest" && (
+                <AutoIngestPanel
+                  catalogOptions={catalogOptions}
+                  technicalMode={technicalMode}
+                  catalogOptionsLoading={catalogOptionsLoading}
+                  onRefreshAssetReview={() => loadData(apiFilters)}
+                  onCatalogOptionsRefresh={() => refreshCatalogOptions()}
+                />
+              )}
+
+              {activeOpsSection === "backups" && (
+                <BackupsPanel technicalMode={technicalMode} />
+              )}
+
+              {activeOpsSection === "catalogs" && (
+                <CatalogsPanel
+                  technicalMode={technicalMode}
+                  onCatalogsChanged={() => void refreshCatalogOptions()}
+                />
+              )}
+
+              {activeOpsSection === "access" && (
+                <UserAccessPanel currentUser={currentUser} />
+              )}
             </div>
           )}
         </PageContainer>
@@ -466,6 +591,7 @@ export default function App() {
             }
           }}
           onPromote={handleModalPromote}
+          onSelect={handleModalSelect}
           onReject={handleModalReject}
           onReviewNotesChange={(notes) => {
             setReviewNotes(notes);

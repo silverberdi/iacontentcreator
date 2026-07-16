@@ -12,6 +12,7 @@ Use this dashboard to:
 - List review candidates from the canonical asset registry
 - Preview images served from MinIO
 - Inspect metadata (status, SHA256, assetId, review notes, createdAt)
+- Mark candidates as selected (shortlist / backup)
 - Promote a candidate as the canonical asset for its group
 - Reject unwanted candidates
 - Refresh data after each operation
@@ -64,6 +65,7 @@ All requests are `POST` with `Content-Type: application/json` and `X-Avatares-Ap
 | `/assets/review-candidates` | List candidates for avatar + scene + assetType |
 | `/assets/get-canonical` | Get current canonical asset for the group |
 | `/assets/promote-canonical` | Promote an assetId to canonical |
+| `/assets/select` | Mark an assetId as selected (shortlist) |
 | `/assets/reject` | Reject a non-canonical asset |
 | `/admin/catalogs/options` | Active catalog options for selects |
 | `/admin/catalogs/list` | All catalog rows (including disabled) |

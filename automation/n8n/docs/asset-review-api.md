@@ -10,6 +10,7 @@ Endpoints probados:
 POST /webhook/assets/review-candidates
 POST /webhook/assets/get-canonical
 POST /webhook/assets/promote-canonical
+POST /webhook/assets/select
 POST /webhook/assets/reject
 ```
 
@@ -45,6 +46,7 @@ http://192.168.0.194:9000
 Avatares AI - API - List Review Candidates
 Avatares AI - API - Get Canonical Asset
 Avatares AI - API - Promote Canonical Asset
+Avatares AI - API - Select Asset
 Avatares AI - API - Reject Asset
 ```
 
@@ -238,7 +240,41 @@ curl -X POST http://192.168.0.194:5678/webhook/assets/promote-canonical \
 
 ---
 
-## 4. Reject Asset
+## 4. Select Asset
+
+### Endpoint
+
+```text
+POST /webhook/assets/select
+```
+
+### Payload
+
+```json
+{
+  "assetId": "PASTE_ASSET_ID",
+  "reviewNotes": "Marked as selected during manual review",
+  "baseUrl": "http://192.168.0.194:9000"
+}
+```
+
+### Respuesta esperada
+
+```json
+{
+  "selected": true,
+  "assetId": "...",
+  "url": "http://192.168.0.194:9000/iacontentcreator-assets/avatars/...",
+  "status": "selected",
+  "reviewNotes": "Marked as selected during manual review"
+}
+```
+
+Ver también `select-asset-api.md`.
+
+---
+
+## 5. Reject Asset
 
 ### Endpoint
 
@@ -321,10 +357,11 @@ Para rechazar un asset que hoy es canonical:
 POST /assets/review-candidates
 ```
 
-3. Abrir URLs y elegir el mejor asset.
-4. Promover candidato.
-5. Rechazar descartados.
-6. Confirmar canonical.
+3. Abrir URLs y elegir shortlist.
+4. Marcar backups con Select (puede ser más de uno).
+5. Promover el mejor como canonical.
+6. Rechazar descartados.
+7. Confirmar canonical.
 
 ### Pipeline automático con revisión posterior
 

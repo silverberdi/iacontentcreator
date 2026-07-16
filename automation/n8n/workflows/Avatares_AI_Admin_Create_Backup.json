@@ -1,0 +1,90 @@
+{
+  "updatedAt": "2026-06-01T01:55:52.930Z",
+  "createdAt": "2026-06-01T01:32:22.641Z",
+  "id": "VmXV2peDfvzU5HUk",
+  "name": "Avatares AI - Admin - Create Backup",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/backups/create",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -112
+      ],
+      "id": "9fabb7ce-b975-430e-b8c6-a669a8282c34",
+      "name": "POST /admin/backups/create",
+      "webhookId": "eebc67e6-bc5e-4e5d-8b5e-457aab525a6d"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const body = $json.body || {};\n\n  const data = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://backup-runner:8080/backups/create',\n    headers: {\n      'Content-Type': 'application/json',\n    },\n    body: {\n      requestedBy: body.requestedBy || 'dashboard',\n      backupId: body.backupId,\n    },\n    json: true,\n  });\n\n  return {\n    json: {\n      ok: true,\n      ...data,\n    },\n  };\n} catch (error) {\n  return {\n    json: {\n      ok: false,\n      message: error.message,\n      error: error.description || error.cause || null,\n    },\n  };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -112
+      ],
+      "id": "05cc63f4-ee81-4702-ab61-f784340ce435",
+      "name": "Call Backup Runner - Create"
+    }
+  ],
+  "connections": {
+    "POST /admin/backups/create": {
+      "main": [
+        [
+          {
+            "node": "Call Backup Runner - Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "4949cd22-65df-4633-93aa-29eba8d4029b",
+  "activeVersionId": "4949cd22-65df-4633-93aa-29eba8d4029b",
+  "versionCounter": 56,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-01T01:32:22.641Z",
+      "createdAt": "2026-06-01T01:32:22.641Z",
+      "role": "workflow:owner",
+      "workflowId": "VmXV2peDfvzU5HUk",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "v3",
+    "description": ""
+  }
+}

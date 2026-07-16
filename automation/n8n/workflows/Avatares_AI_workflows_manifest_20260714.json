@@ -1,0 +1,686 @@
+{
+  "exportedAt": "2026-07-14",
+  "source": "ssh://silverman@192.168.0.194 docker exec local-ai-stack-n8n-1 n8n export:workflow --all",
+  "totalExported": 56,
+  "avataresWorkflows": 51,
+  "workflows": [
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Health",
+      "id": "ZWy4dZHjFaeyJKLP",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Health.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/health",
+          "method": "POST",
+          "path": "admin/auto-ingest/health"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Pipeline",
+      "id": "3rfBJqcTC1rCspjN",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Pipeline.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/run-pipeline",
+          "method": "POST",
+          "path": "admin/auto-ingest/run-pipeline"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Preview",
+      "id": "QBbTYp85LQ7hSRLn",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Preview.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/preview",
+          "method": "POST",
+          "path": "admin/auto-ingest/preview"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Run",
+      "id": "7biS4Lr0oZn6YGgA",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Run.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/run",
+          "method": "POST",
+          "path": "admin/auto-ingest/run"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Watcher Config",
+      "id": "jIZju8rR8ZtOjphY",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Watcher_Config.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/watcher-config",
+          "method": "POST",
+          "path": "admin/auto-ingest/watcher-config"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Watcher Run Once",
+      "id": "tb3LngxoIc6YQw9w",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Watcher_Run_Once.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/watcher-run-once",
+          "method": "POST",
+          "path": "admin/auto-ingest/watcher-run-once"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Watcher Start",
+      "id": "sLNAMsuUdnB2vdWw",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Watcher_Start.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/watcher-start",
+          "method": "POST",
+          "path": "admin/auto-ingest/watcher-start"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Watcher Status",
+      "id": "OfKWDj0EuTnW3cti",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Watcher_Status.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/watcher-status",
+          "method": "POST",
+          "path": "admin/auto-ingest/watcher-status"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Auto Ingest Watcher Stop",
+      "id": "jPBCYqfHuJyEbrCo",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Auto_Ingest_Watcher_Stop.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/auto-ingest/watcher-stop",
+          "method": "POST",
+          "path": "admin/auto-ingest/watcher-stop"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Backup Health",
+      "id": "HudUN0EN1puqDjR1",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Backup_Health.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/backups/health",
+          "method": "POST",
+          "path": "admin/backups/health"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Catalog Init",
+      "id": "VFqJ1Ucg1YpJZIbl",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Catalog_Init.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/catalogs/init",
+          "method": "POST",
+          "path": "admin/catalogs/init"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Catalog List All",
+      "id": "tvlsEKZv6Z4NTyXW",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Catalog_List_All.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/catalogs/list",
+          "method": "POST",
+          "path": "admin/catalogs/list"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Catalog Options",
+      "id": "C96f9iDSUzw1IBgs",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Catalog_Options.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/catalogs/options",
+          "method": "POST",
+          "path": "admin/catalogs/options"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Catalog Set Status",
+      "id": "Bzw7D8lvZInaVq5O",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Catalog_Set_Status.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/catalogs/set-status",
+          "method": "POST",
+          "path": "admin/catalogs/set-status"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Catalog Upsert Item",
+      "id": "o8WYKQ7JuTP6I5Ws",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Catalog_Upsert_Item.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/catalogs/upsert",
+          "method": "POST",
+          "path": "admin/catalogs/upsert"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Create Backup",
+      "id": "VmXV2peDfvzU5HUk",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Create_Backup.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/backups/create",
+          "method": "POST",
+          "path": "admin/backups/create"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Daily Backup",
+      "id": "bMaE52DvSYO4cipf",
+      "active": false,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Daily_Backup.json",
+      "webhooks": []
+    },
+    {
+      "name": "Avatares AI - Admin - Delete Ingest Profile",
+      "id": "vFPrcgCWfQIv1Cf1",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Delete_Ingest_Profile.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/ingest-profiles/delete",
+          "method": "POST",
+          "path": "admin/ingest-profiles/delete"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Get Active Ingest Profile",
+      "id": "ggd0ekHSb3H4wuMc",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Get_Active_Ingest_Profile.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/ingest-profiles/active",
+          "method": "POST",
+          "path": "admin/ingest-profiles/active"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Init Ingest Profiles",
+      "id": "gy5MxnYhGGC2KvwA",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Init_Ingest_Profiles.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/ingest-profiles/init",
+          "method": "POST",
+          "path": "admin/ingest-profiles/init"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - List Backups",
+      "id": "qWsQ9f2i77C5kT31",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_List_Backups.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/backups/list",
+          "method": "POST",
+          "path": "admin/backups/list"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - List Ingest Profiles",
+      "id": "76Mu0R2d3WsjUJbo",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_List_Ingest_Profiles.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/ingest-profiles/list",
+          "method": "POST",
+          "path": "admin/ingest-profiles/list"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Prune Backups",
+      "id": "r1oI0TM1Un2GbUnS",
+      "active": false,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Prune_Backups.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/backups/prune",
+          "method": "POST",
+          "path": "admin/backups/prune"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Set Active Ingest Profile",
+      "id": "OjQr9LzPF3RFRt3U",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Set_Active_Ingest_Profile.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/ingest-profiles/set-active",
+          "method": "POST",
+          "path": "admin/ingest-profiles/set-active"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Upsert Ingest Profile",
+      "id": "FADioh2ZlSHfITjL",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Upsert_Ingest_Profile.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/ingest-profiles/upsert",
+          "method": "POST",
+          "path": "admin/ingest-profiles/upsert"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Admin - Upsert Ingest Profile Catalog Validated",
+      "id": "ggzAAMykt7Pl6X2v",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Admin_Upsert_Ingest_Profile_Catalog_Validated.json",
+      "webhooks": [
+        {
+          "node": "POST /admin/ingest-profiles/upsert-validated",
+          "method": "POST",
+          "path": "admin/ingest-profiles/upsert-validated"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Approve Generated Asset",
+      "id": "dJInolNfhyKEF2fv",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Approve_Generated_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /generation/generated/approve",
+          "method": "POST",
+          "path": "generation/generated/approve"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Approve Publication Draft",
+      "id": "WrPuu0Sytu20atRG",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Approve_Publication_Draft.json",
+      "webhooks": [
+        {
+          "node": "POST /publication/drafts/approve",
+          "method": "POST",
+          "path": "publication/drafts/approve"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Get Canonical Asset",
+      "id": "RQRHOxFx851ix3u3",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Get_Canonical_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /assets/get-canonical",
+          "method": "POST",
+          "path": "assets/get-canonical"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - List Generated Candidates",
+      "id": "7IbnGcAhvIISb3so",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_List_Generated_Candidates.json",
+      "webhooks": [
+        {
+          "node": "POST /generation/generated/list",
+          "method": "POST",
+          "path": "generation/generated/list"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - List Publication Drafts",
+      "id": "g53mRwoltDUZQGXT",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_List_Publication_Drafts.json",
+      "webhooks": [
+        {
+          "node": "POST /publication/drafts/list",
+          "method": "POST",
+          "path": "publication/drafts/list"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - List Review Candidates",
+      "id": "oqVDpdkqjNWsYgWK",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_List_Review_Candidates.json",
+      "webhooks": [
+        {
+          "node": "POST /assets/review-candidates",
+          "method": "POST",
+          "path": "assets/review-candidates"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Promote Canonical Asset",
+      "id": "cyUCEEhmf08qOeAT",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Promote_Canonical_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /assets/promote-canonical",
+          "method": "POST",
+          "path": "assets/promote-canonical"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Reject Asset",
+      "id": "f7MMTbEpIvwmrmrI",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Reject_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /assets/reject",
+          "method": "POST",
+          "path": "assets/reject"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Reject Generated Asset",
+      "id": "KqiwZpDLjHcm8LYl",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Reject_Generated_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /generation/generated/reject",
+          "method": "POST",
+          "path": "generation/generated/reject"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Resolve Asset",
+      "id": "NBfnzkfpEYsAicPp",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Resolve_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /assets/resolve",
+          "method": "POST",
+          "path": "assets/resolve"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Resolve Identity Pack",
+      "id": "VhMF1c0zePBVMjQi",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Resolve_Identity_Pack.json",
+      "webhooks": [
+        {
+          "node": "POST /identity/resolve-pack",
+          "method": "POST",
+          "path": "identity/resolve-pack"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Resolve Scene Brief",
+      "id": "hH6dbg2uCUV8eFkw",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Resolve_Scene_Brief.json",
+      "webhooks": [
+        {
+          "node": "POST /scenes/resolve-brief",
+          "method": "POST",
+          "path": "scenes/resolve-brief"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - API - Select Asset",
+      "id": "UuAfi47a8ZHOJr70",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_API_Select_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /assets/select",
+          "method": "POST",
+          "path": "assets/select"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Asset Pipeline Orchestrator - Manifest Catalog Validation",
+      "id": "QYrnExGiwozPNByR",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Asset_Pipeline_Orchestrator_Manifest_Catalog_Validation.json",
+      "webhooks": []
+    },
+    {
+      "name": "Avatares AI - Content - Create Publication Draft",
+      "id": "4tlB4vEo3DE80MzT",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Content_Create_Publication_Draft.json",
+      "webhooks": [
+        {
+          "node": "POST /content/create-publication-draft",
+          "method": "POST",
+          "path": "content/create-publication-draft"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Content - Generate Post Brief",
+      "id": "UxvEYJd6hnxHrTQr",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Content_Generate_Post_Brief.json",
+      "webhooks": [
+        {
+          "node": "POST /content/generate-post-brief",
+          "method": "POST",
+          "path": "content/generate-post-brief"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Content - Generate Prompt Pack",
+      "id": "3hIClKlbEhWg3H0K",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Content_Generate_Prompt_Pack.json",
+      "webhooks": [
+        {
+          "node": "POST /content/generate-prompt-pack",
+          "method": "POST",
+          "path": "content/generate-prompt-pack"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Generation - Queue Image Job",
+      "id": "uXqy6GGlStzAdPpR",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Generation_Queue_Image_Job.json",
+      "webhooks": [
+        {
+          "node": "POST /generation/jobs/queue",
+          "method": "POST",
+          "path": "generation/jobs/queue"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Generation - Register Generated Asset",
+      "id": "6ezn8ZB5hcfL6zhs",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Generation_Register_Generated_Asset.json",
+      "webhooks": [
+        {
+          "node": "POST /generation/generated/register",
+          "method": "POST",
+          "path": "generation/generated/register"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Generation - Run Comfy Job",
+      "id": "CDyJmkcjt3CKCnvP",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Generation_Run_Comfy_Job.json",
+      "webhooks": [
+        {
+          "node": "POST /generation/jobs/run-comfy",
+          "method": "POST",
+          "path": "generation/jobs/run-comfy"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Get Canonical Asset - Callable",
+      "id": "pGQmE7sucXShFI2j",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Get_Canonical_Asset_Callable.json",
+      "webhooks": []
+    },
+    {
+      "name": "Avatares AI - Promote Canonical Asset - Callable",
+      "id": "HEXeD4rNuwmjNI0v",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Promote_Canonical_Asset_Callable.json",
+      "webhooks": []
+    },
+    {
+      "name": "Avatares AI - Publish - Manual Export",
+      "id": "x7jgdgCGcRtZJcFA",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Publish_Manual_Export.json",
+      "webhooks": [
+        {
+          "node": "POST /publish/manual-export",
+          "method": "POST",
+          "path": "publish/manual-export"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Register Raw Asset Batch - Callable",
+      "id": "AfxD9EeNMHktFrld",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Register_Raw_Asset_Batch_Callable.json",
+      "webhooks": []
+    },
+    {
+      "name": "Avatares AI - Register Raw Asset Batch - Callable",
+      "id": "KVev4qMZKHUnXn8j",
+      "active": false,
+      "isArchived": true,
+      "filename": "Avatares_AI_Register_Raw_Asset_Batch_Callable_KVev4qMZKHUnXn8j.json",
+      "webhooks": []
+    }
+  ]
+}

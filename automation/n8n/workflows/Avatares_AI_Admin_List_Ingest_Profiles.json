@@ -1,0 +1,121 @@
+{
+  "updatedAt": "2026-06-02T19:19:49.616Z",
+  "createdAt": "2026-06-02T19:12:35.099Z",
+  "id": "76Mu0R2d3WsjUJbo",
+  "name": "Avatares AI - Admin - List Ingest Profiles",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/ingest-profiles/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "66a6281e-a39c-43a9-9de0-031a918844f7",
+      "name": "POST /admin/ingest-profiles/list",
+      "webhookId": "e965a4c4-357c-4575-bee6-56cc3e08adda"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  profile_id AS \"profileId\",\n  profile_name AS \"profileName\",\n  avatar,\n  avatar_short AS \"avatarShort\",\n  scene,\n  asset_type AS \"assetType\",\n  workflow,\n  model,\n  seed,\n  version,\n  auto_promote_latest AS \"autoPromoteLatest\",\n  is_active AS \"isActive\",\n  is_enabled AS \"isEnabled\",\n  created_at AS \"createdAt\",\n  updated_at AS \"updatedAt\"\nFROM ingest_profiles\nORDER BY is_active DESC, avatar, scene, asset_type, updated_at DESC;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        320,
+        0
+      ],
+      "id": "c29c42eb-f26f-45e2-83dd-6b6f9c008681",
+      "name": "List Ingest Profiles",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const profiles = $input.all().map(item => item.json);\n\nreturn [{\n  json: {\n    ok: true,\n    count: profiles.length,\n    profiles\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "81001b64-54a8-407b-a6f7-f01479f93a5b",
+      "name": "Return Profiles List"
+    }
+  ],
+  "connections": {
+    "POST /admin/ingest-profiles/list": {
+      "main": [
+        [
+          {
+            "node": "List Ingest Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Ingest Profiles": {
+      "main": [
+        [
+          {
+            "node": "Return Profiles List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "acb67408-32b1-47d6-907c-3eb90c6ff1cc",
+  "activeVersionId": "acb67408-32b1-47d6-907c-3eb90c6ff1cc",
+  "versionCounter": 53,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-02T19:12:35.099Z",
+      "createdAt": "2026-06-02T19:12:35.099Z",
+      "role": "workflow:owner",
+      "workflowId": "76Mu0R2d3WsjUJbo",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version acb67408",
+    "description": ""
+  }
+}

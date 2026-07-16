@@ -1,0 +1,121 @@
+{
+  "updatedAt": "2026-06-04T05:37:30.075Z",
+  "createdAt": "2026-06-03T15:35:30.511Z",
+  "id": "tvlsEKZv6Z4NTyXW",
+  "name": "Avatares AI - Admin - Catalog List All",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/catalogs/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        832,
+        208
+      ],
+      "id": "3aea1147-845c-4bc0-a751-2d8292a7587a",
+      "name": "POST /admin/catalogs/list",
+      "webhookId": "d0f74d2f-65a2-430a-8a9b-c6d38decef1d"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT jsonb_build_object(\n  'avatars', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', avatar_id,\n      'value', avatar,\n      'label', display_name,\n      'avatar', avatar,\n      'avatarShort', avatar_short,\n      'displayName', display_name,\n      'avatarKind', avatar_kind,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM avatar_catalog\n    \n  ), '[]'::jsonb),\n\n  'scenes', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', scene_id,\n      'value', scene,\n      'label', display_name,\n      'avatar', avatar,\n      'scene', scene,\n      'displayName', display_name,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'isActive', COALESCE(is_active, is_enabled),\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY avatar, display_name)\n    FROM scene_catalog\n    \n  ), '[]'::jsonb),\n\n  'assetTypes', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', asset_type_id,\n      'value', asset_type,\n      'label', display_name,\n      'assetType', asset_type,\n      'displayName', display_name,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM asset_type_catalog\n    \n  ), '[]'::jsonb),\n\n  'workflows', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', generation_workflow_id,\n      'value', workflow,\n      'label', display_name,\n      'workflow', workflow,\n      'displayName', display_name,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM generation_workflow_catalog\n    \n  ), '[]'::jsonb),\n\n  'models', COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id', generation_model_id,\n      'value', model,\n      'label', display_name,\n      'model', model,\n      'displayName', display_name,\n      'provider', provider,\n      'description', description,\n      'notes', notes,\n      'isEnabled', is_enabled,\n      'disabledAt', disabled_at,\n      'disabledReason', disabled_reason,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY display_name)\n    FROM generation_model_catalog\n    \n  ), '[]'::jsonb)\n) AS result;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1136,
+        208
+      ],
+      "id": "899075f4-3353-4578-9078-712ba2c17c0a",
+      "name": "List All Catalogs",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst result = typeof row.result === 'string' ? JSON.parse(row.result) : row.result;\n\nreturn [{\n  json: {\n    ok: true,\n    ...result\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        208
+      ],
+      "id": "d8cdb375-b6e9-4983-a7c6-ca25c919db6a",
+      "name": "Return All Catalogs"
+    }
+  ],
+  "connections": {
+    "POST /admin/catalogs/list": {
+      "main": [
+        [
+          {
+            "node": "List All Catalogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List All Catalogs": {
+      "main": [
+        [
+          {
+            "node": "Return All Catalogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "b68e6739-eb27-48e3-8579-9a2450f04ab7",
+  "activeVersionId": "b68e6739-eb27-48e3-8579-9a2450f04ab7",
+  "versionCounter": 52,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-06-03T15:35:30.511Z",
+      "createdAt": "2026-06-03T15:35:30.511Z",
+      "role": "workflow:owner",
+      "workflowId": "tvlsEKZv6Z4NTyXW",
+      "projectId": "TOlKyKQ2YyZRVF7a",
+      "project": {
+        "updatedAt": "2026-07-05T02:16:46.763Z",
+        "createdAt": "2026-05-22T16:09:53.499Z",
+        "id": "TOlKyKQ2YyZRVF7a",
+        "name": "Silverio Bernal <silverio.bernal@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "773a8cb7-193a-4787-a9fc-43d6399e1f12"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version b68e6739",
+    "description": ""
+  }
+}
