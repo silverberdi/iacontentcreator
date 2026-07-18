@@ -8,6 +8,8 @@ import type {
   GeneratePublicationBriefResponse,
   GeneratePublicationImagesPayload,
   GeneratePublicationImagesResponse,
+  PreparePublicationReferencesPayload,
+  PreparePublicationReferencesResponse,
   RefreshPublicationGenerationPayload,
   RefreshPublicationGenerationResponse,
   GeneratePublicationCopyPackPayload,
@@ -105,6 +107,19 @@ export async function generatePublicationImages(
     throw new Error(data.error || data.reason || data.message || "Image generation was not submitted.");
   }
   return { job, generation: data.generation };
+}
+
+export async function preparePublicationReferences(
+  payload: PreparePublicationReferencesPayload,
+): Promise<PreparePublicationReferencesResponse> {
+  const data = await postN8nJson<PreparePublicationReferencesResponse>(
+    "/publications/jobs/prepare-references",
+    payload,
+  );
+  if (!data.ok) {
+    throw new Error(data.error || data.reason || data.message || "Publication references could not be prepared.");
+  }
+  return data;
 }
 
 export async function refreshPublicationGeneration(

@@ -21,6 +21,8 @@ POST /publication-copy-pack
 POST /comfy/publication-submit
 POST /comfy/publication-status
 POST /comfy/download-output
+POST /comfy/prepare-reference
+POST /publication-image-qa
 ```
 
 `POST /publication-brief` expects publication job context and returns:
@@ -70,7 +72,11 @@ COMFY_CLOUD_BASE_URL=https://cloud.comfy.org
 COMFY_CLOUD_API_PREFIX=/api
 COMFY_CLOUD_AUTH_HEADER_NAME=X-API-Key
 COMFY_CLOUD_SUBMIT_PATH=/prompt
+COMFY_CLOUD_UPLOAD_PATH=/upload/image
 COMFY_CLOUD_ENABLE_FACE_DETAILER=false
+VISUAL_QA_API_KEY=...
+VISUAL_QA_BASE_URL=https://api.openai-compatible-provider.example/v1
+VISUAL_QA_MODEL=...
 ```
 
 Do not publish this service to the LAN or internet. It should only be reachable on the internal Docker network.
@@ -100,6 +106,10 @@ Reference images use an explicit handoff contract:
 Only `comfyInputName` is valid for Comfy `LoadImage`. MinIO object paths and public URLs are kept as source metadata and identity guidance, but they are not written into `LoadImage`. If no `comfyInputName` is present, the gateway leaves the workflow template's default `LoadImage` input unchanged. Preparing MinIO assets as Comfy inputs belongs to the asset sync step.
 
 `POST /comfy/download-output` downloads an output image from a validated `https://cloud.comfy.org/api/view` URL and returns base64 image data plus metadata for n8n ingest. It keeps the Comfy Cloud API key inside the gateway.
+
+`POST /comfy/prepare-reference` receives a base64 image from n8n, uploads it to Comfy Cloud input storage through `COMFY_CLOUD_UPLOAD_PATH`, and returns the `comfyInputName` that can be used in the workflow `LoadImage` node.
+
+`POST /publication-image-qa` scores a generated image for identity, face, hands, feet, composition, and publishability. If `VISUAL_QA_*` is not configured, it returns an explicit `heuristic-pre-visual` QA result so the console can still flag risk without pretending pixel-level review happened.
 
 The older `SILVERMAN_COMFYUI_*` variable names are still accepted as compatibility aliases, but new deployments should use `COMFY_CLOUD_*`.
 

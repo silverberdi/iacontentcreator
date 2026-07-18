@@ -7,11 +7,15 @@ const PORT = Number(process.env.PORT || 8095);
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_TOKEN || "";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 const DEEPSEEK_BASE_URL = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
+const VISUAL_QA_API_KEY = process.env.VISUAL_QA_API_KEY || "";
+const VISUAL_QA_BASE_URL = (process.env.VISUAL_QA_BASE_URL || "").replace(/\/$/, "");
+const VISUAL_QA_MODEL = process.env.VISUAL_QA_MODEL || "";
 const COMFYUI_API_KEY = process.env.COMFY_CLOUD_API_KEY || process.env.SILVERMAN_COMFYUI_API_KEY || "";
 const COMFYUI_BASE_URL = (process.env.COMFY_CLOUD_BASE_URL || process.env.SILVERMAN_COMFYUI_BASE_URL || "https://cloud.comfy.org").replace(/\/$/, "");
 const COMFYUI_API_PREFIX = `/${String(process.env.COMFY_CLOUD_API_PREFIX || process.env.SILVERMAN_COMFYUI_API_PREFIX || "/api").replace(/^\/+|\/+$/g, "")}`;
 const COMFYUI_AUTH_HEADER_NAME = process.env.COMFY_CLOUD_AUTH_HEADER_NAME || process.env.SILVERMAN_COMFYUI_AUTH_HEADER_NAME || "X-API-Key";
 const COMFYUI_SUBMIT_PATH = `/${String(process.env.COMFY_CLOUD_SUBMIT_PATH || process.env.SILVERMAN_COMFYUI_SUBMIT_PATH || "/prompt").replace(/^\/+|\/+$/g, "")}`;
+const COMFYUI_UPLOAD_PATH = `/${String(process.env.COMFY_CLOUD_UPLOAD_PATH || process.env.SILVERMAN_COMFYUI_UPLOAD_PATH || "/upload/image").replace(/^\/+|\/+$/g, "")}`;
 const COMFYUI_ENABLE_FACE_DETAILER = ["1", "true", "yes"].includes(
   String(process.env.COMFY_CLOUD_ENABLE_FACE_DETAILER || "").toLowerCase(),
 );
@@ -39,6 +43,8 @@ const REQUIRED_COPY_PACK_FIELDS = [
   "hashtags",
   "publishingNotes",
 ];
+
+const QA_FIELDS = ["identity", "face", "hands", "feet", "composition", "publishability"];
 
 function jsonResponse(res, status, body) {
   const payload = JSON.stringify(body);
@@ -530,6 +536,237 @@ async function downloadComfyOutput(outputUrl) {
     byteLength: buffer.length,
     sha256: crypto.createHash("sha256").update(buffer).digest("hex"),
     base64: buffer.toString("base64"),
+  };
+}
+
+function safeComfyInputName(filename, assetId) {
+  const parsed = path.parse(String(filename || "reference.png"));
+  const ext = parsed.ext && /^[.][a-zA-Z0-9]+$/.test(parsed.ext) ? parsed.ext : ".png";
+  const base = [parsed.name || "reference", assetId || crypto.randomUUID()]
+    .join("-")
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 120);
+  return `${base}${ext}`;
+}
+
+async function uploadComfyInputImage(input = {}) {
+  if (!COMFYUI_API_KEY) {
+    return {
+      ok: false,
+      error: "COMFY_CLOUD_API_KEY is not configured",
+      category: "missing_credentials",
+    };
+  }
+
+  const fileBase64 = String(input.fileBase64 || input.base64 || "").trim();
+  if (!fileBase64) {
+    return { ok: false, error: "fileBase64 is required", category: "invalid_request" };
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(fileBase64, "base64");
+  } catch {
+    return { ok: false, error: "fileBase64 must be valid base64", category: "invalid_request" };
+  }
+
+  if (buffer.length < 1000) {
+    return { ok: false, error: "reference image is too small or empty", category: "invalid_request" };
+  }
+
+  const mimeType = String(input.mimeType || "image/png").trim();
+  if (!mimeType.startsWith("image/")) {
+    return { ok: false, error: "mimeType must be an image type", category: "invalid_request" };
+  }
+
+  const comfyInputName = safeComfyInputName(input.filename || input.objectPath, input.assetId);
+  const form = new FormData();
+  form.append("image", new Blob([buffer], { type: mimeType }), comfyInputName);
+  form.append("overwrite", "true");
+
+  const started = Date.now();
+  const endpoint = `${COMFYUI_BASE_URL}${COMFYUI_API_PREFIX}${COMFYUI_UPLOAD_PATH}`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      [COMFYUI_AUTH_HEADER_NAME]: COMFYUI_API_KEY,
+    },
+    body: form,
+  });
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || data?.error) {
+    return {
+      ok: false,
+      provider: "comfy-cloud",
+      error: data?.error?.message || data?.message || text.slice(0, 300) || response.statusText,
+      category: "provider_error",
+      httpStatus: response.status,
+      endpoint,
+      comfyInputName,
+      latencyMs: Date.now() - started,
+    };
+  }
+
+  return {
+    ok: true,
+    provider: "comfy-cloud",
+    endpoint,
+    latencyMs: Date.now() - started,
+    comfyInputName: data?.name || data?.filename || comfyInputName,
+    response: data || text,
+    source: {
+      assetId: input.assetId || null,
+      bucket: input.bucket || null,
+      objectPath: input.objectPath || null,
+      sha256: crypto.createHash("sha256").update(buffer).digest("hex"),
+      byteLength: buffer.length,
+      mimeType,
+    },
+  };
+}
+
+function normalizeQa(raw, fallbackFlags = []) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const scores = {};
+  for (const field of QA_FIELDS) {
+    const value = Number(source.scores?.[field] ?? source[field]);
+    scores[field] = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
+  }
+  const flags = normalizeArray(source.flags, fallbackFlags);
+  const blocked = scores.identity < 0.35 || scores.face < 0.35 || scores.publishability < 0.35;
+  const reviewRequired =
+    blocked ||
+    flags.length > 0 ||
+    scores.hands < 0.55 ||
+    scores.feet < 0.55 ||
+    scores.composition < 0.55;
+  return {
+    contractVersion: "publication-image-qa-v1",
+    provider: String(source.provider || "heuristic-pre-visual"),
+    status: blocked ? "blocked" : reviewRequired ? "review_required" : "pass",
+    scores,
+    flags,
+    notes: normalizeArray(source.notes, ["Human review is required before publication."]),
+    correctionRecommended: Boolean(source.correctionRecommended ?? (scores.hands < 0.55 || scores.feet < 0.55)),
+    correctionMode: source.correctionMode || (scores.hands < 0.55 || scores.feet < 0.55 ? "future-inpaint-pass" : null),
+    reviewedAt: new Date().toISOString(),
+  };
+}
+
+async function evaluatePublicationImageQa(input = {}) {
+  const promptPack = input.promptPack && typeof input.promptPack === "object" ? input.promptPack : {};
+  const compositionPolicy =
+    promptPack.compositionPolicy && typeof promptPack.compositionPolicy === "object"
+      ? promptPack.compositionPolicy
+      : {};
+  const rejectIf = normalizeArray(compositionPolicy.rejectIf, []);
+  const fallbackFlags = [];
+  if (rejectIf.some((item) => /foot|feet|toe|toes/.test(item.toLowerCase()))) {
+    fallbackFlags.push("foot-risk-review");
+  }
+  if (rejectIf.some((item) => /hand|hands|finger|fingers/.test(item.toLowerCase()))) {
+    fallbackFlags.push("hand-risk-review");
+  }
+  if (rejectIf.some((item) => item.toLowerCase().includes("identity") || item.toLowerCase().includes("face"))) {
+    fallbackFlags.push("identity-review");
+  }
+
+  if (!VISUAL_QA_API_KEY || !VISUAL_QA_BASE_URL || !VISUAL_QA_MODEL || !input.fileBase64) {
+    return {
+      ok: true,
+      qa: {
+        ...normalizeQa({ flags: fallbackFlags }),
+        provider: "heuristic-pre-visual",
+        notes: [
+          "Visual QA provider is not configured; this is a conservative heuristic review.",
+          "Configure VISUAL_QA_API_KEY, VISUAL_QA_BASE_URL, and VISUAL_QA_MODEL for pixel-level scoring.",
+        ],
+      },
+      provider: "heuristic-pre-visual",
+    };
+  }
+
+  const started = Date.now();
+  const mimeType = String(input.mimeType || "image/png");
+  const response = await fetch(`${VISUAL_QA_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${VISUAL_QA_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: VISUAL_QA_MODEL,
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a strict visual QA reviewer for AI influencer images. Return only JSON with scores 0..1 for identity, face, hands, feet, composition, publishability; flags array; notes array; correctionRecommended boolean; correctionMode string or null.",
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                avatar: input.avatar || "estefania-montealegre",
+                scene: input.scene || null,
+                criteria: "Check face consistency, identity drift, hands, feet, body geometry, composition, and whether the asset is usable for Instagram publication.",
+                promptPack,
+              }),
+            },
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${input.fileBase64}` },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    return {
+      ok: false,
+      provider: "visual-qa",
+      error: data?.error?.message || data?.message || text.slice(0, 300) || response.statusText,
+      category: "provider_error",
+      status: response.status,
+      latencyMs: Date.now() - started,
+      qa: normalizeQa({ flags: fallbackFlags }),
+    };
+  }
+  let parsed = null;
+  try {
+    const content = data?.choices?.[0]?.message?.content;
+    parsed = typeof content === "string" ? JSON.parse(content) : content;
+  } catch {
+    parsed = null;
+  }
+  return {
+    ok: true,
+    provider: "visual-qa",
+    model: VISUAL_QA_MODEL,
+    latencyMs: Date.now() - started,
+    qa: {
+      ...normalizeQa(parsed, fallbackFlags),
+      provider: "visual-qa",
+    },
   };
 }
 
@@ -1062,6 +1299,57 @@ async function handleComfyDownloadOutput(req, res, requestId) {
   });
 }
 
+async function handleComfyPrepareReference(req, res, requestId) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    jsonResponse(res, 400, { ok: false, requestId, error: "Invalid JSON body", category: "invalid_request" });
+    return;
+  }
+
+  const result = await uploadComfyInputImage(body);
+  console.log(
+    JSON.stringify({
+      requestId,
+      route: "comfy/prepare-reference",
+      ok: result.ok,
+      provider: "comfy-cloud",
+      category: result.category || "ok",
+      latencyMs: result.latencyMs || 0,
+      comfyInputName: result.comfyInputName || null,
+    }),
+  );
+  jsonResponse(res, result.ok ? 200 : result.category === "missing_credentials" ? 503 : 502, {
+    requestId,
+    ...result,
+  });
+}
+
+async function handlePublicationImageQa(req, res, requestId) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    jsonResponse(res, 400, { ok: false, requestId, error: "Invalid JSON body", category: "invalid_request" });
+    return;
+  }
+
+  const result = await evaluatePublicationImageQa(body);
+  console.log(
+    JSON.stringify({
+      requestId,
+      route: "publication-image-qa",
+      ok: result.ok,
+      provider: result.provider || "visual-qa",
+      model: result.model || VISUAL_QA_MODEL || null,
+      status: result.qa?.status || null,
+      latencyMs: result.latencyMs || 0,
+    }),
+  );
+  jsonResponse(res, result.ok ? 200 : 502, { requestId, ...result });
+}
+
 const server = http.createServer(async (req, res) => {
   const requestId = req.headers["x-request-id"] || crypto.randomUUID();
   const url = new URL(req.url || "/", `http://${req.headers.host || "ai-gateway"}`);
@@ -1085,9 +1373,15 @@ const server = http.createServer(async (req, res) => {
             baseUrl: COMFYUI_BASE_URL,
             apiPrefix: COMFYUI_API_PREFIX,
             submitPath: COMFYUI_SUBMIT_PATH,
+            uploadPath: COMFYUI_UPLOAD_PATH,
             authHeaderName: COMFYUI_AUTH_HEADER_NAME,
             estefaniaTemplate: fs.existsSync(ESTEFANIA_COMFY_TEMPLATE_PATH),
             downloadOutput: true,
+          },
+          visualQa: {
+            configured: Boolean(VISUAL_QA_API_KEY && VISUAL_QA_BASE_URL && VISUAL_QA_MODEL),
+            baseUrl: VISUAL_QA_BASE_URL || null,
+            model: VISUAL_QA_MODEL || null,
           },
         },
       });
@@ -1121,6 +1415,16 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/comfy/download-output") {
       await handleComfyDownloadOutput(req, res, requestId);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/comfy/prepare-reference") {
+      await handleComfyPrepareReference(req, res, requestId);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/publication-image-qa") {
+      await handlePublicationImageQa(req, res, requestId);
       return;
     }
 

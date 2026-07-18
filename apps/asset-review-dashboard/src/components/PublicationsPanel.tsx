@@ -10,6 +10,7 @@ import {
   listPublicationJobs,
   loadPublicationTimeline,
   markPublicationPublished,
+  preparePublicationReferences,
   recordPublicationJobError,
   refreshPublicationGeneration,
   retryPublicationJob,
@@ -107,6 +108,7 @@ export default function PublicationsPanel({
   const [promptPackText, setPromptPackText] = useState("");
   const [promptPackBusy, setPromptPackBusy] = useState(false);
   const [promptPackMessage, setPromptPackMessage] = useState<string | null>(null);
+  const [prepareReferencesBusy, setPrepareReferencesBusy] = useState(false);
   const [generation, setGeneration] = useState<PublicationGenerationSubmission | null>(null);
   const [generationAttempts, setGenerationAttempts] = useState<PublicationGenerationSubmission[]>([]);
   const [generationBusy, setGenerationBusy] = useState(false);
@@ -605,6 +607,34 @@ export default function PublicationsPanel({
       await handleStepFailure("generate-prompt-pack", err, "Failed to generate publication prompt pack");
     } finally {
       setPromptPackBusy(false);
+    }
+  }
+
+  async function handlePrepareReferences() {
+    if (!createdJob?.publicationJobId) return;
+    setPrepareReferencesBusy(true);
+    setError(null);
+    setPromptPackMessage(null);
+
+    try {
+      const result = await preparePublicationReferences({
+        publicationJobId: createdJob.publicationJobId,
+      });
+      if (result.job) {
+        setCreatedJob(result.job);
+        if (result.job.promptPack) {
+          setPromptPackText(JSON.stringify(result.job.promptPack, null, 2));
+        }
+      }
+      setPromptPackMessage(
+        `References prepared: ${result.preparedCount || 0}. Failures: ${result.failedCount || 0}.`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to prepare references";
+      setPromptPackMessage(message);
+      setError(message);
+    } finally {
+      setPrepareReferencesBusy(false);
     }
   }
 
@@ -1391,6 +1421,16 @@ export default function PublicationsPanel({
                   Save edited prompt pack
                 </button>
               )}
+              {promptPackText && (
+                <button
+                  type="button"
+                  onClick={() => void handlePrepareReferences()}
+                  disabled={prepareReferencesBusy}
+                  className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs font-medium text-gray-200 hover:border-gray-500 disabled:opacity-50"
+                >
+                  {prepareReferencesBusy ? "Preparing..." : "Prepare references"}
+                </button>
+              )}
             </>
           }
         >
@@ -1636,7 +1676,8 @@ export default function PublicationsPanel({
                           disabled={
                             selectAssetBusy ||
                             selectedAsset?.assetId === latestAsset.assetId ||
-                            !latestAsset.assetId
+                            !latestAsset.assetId ||
+                            qaStatus === "blocked"
                           }
                           className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
                         >
@@ -1644,6 +1685,8 @@ export default function PublicationsPanel({
                             ? "Selecting..."
                             : selectedAsset?.assetId === latestAsset.assetId
                               ? "Selected"
+                              : qaStatus === "blocked"
+                                ? "Blocked by QA"
                               : "Select for publication"}
                         </button>
                       </div>

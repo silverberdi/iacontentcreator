@@ -1,0 +1,222 @@
+{
+  "createdAt": "2026-07-18T00:00:00.000Z",
+  "updatedAt": "2026-07-18T00:00:00.000Z",
+  "id": "AvAIPubPrepareRefs01",
+  "name": "Avatares AI - Publications - Prepare References",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/prepare-references",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "prepare-refs-001",
+      "name": "POST /publications/jobs/prepare-references",
+      "webhookId": "prepare-publication-references-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) { if (value === undefined || value === null || String(value).trim() === '') return 'NULL'; return \"'\" + String(value).replace(/'/g, \"''\") + \"'\"; }\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst baseUrl = String(body.baseUrl || body.base_url || 'http://minio:9000').replace(/\\/$/, '');\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error, NULL AS \\\"publicationJobId\\\", '{}'::jsonb AS \\\"promptPack\\\", '[]'::jsonb AS references, \" + sql(baseUrl) + \" AS \\\"baseUrl\\\";\" } }];\nconst query = `\nWITH job AS (\n  SELECT * FROM publication_jobs WHERE publication_job_id = ${sql(publicationJobId)}::uuid LIMIT 1\n), refs AS (\n  SELECT jsonb_array_elements(COALESCE((SELECT prompt_pack FROM job)->'identityReferences', '[]'::jsonb)) AS ref\n)\nSELECT\n  EXISTS(SELECT 1 FROM job) AS ok,\n  CASE WHEN NOT EXISTS(SELECT 1 FROM job) THEN 'Publication job not found' ELSE NULL END AS error,\n  (SELECT publication_job_id FROM job) AS \"publicationJobId\",\n  (SELECT prompt_pack FROM job) AS \"promptPack\",\n  COALESCE((SELECT jsonb_agg(ref) FROM refs), '[]'::jsonb) AS references,\n  ${sql(baseUrl)} AS \"baseUrl\";\n`;\nreturn [{ json: { ok: true, query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "prepare-refs-002",
+      "name": "Build Prepare References Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "prepare-refs-003",
+      "name": "Load Reference Context",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nfunction parse(value, fallback) { if (value == null) return fallback; if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } } return value; }\nif (row.ok === false || row.ok === 'f') return [{ json: { ok: false, error: row.error || 'Reference context not found' } }];\nconst publicationJobId = row.publicationJobId;\nconst baseUrl = String(row.baseUrl || 'http://minio:9000').replace(/\\/$/, '');\nconst references = parse(row.references, []);\nconst prepared = [];\nconst failed = [];\nfor (const ref of references) {\n  if (!ref || typeof ref !== 'object') continue;\n  if (String(ref.comfyInputName || '').trim()) {\n    prepared.push({ ...ref, reused: true });\n    continue;\n  }\n  const assetId = ref.assetId || ref.asset_id;\n  const bucket = ref.minioBucket || ref.bucket;\n  const objectPath = ref.minioObjectPath || ref.objectPath;\n  if (!assetId || !bucket || !objectPath) {\n    failed.push({ ref, error: 'Reference is missing assetId, bucket, or objectPath' });\n    continue;\n  }\n  try {\n    const imageUrl = baseUrl + '/' + encodeURIComponent(bucket) + '/' + String(objectPath).split('/').map(encodeURIComponent).join('/');\n    const image = await this.helpers.httpRequest({ method: 'GET', url: imageUrl, encoding: 'arraybuffer', timeout: 120000, returnFullResponse: true });\n    const buffer = Buffer.from(image.body);\n    const mimeType = image.headers?.['content-type'] || image.headers?.['Content-Type'] || 'image/png';\n    const upload = await this.helpers.httpRequest({ method: 'POST', url: 'http://ai-gateway:8095/comfy/prepare-reference', headers: { 'Content-Type': 'application/json', 'X-Request-Id': 'prepare-reference-' + assetId }, body: { assetId, bucket, objectPath, filename: objectPath.split('/').pop(), mimeType, fileBase64: buffer.toString('base64') }, json: true, timeout: 120000 });\n    if (!upload?.ok || !upload.comfyInputName) {\n      failed.push({ assetId, bucket, objectPath, error: upload?.error || 'Comfy reference upload failed', upload });\n      continue;\n    }\n    prepared.push({ ...ref, assetId, minioBucket: bucket, minioObjectPath: objectPath, comfyInputName: upload.comfyInputName, comfyLoadable: true, preparedAt: new Date().toISOString(), prepareProvider: 'comfy-cloud', prepareResponse: upload.response || null });\n  } catch (error) {\n    failed.push({ assetId, bucket, objectPath, error: error?.message || 'Reference preparation failed' });\n  }\n}\nreturn [{ json: { ok: failed.length === 0, publicationJobId, prepared, failed, preparedCount: prepared.length, failedCount: failed.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "prepare-refs-004",
+      "name": "Prepare References In Comfy"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) { if (value === undefined || value === null || String(value).trim() === '') return 'NULL'; return \"'\" + String(value).replace(/'/g, \"''\") + \"'\"; }\nfunction sqlJson(value) { return sql(JSON.stringify(value ?? {})) + '::jsonb'; }\nconst row = $input.first()?.json || {};\nif (!row.publicationJobId) return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\nconst prepared = Array.isArray(row.prepared) ? row.prepared : [];\nconst failed = Array.isArray(row.failed) ? row.failed : [];\nconst values = prepared.map((ref) => '(' + sql(ref.assetId) + ', ' + sql(ref.comfyInputName) + ', ' + sqlJson(ref) + ')').join('\\n');\nconst updateRefs = values ? `, ref_values(asset_id, comfy_input_name, ref_payload) AS (VALUES ${values}), registry_update AS (UPDATE canonical_asset_registry car SET metadata = COALESCE(car.metadata, '{}'::jsonb) || jsonb_build_object('comfyInputName', rv.comfy_input_name, 'comfyPreparedAt', now(), 'comfyReference', rv.ref_payload), updated_at = now() FROM ref_values rv WHERE car.asset_id::text = rv.asset_id RETURNING car.asset_id, car.metadata)` : ', registry_update AS (SELECT NULL::text AS asset_id, NULL::jsonb AS metadata WHERE false)';\nconst query = `\nWITH input AS (SELECT ${sql(row.publicationJobId)}::uuid AS publication_job_id, ${sqlJson(prepared)} AS prepared, ${sqlJson(failed)} AS failed)\n${updateRefs}\n, job_update AS (\n  UPDATE publication_jobs pj\n  SET prompt_pack = jsonb_set(COALESCE(prompt_pack, '{}'::jsonb), '{identityReferences}', (SELECT prepared FROM input), true),\n      metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('preparedIdentityReferences', (SELECT prepared FROM input), 'prepareReferenceFailures', (SELECT failed FROM input), 'referencesPreparedAt', now()),\n      updated_at = now()\n  WHERE publication_job_id = (SELECT publication_job_id FROM input)\n  RETURNING *\n)\nSELECT\n  ${row.failedCount ? 'false' : 'true'} AS ok,\n  CASE WHEN ${row.failedCount || 0} > 0 THEN 'Some references could not be prepared' ELSE NULL END AS error,\n  ${Number(row.preparedCount || 0)}::int AS \"preparedCount\",\n  ${Number(row.failedCount || 0)}::int AS \"failedCount\",\n  ${sqlJson(prepared)} AS prepared,\n  ${sqlJson(failed)} AS failed,\n  (SELECT jsonb_build_object('publicationJobId', publication_job_id, 'avatar', avatar, 'scene', scene, 'format', format, 'objective', objective, 'businessProfile', business_profile, 'assetType', asset_type, 'status', status, 'brief', brief, 'promptPack', prompt_pack, 'publishingPack', publishing_pack, 'metadata', metadata, 'createdAt', created_at, 'updatedAt', updated_at) FROM job_update) AS job;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "prepare-refs-005",
+      "name": "Build Persist Prepared References Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "prepare-refs-006",
+      "name": "Persist Prepared References",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function parse(value, fallback) { if (value == null) return fallback; if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } } return value; }\nconst row = $input.first()?.json || {};\nconst ok = row.ok === true || row.ok === 't';\nreturn [{ json: { ok, error: row.error || null, preparedCount: Number(row.preparedCount || 0), failedCount: Number(row.failedCount || 0), prepared: parse(row.prepared, []), failed: parse(row.failed, []), job: parse(row.job, null) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "prepare-refs-007",
+      "name": "Return Prepared References"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1792,
+        0
+      ],
+      "id": "prepare-refs-008",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/prepare-references": {
+      "main": [
+        [
+          {
+            "node": "Build Prepare References Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prepare References Query": {
+      "main": [
+        [
+          {
+            "node": "Load Reference Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Reference Context": {
+      "main": [
+        [
+          {
+            "node": "Prepare References In Comfy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare References In Comfy": {
+      "main": [
+        [
+          {
+            "node": "Build Persist Prepared References Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Persist Prepared References Query": {
+      "main": [
+        [
+          {
+            "node": "Persist Prepared References",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Prepared References": {
+      "main": [
+        [
+          {
+            "node": "Return Prepared References",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Prepared References": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1"
+}

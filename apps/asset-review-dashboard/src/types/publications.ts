@@ -405,6 +405,22 @@ export type GeneratePublicationImagesResponse = {
   reason?: string;
 };
 
+export type PreparePublicationReferencesPayload = {
+  publicationJobId: string;
+};
+
+export type PreparePublicationReferencesResponse = {
+  ok?: boolean;
+  preparedCount?: number;
+  failedCount?: number;
+  prepared?: PublicationReferenceImage[];
+  failed?: Record<string, unknown>[];
+  job?: PublicationJob | null;
+  message?: string;
+  error?: string | null;
+  reason?: string;
+};
+
 export type RefreshPublicationGenerationPayload = {
   publicationJobId: string;
   generationJobId?: string;

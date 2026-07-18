@@ -35,11 +35,13 @@ Completed:
 - Add structured publication quality review criteria and rejection reasons.
 - Prefer prepared Comfy identity references and block generation with a clear error when none exists.
 - Store initial QA metadata and show QA badges in the console.
+- Prepare canonical MinIO references into Comfy input files from the console.
+- Run image QA through a configurable visual provider, with explicit heuristic fallback if no provider is configured.
 
 Remaining for Wave 1:
 
-- Implement automatic Comfy Cloud reference upload/registration, so `metadata.comfyInputName` is created without manual operator work.
-- Replace heuristic QA with pixel-level visual QA for identity, hands, feet, composition, and publishability.
+- Configure a production visual QA provider/model if heuristic fallback is not sufficient.
+- Validate Comfy Cloud reference upload against a live Estefanía reference.
 - Use the runbook in at least one live production cycle and capture gaps.
 
 ## Canonical Backlog

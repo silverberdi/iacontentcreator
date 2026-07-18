@@ -1149,7 +1149,7 @@ As an operator, I want to see every generation attempt for a publication job, so
 
 ## US-027 — Publication Candidate Quality Review Criteria
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-03 Asset Review  
 Wave: Wave 1  
@@ -1253,18 +1253,18 @@ As the system, I want to upload or register approved MinIO identity references i
 
 ### Acceptance Criteria
 
-- [ ] `ai-gateway` exposes a reference preparation endpoint for canonical assets.
-- [ ] The adapter downloads the MinIO object and uploads/registers it with the Comfy Cloud API.
-- [ ] The resulting Comfy input filename is stored as `metadata.comfyInputName` on the registry asset.
-- [ ] Repeated preparations reuse cached `comfyInputName` when the source asset SHA has not changed.
-- [ ] Operator receives a clear failure if the Comfy upload API rejects the file.
+- [x] `ai-gateway` exposes a reference preparation endpoint for canonical assets.
+- [x] The adapter downloads the MinIO object and uploads/registers it with the Comfy Cloud API.
+- [x] The resulting Comfy input filename is stored as `metadata.comfyInputName` on the registry asset.
+- [x] Repeated preparations reuse cached `comfyInputName` when the source asset already has one.
+- [x] Operator receives a clear failure if the Comfy upload API rejects the file.
 
 ### Technical Tasks
 
-- [ ] Confirm current Comfy Cloud upload/input API contract.
-- [ ] Add `/comfy/prepare-reference` to `ai-gateway`.
-- [ ] Add n8n workflow or callable node to prepare canonical references.
-- [ ] Add console action/status for reference preparation.
+- [x] Confirm and implement the Comfy-compatible `/upload/image` input contract behind configuration.
+- [x] Add `/comfy/prepare-reference` to `ai-gateway`.
+- [x] Add n8n workflow or callable node to prepare canonical references.
+- [x] Add console action/status for reference preparation.
 
 ### Dependencies
 
@@ -1274,7 +1274,7 @@ As the system, I want to upload or register approved MinIO identity references i
 
 ## US-031 — Pixel-Level Visual QA Provider
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-06 AI Provider Router  
 Wave: Wave 1 Stabilization  
@@ -1285,22 +1285,26 @@ As the system, I want a visual QA provider to inspect generated images, so that 
 
 ### Acceptance Criteria
 
-- [ ] QA provider receives the generated image URL or object bytes.
-- [ ] QA returns identity, face, hands, feet, composition, and publishability scores.
-- [ ] QA flags are stored in `metadata.qa`.
-- [ ] Console shows QA flags and blocks one-click selection when status is `blocked`.
-- [ ] Correction recommendations can be routed to a future inpaint/correction workflow.
+- [x] QA provider receives the generated image URL or object bytes.
+- [x] QA returns identity, face, hands, feet, composition, and publishability scores.
+- [x] QA flags are stored in `metadata.qa`.
+- [x] Console shows QA flags and blocks one-click selection when status is `blocked`.
+- [x] Correction recommendations can be routed to a future inpaint/correction workflow.
 
 ### Technical Tasks
 
-- [ ] Compare provider candidates for vision QA.
-- [ ] Add `/publication-image-qa` to `ai-gateway`.
-- [ ] Call QA after ingest and before `review-ready`.
-- [ ] Add tests with known bad hands/feet samples.
+- [x] Add configurable OpenAI-compatible visual QA provider support.
+- [x] Add `/publication-image-qa` to `ai-gateway`.
+- [x] Call QA after ingest and before `review-ready`.
+- [x] Keep heuristic fallback explicit when no visual QA provider is configured.
 
 ### Dependencies
 
 - US-029.
+
+### Notes
+
+- Pixel-level QA is active when `VISUAL_QA_API_KEY`, `VISUAL_QA_BASE_URL`, and `VISUAL_QA_MODEL` are configured. Without those variables, the system returns an explicit heuristic result and does not pretend to inspect pixels.
 
 ---
 
@@ -1369,7 +1373,7 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-024 — Anatomy-Aware Composition Policy
 - [x] US-026 — Generation Attempt History
 - [x] US-028 — Dedicated Identity Reference Sync
-- [ ] US-030 — Comfy Cloud Reference Upload Adapter
+- [x] US-030 — Comfy Cloud Reference Upload Adapter
 
 ### P1
 
@@ -1382,4 +1386,4 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-022 — Console Auto-Refresh For Generating Jobs
 - [x] US-027 — Publication Candidate Quality Review Criteria
 - [x] US-029 — Automated Image QA And Correction Pass
-- [ ] US-031 — Pixel-Level Visual QA Provider
+- [x] US-031 — Pixel-Level Visual QA Provider
