@@ -22,13 +22,18 @@ Completed:
 - Reopen existing publication jobs from the console.
 - Select the publication asset.
 - Generate caption/copy pack.
-
-Remaining for Wave 1:
-
 - Export final manual publishing pack.
 - Mark publication as published.
 - Add clear job timeline/status history.
+- Add error handling and retry for supported publication steps.
 - Add operator-oriented next-action guidance.
+- Validate existing Asset Review against the publication flow.
+- Create the Wave 1 operator runbook.
+
+Remaining for Wave 1:
+
+- Harden legacy Asset Review workflow SQL handling for review notes with special characters.
+- Use the runbook in at least one live production cycle and capture gaps.
 
 ## Canonical Backlog
 
@@ -51,7 +56,7 @@ dc539e40-c15f-47bb-9d7f-68ca901334e2
 Validated state:
 
 ```text
-copy-ready
+published-flow-capable
 ```
 
 Selected asset:

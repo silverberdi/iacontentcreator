@@ -24,6 +24,7 @@ Use `planning/backlog/` for product backlog, user stories, acceptance criteria, 
 Use `docs/operations/` for operator-facing procedures.
 
 - `docs/operations/runbooks/`
+- `docs/operations/runbooks/wave-1-estefania-publication.md`
 - `docs/operations/deployment/`
 - `docs/operations/troubleshooting/`
 

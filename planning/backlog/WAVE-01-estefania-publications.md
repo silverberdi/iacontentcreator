@@ -773,7 +773,7 @@ As the product owner, I want to validate the existing Asset Review behavior agai
 
 ## US-015 — Wave 1 Runbook
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-04 Admin Operations  
 Wave: Wave 1  
@@ -784,17 +784,17 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 
 ### Acceptance Criteria
 
-- [ ] Runbook explains the Wave 1 flow.
-- [ ] Runbook explains what each status means.
-- [ ] Runbook explains common failures.
-- [ ] Runbook explains when human approval is required.
-- [ ] Runbook is linked from the console or repo.
+- [x] Runbook explains the Wave 1 flow.
+- [x] Runbook explains what each status means.
+- [x] Runbook explains common failures.
+- [x] Runbook explains when human approval is required.
+- [x] Runbook is linked from the console or repo.
 
 ### Technical Tasks
 
-- [ ] Create operator runbook document.
-- [ ] Add link from console admin/help area if available.
-- [ ] Keep runbook aligned with actual UI.
+- [x] Create operator runbook document.
+- [x] Add link from console admin/help area if available.
+- [x] Keep runbook aligned with actual UI.
 
 ### Dependencies
 
@@ -803,6 +803,8 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 ### Notes
 
 - The runbook should be practical, not architectural.
+- Implemented as `docs/operations/runbooks/wave-1-estefania-publication.md`.
+- Linked from `docs/operations/README.md` and `docs/README.md`. The console does not yet have a dedicated help/docs area, so the repo link satisfies this story without adding a weak UI element.
 
 ---
 
@@ -859,4 +861,4 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 - [x] US-012 — Operator Home / Next Action View
 - [x] US-013 — Publication Job Error Handling And Retry
 - [ ] US-016 — Harden Legacy Asset Review Workflow SQL Handling
-- [ ] US-015 — Wave 1 Runbook
+- [x] US-015 — Wave 1 Runbook
