@@ -7,6 +7,7 @@ RUN npm install --omit=dev
 
 COPY server.mjs ./
 COPY templates ./templates
+COPY profiles ./profiles
 
 ENV PORT=8095
 EXPOSE 8095

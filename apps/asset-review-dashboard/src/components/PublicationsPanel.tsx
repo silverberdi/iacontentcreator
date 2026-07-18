@@ -12,6 +12,7 @@ import {
   markPublicationPublished,
   selectPublicationAsset,
 } from "../api/publicationsApi";
+import { avatarProfileSummaries } from "../data/avatarProfiles";
 import { defaultFilters } from "../data/catalogs";
 import type { CatalogOptionsBundle } from "../types/catalogs";
 import type {
@@ -120,6 +121,7 @@ export default function PublicationsPanel({
   }, [avatar, catalogOptions.avatars, catalogOptions.scenes, scene]);
 
   const avatarShort = findAvatarShort(catalogOptions, avatar);
+  const avatarProfile = avatarProfileSummaries[avatar];
   const canCreate = Boolean(avatar && scene && format && objective.trim());
 
   async function refreshTimeline(publicationJobId: string) {
@@ -675,6 +677,55 @@ export default function PublicationsPanel({
           </button>
         }
       >
+        {avatarProfile && (
+          <div className="mb-4 rounded-md border border-border bg-surface p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-100">{avatarProfile.displayName}</p>
+                <p className="mt-1 text-sm text-gray-400">{avatarProfile.primaryObjective}</p>
+              </div>
+              <a
+                href={avatarProfile.primaryPlatform.url}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs text-gray-300 hover:border-gray-500 hover:text-white"
+              >
+                {avatarProfile.primaryPlatform.handle}
+              </a>
+            </div>
+            <dl className="mt-4 grid gap-3 text-sm lg:grid-cols-3">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">Business profile</dt>
+                <dd className="mt-1 text-gray-200">{avatarProfile.businessProfile}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">Content pillars</dt>
+                <dd className="mt-1 text-gray-200">{avatarProfile.contentPillars.join(", ")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">Publishing mode</dt>
+                <dd className="mt-1 text-gray-200">
+                  {avatarProfile.primaryPlatform.publishingMode}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">Brand fit</dt>
+                <dd className="mt-1 text-gray-200">{avatarProfile.brandFit.join(", ")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">Caption tone</dt>
+                <dd className="mt-1 text-gray-200">{avatarProfile.captionTone.join(", ")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">Review triggers</dt>
+                <dd className="mt-1 text-gray-200">
+                  {avatarProfile.safetyReviewTriggers.join(", ")}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <CatalogSelect
             label="Avatar"

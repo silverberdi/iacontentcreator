@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://avatares.ai/schemas/avatar-profile.schema.json",
+  "title": "Avatares AI Avatar Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "metadata",
+    "businessIntent",
+    "audience",
+    "identityCanon",
+    "visualIdentity",
+    "voiceAndLanguage",
+    "contentSystem",
+    "platformStrategy",
+    "businessModule",
+    "safetyBoundaries",
+    "operations",
+    "metrics"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["avatarSlug", "displayName", "avatarType", "businessProfile", "profileStatus"],
+      "properties": {
+        "avatarSlug": { "type": "string" },
+        "displayName": { "type": "string" },
+        "publicName": { "type": "string" },
+        "aliases": { "$ref": "#/$defs/stringArray" },
+        "avatarType": { "type": "string" },
+        "businessProfile": { "type": "string" },
+        "primaryLanguage": { "type": "string" },
+        "secondaryLanguages": { "$ref": "#/$defs/stringArray" },
+        "profileStatus": { "type": "string" },
+        "ownerMode": { "type": "string" }
+      }
+    },
+    "businessIntent": { "$ref": "#/$defs/textBlock" },
+    "audience": { "$ref": "#/$defs/textBlock" },
+    "identityCanon": { "$ref": "#/$defs/textBlock" },
+    "visualIdentity": { "$ref": "#/$defs/textBlock" },
+    "voiceAndLanguage": { "$ref": "#/$defs/textBlock" },
+    "contentSystem": { "$ref": "#/$defs/textBlock" },
+    "platformStrategy": { "$ref": "#/$defs/textBlock" },
+    "businessModule": { "$ref": "#/$defs/textBlock" },
+    "safetyBoundaries": { "$ref": "#/$defs/textBlock" },
+    "operations": { "$ref": "#/$defs/textBlock" },
+    "metrics": { "$ref": "#/$defs/textBlock" }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "textBlock": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

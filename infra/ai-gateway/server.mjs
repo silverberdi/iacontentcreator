@@ -20,6 +20,10 @@ const ESTEFANIA_COMFY_TEMPLATE_PATH = path.join(
   "templates",
   "estefania-montealegre-api.json",
 );
+const DEFAULT_PROFILE_ROOT = fs.existsSync(path.join(process.cwd(), "profiles"))
+  ? path.join(process.cwd(), "profiles")
+  : path.join(process.cwd(), "infra", "ai-gateway", "profiles");
+const AVATAR_PROFILE_ROOT = process.env.AVATAR_PROFILE_ROOT || DEFAULT_PROFILE_ROOT;
 
 const REQUIRED_BRIEF_FIELDS = [
   "visualIntent",
@@ -77,6 +81,49 @@ function randomSeed() {
 function loadEstefaniaWorkflowTemplate() {
   const raw = fs.readFileSync(ESTEFANIA_COMFY_TEMPLATE_PATH, "utf8");
   return JSON.parse(raw);
+}
+
+function profilePathForAvatar(avatarSlug) {
+  const safeSlug = String(avatarSlug || "").replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!safeSlug) return null;
+  return path.join(AVATAR_PROFILE_ROOT, `${safeSlug}.json`);
+}
+
+function loadAvatarProfile(avatarSlug) {
+  const profilePath = profilePathForAvatar(avatarSlug);
+  if (!profilePath || !fs.existsSync(profilePath)) return null;
+  return JSON.parse(fs.readFileSync(profilePath, "utf8"));
+}
+
+function profileSummary(profile) {
+  if (!profile) return null;
+  return {
+    avatarSlug: profile.metadata?.avatarSlug || null,
+    displayName: profile.metadata?.displayName || null,
+    businessProfile: profile.metadata?.businessProfile || null,
+    avatarType: profile.metadata?.avatarType || null,
+    profileStatus: profile.metadata?.profileStatus || null,
+    primaryObjective: profile.businessIntent?.primaryObjective || null,
+    contentPillars: profile.contentSystem?.contentPillars || [],
+    brandFit: profile.businessModule?.brandFit || [],
+    commercialToneAllowed: profile.businessModule?.commercialToneAllowed || [],
+    captionTone: profile.voiceAndLanguage?.tone || [],
+    visualPriorities: profile.visualIdentity?.priorityOrder || [],
+    visualAvoid: profile.visualIdentity?.negativeDirections || [],
+    safetyReviewTriggers: profile.safetyBoundaries?.humanReviewTriggers || [],
+    primaryPlatforms: profile.platformStrategy?.primaryPlatforms || [],
+  };
+}
+
+function withAvatarProfile(context) {
+  const avatarSlug = context?.job?.avatar || context?.avatar || "estefania-montealegre";
+  const avatarProfile = loadAvatarProfile(avatarSlug);
+  if (!avatarProfile) return context;
+  return {
+    ...context,
+    avatarProfile,
+    avatarProfileSummary: profileSummary(avatarProfile),
+  };
 }
 
 function dimensionsForFormat(format) {
@@ -325,14 +372,14 @@ function normalizeBrief(raw, context) {
 }
 
 function buildDeepSeekMessages(context) {
+  const profile = context.avatarProfileSummary || {};
   const systemPrompt = [
-    "You are the creative strategist for Estefanía Montealegre, a fictional AI influencer.",
+    `You are the creative strategist for ${profile.displayName || "Estefanía Montealegre"}, a fictional AI influencer.`,
     "Return only strict JSON.",
-    "Estefanía is a Colombian lifestyle creator based between Medellín and Miami.",
-    "She should feel real, warm, natural, socially curious, elegant without being pretentious, aspirational but reachable.",
-    "She is not a luxury billionaire character.",
-    "Captions should feel like natural thoughts: casual, warm, smart, spontaneous, lightly reflective, sometimes lightly sarcastic.",
-    "Avoid motivational speeches, generic self-help, overproduced influencer copy, forced spanglish, artificial sadness, and identity inconsistency.",
+    "Use the provided avatarProfile and avatarProfileSummary as the operating source for business intent, voice, visual rules, safety boundaries, and brand fit.",
+    "Do not override profile rules with generic influencer advice.",
+    "Captions should feel like natural thoughts, not produced ad copy.",
+    "Avoid motivational speeches, generic self-help, overproduced influencer copy, forced spanglish, artificial sadness, identity inconsistency, and unsupported commercial claims.",
   ].join(" ");
 
   const userPrompt = {
@@ -377,7 +424,7 @@ async function callDeepSeek(context) {
     },
     body: JSON.stringify({
       model: DEEPSEEK_MODEL,
-      messages: buildDeepSeekMessages(context),
+      messages: buildDeepSeekMessages(withAvatarProfile(context)),
       temperature: 0.7,
       response_format: { type: "json_object" },
     }),
@@ -418,7 +465,8 @@ async function callDeepSeek(context) {
     };
   }
 
-  const { brief, missing } = normalizeBrief(parsed, context);
+  const enrichedContext = withAvatarProfile(context);
+  const { brief, missing } = normalizeBrief(parsed, enrichedContext);
   if (missing.length > 0) {
     return {
       ok: false,
@@ -502,12 +550,13 @@ function normalizeCopyPack(raw, context) {
 }
 
 function buildCopyPackMessages(context) {
+  const profile = context.avatarProfileSummary || {};
   const systemPrompt = [
-    "You are the social copywriter for Estefanía Montealegre, a fictional AI influencer.",
+    `You are the social copywriter for ${profile.displayName || "Estefanía Montealegre"}, a fictional AI influencer.`,
     "Return only strict JSON.",
-    "Estefanía is a Colombian lifestyle creator. She should sound natural, warm, smart, casual, and brand-friendly.",
-    "The business goal is to make brands interested in her through believable lifestyle content.",
-    "Avoid generic self-help, motivational speeches, forced spanglish, luxury obsession, influencer clichés, and overproduced ad copy.",
+    "Use the provided avatarProfile and avatarProfileSummary as the operating source for business intent, caption tone, brand fit, claims policy, and review boundaries.",
+    "The business goal is to make brands interested through believable lifestyle content.",
+    "Avoid generic self-help, motivational speeches, forced spanglish, luxury obsession, influencer clichés, overproduced ad copy, and unsupported product claims.",
     "Spanish should feel natural for Colombia/LatAm, not stiff translation.",
   ].join(" ");
 
@@ -551,7 +600,7 @@ async function callDeepSeekCopyPack(context) {
     },
     body: JSON.stringify({
       model: DEEPSEEK_MODEL,
-      messages: buildCopyPackMessages(context),
+      messages: buildCopyPackMessages(withAvatarProfile(context)),
       temperature: 0.75,
       response_format: { type: "json_object" },
     }),
@@ -592,7 +641,8 @@ async function callDeepSeekCopyPack(context) {
     };
   }
 
-  const { copyPack, missing } = normalizeCopyPack(parsed, context);
+  const enrichedContext = withAvatarProfile(context);
+  const { copyPack, missing } = normalizeCopyPack(parsed, enrichedContext);
   if (missing.length > 0) {
     return {
       ok: false,
@@ -661,6 +711,35 @@ async function handlePublicationCopyPack(req, res, requestId) {
     }),
   );
   jsonResponse(res, status, { requestId, ...result });
+}
+
+async function handleAvatarProfile(req, res, requestId) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    jsonResponse(res, 400, { ok: false, requestId, error: "Invalid JSON body", category: "invalid_request" });
+    return;
+  }
+
+  const avatarSlug = body.avatar || body.avatarSlug || "estefania-montealegre";
+  const profile = loadAvatarProfile(avatarSlug);
+  if (!profile) {
+    jsonResponse(res, 404, {
+      ok: false,
+      requestId,
+      error: `Avatar profile not found: ${avatarSlug}`,
+      category: "profile_not_found",
+    });
+    return;
+  }
+
+  jsonResponse(res, 200, {
+    ok: true,
+    requestId,
+    profile,
+    summary: profileSummary(profile),
+  });
 }
 
 async function handleComfyPublicationSubmit(req, res, requestId) {
@@ -754,6 +833,10 @@ const server = http.createServer(async (req, res) => {
             configured: Boolean(DEEPSEEK_API_KEY),
             model: DEEPSEEK_MODEL,
           },
+          avatarProfiles: {
+            root: AVATAR_PROFILE_ROOT,
+            estefania: Boolean(loadAvatarProfile("estefania-montealegre")),
+          },
           comfyCloud: {
             configured: Boolean(COMFYUI_API_KEY),
             baseUrl: COMFYUI_BASE_URL,
@@ -775,6 +858,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/publication-copy-pack") {
       await handlePublicationCopyPack(req, res, requestId);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/avatar-profile") {
+      await handleAvatarProfile(req, res, requestId);
       return;
     }
 

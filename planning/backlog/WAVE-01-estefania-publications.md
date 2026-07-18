@@ -619,7 +619,7 @@ As an operator, I want to see the timeline of a publication job, so that I under
 
 ## US-011 — Estefanía Business Profile Configuration
 
-Status: Backlog  
+Status: Done  
 Priority: P0  
 Epic: EPIC-02 Character Profiles  
 Wave: Wave 1  
@@ -630,20 +630,20 @@ As the system, I need a structured Estefanía business profile, so that prompts 
 
 ### Acceptance Criteria
 
-- [ ] Estefanía has `businessProfile: influencer-brand`.
-- [ ] Profile includes brand fit, commercial tone, avoid rules, content pillars, caption style, and visual constraints.
-- [ ] Profile is stored in a machine-usable format.
-- [ ] n8n can read the profile.
-- [ ] Console can display the profile summary.
+- [x] Estefanía has `businessProfile: influencer-brand`.
+- [x] Profile includes brand fit, commercial tone, avoid rules, content pillars, caption style, and visual constraints.
+- [x] Profile is stored in a machine-usable format.
+- [x] n8n can read the profile.
+- [x] Console can display the profile summary.
 
 ### Technical Tasks
 
 - [x] Define human-readable avatar profile contract.
-- [ ] Create JSON schema for character/business profile.
-- [ ] Create Estefanía profile JSON from existing docs.
-- [ ] Store profile in repo.
-- [ ] Add profile load endpoint or n8n workflow.
-- [ ] Use profile in brief/copy generation.
+- [x] Create JSON schema for character/business profile.
+- [x] Create Estefanía profile JSON from existing docs.
+- [x] Store profile in repo.
+- [x] Add profile load endpoint or n8n workflow.
+- [x] Use profile in brief/copy generation.
 
 ### Dependencies
 
@@ -653,6 +653,7 @@ As the system, I need a structured Estefanía business profile, so that prompts 
 ### Notes
 
 - This story can start with repo JSON before moving to Postgres.
+- Implemented with `docs/product/avatar-profile.schema.json`, `avatars/estefania-montealegre/profile.json`, an ai-gateway profile loader, n8n profile load webhook, and a console profile summary in the Publications tab.
 
 ---
 
@@ -814,7 +815,7 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 - [x] US-007 — Generate Caption / Copy Pack
 - [x] US-008 — Export Publishing Pack
 - [x] US-009 — Mark Publication As Published
-- [ ] US-011 — Estefanía Business Profile Configuration
+- [x] US-011 — Estefanía Business Profile Configuration
 - [ ] US-014 — Validate Existing Asset Review Against Publication Flow
 
 ### P1
