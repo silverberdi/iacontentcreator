@@ -1308,6 +1308,38 @@ As the system, I want a visual QA provider to inspect generated images, so that 
 
 ---
 
+## US-032 — Auto-Prepare References Before Image Generation
+
+Status: Done  
+Priority: P0  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1 Stabilization  
+
+### User Story
+
+As an operator, I want `Generate images` to prepare required Comfy references automatically, so that image generation is one operational step and I do not need to remember a separate reference-preparation action.
+
+### Acceptance Criteria
+
+- [x] `Generate images` checks prompt-pack identity references before submitting to Comfy.
+- [x] Missing `comfyInputName` references are prepared automatically by calling the reference preparation workflow.
+- [x] Generation continues only after references are prepared and the prompt pack has been updated.
+- [x] If reference preparation fails, image generation is blocked with a clear error and no Comfy generation is submitted.
+- [x] Manual `Prepare references` remains available only in technical mode.
+
+### Technical Tasks
+
+- [x] Insert reference preparation into `Avatares AI - Publications - Generate Images`.
+- [x] Re-load the updated prompt pack after preparation.
+- [x] Hide the manual prepare button from standard operators.
+- [x] Validate without submitting a new Comfy generation.
+
+### Dependencies
+
+- US-030.
+
+---
+
 ## US-023 — Stabilize Estefania Identity And Safe Composition
 
 Status: Done  
@@ -1374,6 +1406,7 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-026 — Generation Attempt History
 - [x] US-028 — Dedicated Identity Reference Sync
 - [x] US-030 — Comfy Cloud Reference Upload Adapter
+- [x] US-032 — Auto-Prepare References Before Image Generation
 
 ### P1
 

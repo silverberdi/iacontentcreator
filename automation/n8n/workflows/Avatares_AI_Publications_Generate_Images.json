@@ -25,12 +25,25 @@
     },
     {
       "parameters": {
-        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst mode = String(body.mode || 'comfy-cloud-api').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst requestPayload = {\n  ...body,\n  source: 'publication-job-generate-images',\n  requestedAt: new Date().toISOString(),\n  mode\n};\nconst query = `\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), validation AS (\n  SELECT\n    CASE\n      WHEN NOT EXISTS (SELECT 1 FROM job) THEN 'Publication job not found'\n      WHEN (SELECT prompt_pack FROM job) IS NULL THEN 'Prompt pack is required before generating images'\n      ELSE NULL\n    END AS error\n), queued AS (\n  INSERT INTO generation_jobs (\n    avatar,\n    scene,\n    asset_type,\n    platform,\n    status,\n    run_mode,\n    prompt_pack,\n    request_payload,\n    started_at,\n    updated_at\n  )\n  SELECT\n    avatar,\n    scene,\n    COALESCE(asset_type, 'raw-image'),\n    'instagram',\n    'running',\n    ${sql(mode)},\n    prompt_pack,\n    ${sqlJson(requestPayload)},\n    now(),\n    now()\n  FROM job\n  WHERE (SELECT error FROM validation) IS NULL\n  RETURNING *\n), updated_publication AS (\n  UPDATE publication_jobs pj\n  SET\n    status = 'generating',\n    error_message = NULL,\n    updated_at = now(),\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'generationJobId', (SELECT job_id FROM queued),\n      'generationRunMode', ${sql(mode)},\n      'generationSubmittedAt', now(),\n      'generationProvider', 'comfy-cloud-api',\n      'generationInstructions', jsonb_build_array(\n        'Submitted to Comfy Cloud API through ai-gateway.',\n        'Wait for Comfy Cloud output metadata.',\n        'Run or trigger ingest to register generated assets.',\n        'US-005 links outputs back to the publication job.'\n      )\n    )\n  WHERE pj.publication_job_id = (SELECT publication_job_id FROM job)\n    AND EXISTS (SELECT 1 FROM queued)\n  RETURNING\n    pj.publication_job_id AS \"publicationJobId\",\n    pj.avatar,\n    pj.scene,\n    pj.format,\n    pj.objective,\n    pj.business_profile AS \"businessProfile\",\n    pj.asset_type AS \"assetType\",\n    pj.status,\n    pj.brief,\n    pj.prompt_pack AS \"promptPack\",\n    pj.created_at AS \"createdAt\",\n    pj.updated_at AS \"updatedAt\"\n)\nSELECT\n  CASE WHEN (SELECT error FROM validation) IS NULL THEN true ELSE false END AS ok,\n  (SELECT error FROM validation) AS error,\n  (SELECT row_to_json(updated_publication) FROM updated_publication) AS job,\n  (SELECT jsonb_build_object(\n    'generationJobId', job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'assetType', asset_type,\n    'platform', platform,\n    'status', status,\n    'runMode', run_mode,\n    'startedAt', started_at,\n    'promptPack', prompt_pack,\n    'instructions', jsonb_build_array(\n      'Submitted to Comfy Cloud API through ai-gateway.',\n      'Wait for Comfy Cloud output metadata.',\n      'Run or trigger ingest to register generated assets.',\n      'US-005 will link generated outputs back to this publication job.'\n    )\n  ) FROM queued) AS generation;\n`;\nreturn [{ json: { query } }];"
+        "jsCode": "const body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst mode = String(body.mode || 'comfy-cloud-api').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { ...body, publicationJobId, mode, referencePreparation: { ok: false, skipped: true, error: 'publicationJobId is required' } } }];\n}\nlet preparation = { ok: true, skipped: true, preparedCount: 0, failedCount: 0, prepared: [], failed: [] };\ntry {\n  preparation = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://127.0.0.1:5678/webhook/publications/jobs/prepare-references',\n    headers: { 'Content-Type': 'application/json', 'X-Request-Id': 'auto-prepare-references-' + publicationJobId },\n    body: { publicationJobId },\n    json: true,\n    timeout: 180000\n  });\n} catch (error) {\n  preparation = { ok: false, error: error?.message || 'Reference preparation request failed', preparedCount: 0, failedCount: 1, failed: [{ error: error?.message || 'Reference preparation request failed' }] };\n}\nreturn [{ json: { ...body, publicationJobId, mode, referencePreparation: preparation } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         256,
+        0
+      ],
+      "id": "generate-images-auto-prepare-refs",
+      "name": "Auto Prepare References"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst mode = String(body.mode || 'comfy-cloud-api').trim();\nconst referencePreparation = body.referencePreparation && typeof body.referencePreparation === 'object' ? body.referencePreparation : { ok: true, skipped: true };\nconst referencePreparationError = referencePreparation.ok === false ? (referencePreparation.error || 'Reference preparation failed') : null;\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst requestPayload = {\n  ...body,\n  source: 'publication-job-generate-images',\n  requestedAt: new Date().toISOString(),\n  mode\n};\nconst query = `\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), validation AS (\n  SELECT\n    CASE\n      WHEN NOT EXISTS (SELECT 1 FROM job) THEN 'Publication job not found'\n      WHEN (SELECT prompt_pack FROM job) IS NULL THEN 'Prompt pack is required before generating images'\n      WHEN ${sql(referencePreparationError)} IS NOT NULL THEN ${sql(referencePreparationError)}\n      ELSE NULL\n    END AS error\n), queued AS (\n  INSERT INTO generation_jobs (\n    avatar,\n    scene,\n    asset_type,\n    platform,\n    status,\n    run_mode,\n    prompt_pack,\n    request_payload,\n    started_at,\n    updated_at\n  )\n  SELECT\n    avatar,\n    scene,\n    COALESCE(asset_type, 'raw-image'),\n    'instagram',\n    'running',\n    ${sql(mode)},\n    prompt_pack,\n    ${sqlJson(requestPayload)},\n    now(),\n    now()\n  FROM job\n  WHERE (SELECT error FROM validation) IS NULL\n  RETURNING *\n), updated_publication AS (\n  UPDATE publication_jobs pj\n  SET\n    status = 'generating',\n    error_message = NULL,\n    updated_at = now(),\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'generationJobId', (SELECT job_id FROM queued),\n      'generationRunMode', ${sql(mode)},\n      'generationSubmittedAt', now(),\n      'generationProvider', 'comfy-cloud-api',\n      'referencePreparation', ${sqlJson(referencePreparation)},\n      'generationInstructions', jsonb_build_array(\n        'Submitted to Comfy Cloud API through ai-gateway.',\n        'Wait for Comfy Cloud output metadata.',\n        'Run or trigger ingest to register generated assets.',\n        'US-005 links outputs back to the publication job.'\n      )\n    )\n  WHERE pj.publication_job_id = (SELECT publication_job_id FROM job)\n    AND EXISTS (SELECT 1 FROM queued)\n  RETURNING\n    pj.publication_job_id AS \"publicationJobId\",\n    pj.avatar,\n    pj.scene,\n    pj.format,\n    pj.objective,\n    pj.business_profile AS \"businessProfile\",\n    pj.asset_type AS \"assetType\",\n    pj.status,\n    pj.brief,\n    pj.prompt_pack AS \"promptPack\",\n    pj.created_at AS \"createdAt\",\n    pj.updated_at AS \"updatedAt\"\n)\nSELECT\n  CASE WHEN (SELECT error FROM validation) IS NULL THEN true ELSE false END AS ok,\n  (SELECT error FROM validation) AS error,\n  (SELECT row_to_json(updated_publication) FROM updated_publication) AS job,\n  (SELECT jsonb_build_object(\n    'generationJobId', job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'assetType', asset_type,\n    'platform', platform,\n    'status', status,\n    'runMode', run_mode,\n    'startedAt', started_at,\n    'promptPack', prompt_pack,\n    'referencePreparation', ${sqlJson(referencePreparation)},\n    'instructions', jsonb_build_array(\n      'Submitted to Comfy Cloud API through ai-gateway.',\n      'Wait for Comfy Cloud output metadata.',\n      'Run or trigger ingest to register generated assets.',\n      'US-005 will link generated outputs back to this publication job.'\n    )\n  ) FROM queued) AS generation;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
         0
       ],
       "id": "b7fd1c70-0001-4dd7-a001-000000000002",
@@ -45,7 +58,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        512,
+        768,
         0
       ],
       "id": "b7fd1c70-0001-4dd7-a001-000000000003",
@@ -65,7 +78,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        768,
+        1024,
         0
       ],
       "id": "b7fd1c70-0001-4dd7-a001-000000000004",
@@ -80,7 +93,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1536,
+        1792,
         0
       ],
       "id": "b7fd1c70-0001-4dd7-a001-000000000005",
@@ -97,7 +110,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1024,
+        1280,
         0
       ],
       "credentials": {
@@ -116,7 +129,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1280,
+        1536,
         0
       ]
     }
@@ -126,7 +139,7 @@
       "main": [
         [
           {
-            "node": "Build Generate Images Query",
+            "node": "Auto Prepare References",
             "type": "main",
             "index": 0
           }
@@ -182,6 +195,17 @@
         [
           {
             "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto Prepare References": {
+      "main": [
+        [
+          {
+            "node": "Build Generate Images Query",
             "type": "main",
             "index": 0
           }

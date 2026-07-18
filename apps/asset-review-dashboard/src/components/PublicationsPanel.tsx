@@ -1411,7 +1411,7 @@ export default function PublicationsPanel({
                     ? "Regenerate prompt pack"
                     : "Generate prompt pack"}
               </button>
-              {promptPackText && (
+              {technicalMode && promptPackText && (
                 <button
                   type="button"
                   onClick={() => void handleGeneratePromptPack({ saveEdited: true })}
