@@ -1,0 +1,205 @@
+{
+  "updatedAt": "2026-07-18T13:46:09.963Z",
+  "createdAt": "2026-07-18T00:00:00.000Z",
+  "id": "AvAIPubPublished01",
+  "name": "Avatares AI - Publications - Mark Published",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/mark-published",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "copy-pack-001",
+      "name": "POST /publications/jobs/mark-published",
+      "webhookId": "generate-copy-pack-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) { return sql(JSON.stringify(value ?? {})) + '::jsonb'; }\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst platform = String(body.platform || '').trim();\nconst account = String(body.account || '').trim();\nconst publishedUrl = String(body.publishedUrl || body.published_url || '').trim();\nconst publishedAt = String(body.publishedAt || body.published_at || '').trim();\nconst notes = String(body.notes || '').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nif (!platform) {\n  return [{ json: { query: \"SELECT false AS ok, 'platform is required' AS error;\" } }];\n}\nif (!/^https?:\\/\\//i.test(publishedUrl)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publishedUrl must be an http(s) URL' AS error;\" } }];\n}\nconst publishInput = { platform, account, publishedUrl, publishedAt, notes };\nconst query = `\nSELECT\n  true AS ok,\n  pj.publication_job_id AS \"publicationJobId\",\n  pj.avatar,\n  pj.scene,\n  pj.format,\n  pj.objective,\n  pj.business_profile AS \"businessProfile\",\n  pj.asset_type AS \"assetType\",\n  pj.status,\n  pj.brief,\n  pj.prompt_pack AS \"promptPack\",\n  pj.publishing_pack AS \"publishingPack\",\n  pj.metadata,\n  pj.created_at AS \"createdAt\",\n  pj.updated_at AS \"updatedAt\",\n  ${sqlJson(publishInput)} AS \"publishInput\"\nFROM publication_jobs pj\nWHERE pj.publication_job_id = ${sql(publicationJobId)}::uuid\nLIMIT 1;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "copy-pack-002",
+      "name": "Build Load Publish Context Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "copy-pack-003",
+      "name": "Load Publish Context",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) { return sql(JSON.stringify(value ?? {})) + '::jsonb'; }\nfunction parseJson(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nconst row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f' || !row.publicationJobId) {\n  const error = row.error || 'Publication job not found';\n  return [{ json: { query: `SELECT false AS ok, ${sql(error)} AS error;` } }];\n}\nconst publishInput = parseJson(row.publishInput, {});\nconst metadata = parseJson(row.metadata, {});\nconst publishingExport = metadata.publishingExport || null;\nif (!publishingExport) {\n  return [{ json: { query: \"SELECT false AS ok, 'Publishing export is required before marking as published' AS error;\" } }];\n}\nconst now = new Date().toISOString();\nconst publishedAt = publishInput.publishedAt || now;\nconst publishedRecord = {\n  publicationJobId: row.publicationJobId,\n  platform: publishInput.platform,\n  account: publishInput.account || null,\n  publishedUrl: publishInput.publishedUrl,\n  publishedAt,\n  notes: publishInput.notes || null,\n  status: 'published',\n  recordedAt: now,\n  metadata: {\n    avatar: row.avatar,\n    scene: row.scene,\n    format: row.format,\n    businessProfile: row.businessProfile,\n    sourceStatus: row.status,\n    publishingExport\n  }\n};\nconst query = `\nUPDATE publication_jobs\nSET\n  status = 'published',\n  error_message = NULL,\n  updated_at = now(),\n  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(\n    'publishedRecord', ${sqlJson(publishedRecord)},\n    'publishedAt', ${sql(publishedAt)},\n    'publishedPlatform', ${sql(publishInput.platform)},\n    'publishedAccount', ${sql(publishInput.account || '')},\n    'publishedUrl', ${sql(publishInput.publishedUrl)}\n  )\nWHERE publication_job_id = ${sql(row.publicationJobId)}::uuid\nRETURNING\n  true AS ok,\n  publication_job_id AS \"publicationJobId\",\n  avatar,\n  scene,\n  format,\n  objective,\n  business_profile AS \"businessProfile\",\n  asset_type AS \"assetType\",\n  status,\n  brief,\n  prompt_pack AS \"promptPack\",\n  publishing_pack AS \"publishingPack\",\n  metadata->'publishingExport' AS \"publishingExport\",\n  metadata->'publishedRecord' AS \"publishedRecord\",\n  created_at AS \"createdAt\",\n  updated_at AS \"updatedAt\";\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "copy-pack-004",
+      "name": "Build Save Published Record Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "copy-pack-005",
+      "name": "Save Published Record",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, published: false, error: row.error || 'Publication was not marked as published.' } }];\n}\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nconst brief = parse(row.brief, null);\nconst promptPack = parse(row.promptPack, null);\nconst publishingPack = parse(row.publishingPack, null);\nconst publishingExport = parse(row.publishingExport, null);\nconst publishedRecord = parse(row.publishedRecord, null);\nreturn [{\n  json: {\n    ok: true,\n    published: true,\n    publishedRecord,\n    publication: publishedRecord,\n    job: {\n      publicationJobId: row.publicationJobId,\n      avatar: row.avatar,\n      scene: row.scene,\n      format: row.format,\n      objective: row.objective,\n      businessProfile: row.businessProfile,\n      assetType: row.assetType,\n      status: row.status,\n      brief,\n      promptPack,\n      publishingPack,\n      publishingExport,\n      publishedRecord,\n      createdAt: row.createdAt,\n      updatedAt: row.updatedAt\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "copy-pack-006",
+      "name": "Return Published Record"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "copy-pack-007",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/mark-published": {
+      "main": [
+        [
+          {
+            "node": "Build Load Publish Context Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Load Publish Context Query": {
+      "main": [
+        [
+          {
+            "node": "Load Publish Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Publish Context": {
+      "main": [
+        [
+          {
+            "node": "Build Save Published Record Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Save Published Record Query": {
+      "main": [
+        [
+          {
+            "node": "Save Published Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Published Record": {
+      "main": [
+        [
+          {
+            "node": "Return Published Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Published Record": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "publication-mark-published-v1",
+  "activeVersionId": "publication-mark-published-v1",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

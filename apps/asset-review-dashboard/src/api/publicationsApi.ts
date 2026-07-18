@@ -17,6 +17,8 @@ import type {
   IngestComfyOutputResult,
   ListPublicationJobsPayload,
   ListPublicationJobsResponse,
+  MarkPublicationPublishedPayload,
+  MarkPublicationPublishedResponse,
   PublicationJobLoadItem,
   SelectPublicationAssetPayload,
   SelectPublicationAssetResponse,
@@ -24,6 +26,7 @@ import type {
   PublicationBrief,
   PublicationCopyPack,
   PublicationPublishingExport,
+  PublicationPublishedRecord,
   PublicationGenerationSubmission,
   PublicationJob,
   PublicationPromptPack,
@@ -119,6 +122,21 @@ export async function exportPublicationPack(
     throw new Error(data.error || data.reason || data.message || "Publishing pack was not exported.");
   }
   return { job, publishingExport };
+}
+
+export async function markPublicationPublished(
+  payload: MarkPublicationPublishedPayload,
+): Promise<{ job: PublicationJob; publishedRecord: PublicationPublishedRecord }> {
+  const data = await postN8nJson<MarkPublicationPublishedResponse>(
+    "/publications/jobs/mark-published",
+    payload,
+  );
+  const job = parseJob(data);
+  const publishedRecord = data.publishedRecord ?? data.publication;
+  if (!data.ok || !data.published || !publishedRecord) {
+    throw new Error(data.error || data.reason || data.message || "Publication was not marked as published.");
+  }
+  return { job, publishedRecord };
 }
 
 export async function ingestComfyOutput(

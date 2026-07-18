@@ -249,6 +249,17 @@ Initial primary platform:
 Instagram
 ```
 
+Active account:
+
+```text
+handle: @estefaniamontealegre.ai
+url: https://www.instagram.com/estefaniamontealegre.ai/
+accountType: creator
+category: AI Creator
+publishingMode: manual-assisted
+status: active
+```
+
 Initial use:
 
 - lifestyle feed posts,
@@ -431,4 +442,3 @@ create publication job
 - When should video/reel generation enter the workflow?
 - Should brand packages be represented in the console or only in docs for now?
 - When should `profile.json` become the operational source for n8n?
-

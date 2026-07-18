@@ -25,6 +25,8 @@ export type PublicationJob = {
   brief?: PublicationBrief | null;
   promptPack?: PublicationPromptPack | null;
   publishingPack?: PublicationCopyPack | null;
+  publishingExport?: PublicationPublishingExport | null;
+  publishedRecord?: PublicationPublishedRecord | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -158,6 +160,19 @@ export type PublicationPublishingExport = {
   [key: string]: unknown;
 };
 
+export type PublicationPublishedRecord = {
+  publicationJobId: string;
+  platform: string;
+  account?: string | null;
+  publishedUrl: string;
+  publishedAt: string;
+  notes?: string | null;
+  status: "published" | string;
+  recordedAt?: string;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
 export type GeneratePublicationCopyPackPayload = {
   publicationJobId: string;
   copyPack?: PublicationCopyPack;
@@ -187,6 +202,26 @@ export type ExportPublicationPackResponse = {
   job?: PublicationJob;
   publishingExport?: PublicationPublishingExport;
   exportPack?: PublicationPublishingExport;
+  message?: string;
+  error?: string;
+  reason?: string;
+};
+
+export type MarkPublicationPublishedPayload = {
+  publicationJobId: string;
+  platform: string;
+  publishedUrl: string;
+  account?: string;
+  publishedAt?: string;
+  notes?: string;
+};
+
+export type MarkPublicationPublishedResponse = {
+  ok?: boolean;
+  published?: boolean;
+  job?: PublicationJob;
+  publishedRecord?: PublicationPublishedRecord;
+  publication?: PublicationPublishedRecord;
   message?: string;
   error?: string;
   reason?: string;

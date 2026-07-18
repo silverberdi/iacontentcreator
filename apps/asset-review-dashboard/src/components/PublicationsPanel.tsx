@@ -8,6 +8,7 @@ import {
   generatePublicationPromptPack,
   ingestComfyOutput,
   listPublicationJobs,
+  markPublicationPublished,
   selectPublicationAsset,
 } from "../api/publicationsApi";
 import { defaultFilters } from "../data/catalogs";
@@ -16,6 +17,7 @@ import type {
   PublicationBrief,
   PublicationCopyPack,
   PublicationPublishingExport,
+  PublicationPublishedRecord,
   PublicationFormat,
   PublicationGenerationSubmission,
   IngestComfyOutputResult,
@@ -75,6 +77,14 @@ export default function PublicationsPanel({
   const [publishingExport, setPublishingExport] = useState<PublicationPublishingExport | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [publishedRecord, setPublishedRecord] = useState<PublicationPublishedRecord | null>(null);
+  const [publishPlatform, setPublishPlatform] = useState("instagram");
+  const [publishAccount, setPublishAccount] = useState("");
+  const [publishedUrl, setPublishedUrl] = useState("");
+  const [publishedAt, setPublishedAt] = useState("");
+  const [publishedNotes, setPublishedNotes] = useState("");
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [loadJobId, setLoadJobId] = useState("");
   const [recentJobs, setRecentJobs] = useState<PublicationJobLoadItem[]>([]);
   const [loadBusy, setLoadBusy] = useState(false);
@@ -120,8 +130,23 @@ export default function PublicationsPanel({
     setPromptPackMessage(null);
     setCopyPackText(job.publishingPack ? JSON.stringify(job.publishingPack, null, 2) : "");
     setCopyPackMessage(null);
-    setPublishingExport(null);
+    setPublishingExport(job.publishingExport || null);
     setExportMessage(null);
+    setPublishedRecord(job.publishedRecord || null);
+    setPublishMessage(null);
+    setPublishedUrl("");
+    setPublishedAt("");
+    setPublishedNotes("");
+    const existingPublication = job.publishedRecord || null;
+    if (existingPublication) {
+      setPublishPlatform(existingPublication.platform || "instagram");
+      setPublishAccount(existingPublication.account || "");
+      setPublishedUrl(existingPublication.publishedUrl || "");
+      setPublishedAt(existingPublication.publishedAt || "");
+      setPublishedNotes(existingPublication.notes || "");
+    } else if (job.publishingExport) {
+      setPublishPlatform(job.publishingExport.platform || "instagram");
+    }
     setGeneration(item.generation || null);
     setGenerationMessage("Publication job loaded.");
     setComfyOutputUrl("");
@@ -194,6 +219,11 @@ export default function PublicationsPanel({
     setCopyPackMessage(null);
     setPublishingExport(null);
     setExportMessage(null);
+    setPublishedRecord(null);
+    setPublishMessage(null);
+    setPublishedUrl("");
+    setPublishedAt("");
+    setPublishedNotes("");
     setGeneration(null);
     setGenerationMessage(null);
     setComfyOutputUrl("");
@@ -280,6 +310,8 @@ export default function PublicationsPanel({
       setCopyPackMessage(null);
       setPublishingExport(null);
       setExportMessage(null);
+      setPublishedRecord(null);
+      setPublishMessage(null);
       setPromptPackMessage(options.saveEdited ? "Prompt pack saved." : "Prompt pack generated.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate publication prompt pack");
@@ -308,6 +340,8 @@ export default function PublicationsPanel({
       setCopyPackMessage(null);
       setPublishingExport(null);
       setExportMessage(null);
+      setPublishedRecord(null);
+      setPublishMessage(null);
       setGenerationMessage("Generation job submitted.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit image generation");
@@ -423,6 +457,8 @@ export default function PublicationsPanel({
     setCopyPackMessage(null);
     setPublishingExport(null);
     setExportMessage(null);
+    setPublishedRecord(null);
+    setPublishMessage(null);
 
     try {
       let editedCopyPack: PublicationCopyPack | undefined;
@@ -439,6 +475,8 @@ export default function PublicationsPanel({
       setCopyPackMessage(options.saveEdited ? "Copy pack saved." : "Copy pack generated.");
       setPublishingExport(null);
       setExportMessage(null);
+      setPublishedRecord(null);
+      setPublishMessage(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate publication copy pack");
     } finally {
@@ -463,11 +501,37 @@ export default function PublicationsPanel({
       });
       setCreatedJob(result.job);
       setPublishingExport(result.publishingExport);
+      setPublishPlatform(result.publishingExport.platform || "instagram");
       setExportMessage("Publishing pack exported.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to export publishing pack");
     } finally {
       setExportBusy(false);
+    }
+  }
+
+  async function handleMarkPublished() {
+    if (!createdJob?.publicationJobId || !publishedUrl.trim() || !publishPlatform.trim()) return;
+    setPublishBusy(true);
+    setError(null);
+    setPublishMessage(null);
+
+    try {
+      const result = await markPublicationPublished({
+        publicationJobId: createdJob.publicationJobId,
+        platform: publishPlatform.trim(),
+        account: publishAccount.trim(),
+        publishedUrl: publishedUrl.trim(),
+        publishedAt: publishedAt.trim(),
+        notes: publishedNotes.trim(),
+      });
+      setCreatedJob(result.job);
+      setPublishedRecord(result.publishedRecord);
+      setPublishMessage("Publication marked as published.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to mark publication as published");
+    } finally {
+      setPublishBusy(false);
     }
   }
 
@@ -1109,6 +1173,124 @@ export default function PublicationsPanel({
           ) : (
             <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
               No publishing pack exported yet.
+            </div>
+          )}
+        </SectionPanel>
+      )}
+
+      {createdJob && publishingExport && (
+        <SectionPanel
+          title="Published Record"
+          description="Record the manual Instagram publication after posting."
+          actions={
+            <button
+              type="button"
+              onClick={() => void handleMarkPublished()}
+              disabled={publishBusy || !publishedUrl.trim() || !publishPlatform.trim()}
+              className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {publishBusy ? "Saving..." : publishedRecord ? "Update published record" : "Mark published"}
+            </button>
+          }
+        >
+          {publishMessage && (
+            <p className="mb-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+              {publishMessage}
+            </p>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-gray-400">Platform</span>
+              <input
+                value={publishPlatform}
+                onChange={(event) => setPublishPlatform(event.target.value)}
+                disabled={publishBusy}
+                placeholder="instagram"
+                className={inputClass}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-gray-400">Account</span>
+              <input
+                value={publishAccount}
+                onChange={(event) => setPublishAccount(event.target.value)}
+                disabled={publishBusy}
+                placeholder="@account"
+                className={inputClass}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm md:col-span-2">
+              <span className="text-gray-400">Published URL</span>
+              <input
+                value={publishedUrl}
+                onChange={(event) => setPublishedUrl(event.target.value)}
+                disabled={publishBusy}
+                placeholder="https://www.instagram.com/p/..."
+                className={inputClass}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-gray-400">Published at</span>
+              <input
+                type="datetime-local"
+                value={publishedAt}
+                onChange={(event) => setPublishedAt(event.target.value)}
+                disabled={publishBusy}
+                className={inputClass}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm md:col-span-2">
+              <span className="text-gray-400">Notes</span>
+              <textarea
+                value={publishedNotes}
+                onChange={(event) => setPublishedNotes(event.target.value)}
+                disabled={publishBusy}
+                rows={3}
+                className={`${inputClass} resize-y`}
+              />
+            </label>
+          </div>
+
+          {publishedRecord && (
+            <div className="mt-4 rounded-md border border-emerald-800/50 bg-emerald-950/30 p-4">
+              <p className="text-sm font-medium text-emerald-200">Publication recorded</p>
+              <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <dt className="text-xs text-gray-500">status</dt>
+                  <dd className="mt-0.5 text-gray-200">{publishedRecord.status}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">platform</dt>
+                  <dd className="mt-0.5 text-gray-200">{publishedRecord.platform}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">account</dt>
+                  <dd className="mt-0.5 text-gray-200">{publishedRecord.account || "n/a"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">publishedAt</dt>
+                  <dd className="mt-0.5 text-gray-200">{publishedRecord.publishedAt}</dd>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-4">
+                  <dt className="text-xs text-gray-500">publishedUrl</dt>
+                  <dd className="mt-0.5 flex flex-wrap items-center gap-2 break-all font-mono text-gray-200">
+                    <a
+                      href={publishedRecord.publishedUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-accent hover:text-accent-hover"
+                    >
+                      {publishedRecord.publishedUrl}
+                    </a>
+                    <CopyButton value={publishedRecord.publishedUrl} label="Copy URL" />
+                  </dd>
+                </div>
+              </dl>
             </div>
           )}
         </SectionPanel>

@@ -546,7 +546,7 @@ As an operator, I want to export a publishing pack, so that I can manually publi
 
 ## US-009 — Mark Publication As Published
 
-Status: Backlog  
+Status: Done  
 Priority: P0  
 Epic: EPIC-01 Publications  
 Wave: Wave 1  
@@ -557,18 +557,18 @@ As an operator, I want to mark a publication as published, so that the system re
 
 ### Acceptance Criteria
 
-- [ ] Operator can mark a job as published.
-- [ ] Operator can enter platform and published URL.
-- [ ] System stores publish timestamp.
-- [ ] Job status changes to `published`.
-- [ ] Published jobs remain searchable.
+- [x] Operator can mark a job as published.
+- [x] Operator can enter platform and published URL.
+- [x] System stores publish timestamp.
+- [x] Job status changes to `published`.
+- [x] Published jobs remain searchable.
 
 ### Technical Tasks
 
-- [ ] Add status transition to `published`.
-- [ ] Add published URL/platform fields.
-- [ ] Add endpoint `POST /publications/jobs/mark-published`.
-- [ ] Add UI form.
+- [x] Add status transition to `published`.
+- [x] Add published URL/platform fields.
+- [x] Add endpoint `POST /publications/jobs/mark-published`.
+- [x] Add UI form.
 
 ### Dependencies
 
@@ -577,6 +577,7 @@ As an operator, I want to mark a publication as published, so that the system re
 ### Notes
 
 - Manual publishing is acceptable for Wave 1.
+- Implemented as publication-job metadata stored in `publication_jobs.metadata.publishedRecord`.
 
 ---
 
@@ -811,7 +812,7 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 - [x] US-006 — Select Publication Asset
 - [x] US-007 — Generate Caption / Copy Pack
 - [x] US-008 — Export Publishing Pack
-- [ ] US-009 — Mark Publication As Published
+- [x] US-009 — Mark Publication As Published
 - [ ] US-011 — Estefanía Business Profile Configuration
 - [ ] US-014 — Validate Existing Asset Review Against Publication Flow
 
