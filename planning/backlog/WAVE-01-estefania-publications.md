@@ -42,8 +42,8 @@ Wave 1 is done when:
 - [x] The operator can approve/reject/select assets.
 - [x] The system can generate a caption/copy package aligned with Estefanía.
 - [ ] The final package can be exported for manual publishing.
-- [ ] The publication job has a clear status history.
-- [ ] A non-technical operator can understand what to do next.
+- [x] The publication job has a clear status history.
+- [x] A non-technical operator can understand what to do next.
 
 ---
 
@@ -1407,6 +1407,7 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-028 — Dedicated Identity Reference Sync
 - [x] US-030 — Comfy Cloud Reference Upload Adapter
 - [x] US-032 — Auto-Prepare References Before Image Generation
+- [x] US-033 — Operator-First Publications Flow Cleanup
 
 ### P1
 
@@ -1420,3 +1421,38 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-027 — Publication Candidate Quality Review Criteria
 - [x] US-029 — Automated Image QA And Correction Pass
 - [x] US-031 — Pixel-Level Visual QA Provider
+
+---
+
+## US-033 — Operator-First Publications Flow Cleanup
+
+Status: Done  
+Priority: P0  
+Epic: EPIC-04 Admin Operations  
+Wave: Wave 1 Stabilization  
+
+### User Story
+
+As an operator, I want the console to present one clear Estefania publication path, so that I can run the Wave 1 flow without choosing between legacy/manual workflows or technical implementation steps.
+
+### Acceptance Criteria
+
+- [x] The standard operator sees `Publications` as the primary publication workflow.
+- [x] Legacy/manual `Content Cycle` is hidden from standard operation and available only through technical mode.
+- [x] Internal reference preparation is not exposed as a standard operator action.
+- [x] `Publications` shows a clear recommended next action for the current job.
+- [x] Raw technical identifiers and JSON remain available where needed, but do not define the normal operating path.
+
+### Technical Tasks
+
+- [x] Hide `Content Cycle` tab unless technical mode is enabled.
+- [x] Redirect away from `Content Cycle` when technical mode is disabled.
+- [x] Gate manual `Prepare references` behind technical mode.
+- [x] Add operator-facing job status and next-action labels in `Publications`.
+- [x] Validate the console build.
+
+### Dependencies
+
+- US-010.
+- US-012.
+- US-032.

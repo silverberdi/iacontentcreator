@@ -88,6 +88,105 @@ const formatOptions: { value: PublicationFormat; label: string }[] = [
   { value: "story", label: "Story" },
 ];
 
+const JOB_STATUS_LABELS: Record<string, string> = {
+  draft: "Brief pendiente",
+  "brief-ready": "Brief listo",
+  "prompt-ready": "Listo para generar imagen",
+  generating: "Generando imagen",
+  "review-ready": "Imagen lista para revisar",
+  "assets-ready": "Imagen seleccionada",
+  "copy-ready": "Copy listo",
+  "ready-to-publish": "Listo para publicar",
+  published: "Publicado",
+  failed: "Requiere atención",
+};
+
+function humanJobStatus(status: string | undefined): string {
+  if (!status) return "Sin estado";
+  return JOB_STATUS_LABELS[status] || status;
+}
+
+function getOperatorNextAction(input: {
+  job: PublicationJob;
+  hasBrief: boolean;
+  hasPromptPack: boolean;
+  generationActive: boolean;
+  latestAsset: PublicationAssetSummary | null;
+  selectedAsset: PublicationAssetSummary | null;
+  hasCopyPack: boolean;
+  hasExport: boolean;
+  hasPublishedRecord: boolean;
+}): { label: string; description: string; tone: "normal" | "warning" | "success" } {
+  if (input.job.status === "failed") {
+    return {
+      label: "Revisar error y reintentar",
+      description: input.job.errorMessage || "El job falló. Usa el timeline para ver el paso afectado.",
+      tone: "warning",
+    };
+  }
+  if (input.hasPublishedRecord || input.job.status === "published") {
+    return {
+      label: "Publicación registrada",
+      description: "Este job ya quedó cerrado como publicado.",
+      tone: "success",
+    };
+  }
+  if (!input.hasBrief) {
+    return {
+      label: "Generar brief",
+      description: "Crea la dirección creativa antes de preparar prompts o imágenes.",
+      tone: "normal",
+    };
+  }
+  if (!input.hasPromptPack) {
+    return {
+      label: "Generar prompt pack",
+      description: "Convierte el brief en instrucciones listas para Comfy Cloud.",
+      tone: "normal",
+    };
+  }
+  if (input.generationActive) {
+    return {
+      label: "Esperar resultado de Comfy",
+      description: "La consola refresca el estado automáticamente mientras la generación está activa.",
+      tone: "normal",
+    };
+  }
+  if (!input.latestAsset?.assetId) {
+    return {
+      label: "Generar imágenes",
+      description: "Envía el prompt pack a Comfy. Las referencias se preparan automáticamente.",
+      tone: "normal",
+    };
+  }
+  if (!input.selectedAsset?.assetId) {
+    return {
+      label: "Revisar y seleccionar imagen",
+      description: "Valida identidad, rostro, manos/pies, composición y ajuste de marca.",
+      tone: "normal",
+    };
+  }
+  if (!input.hasCopyPack) {
+    return {
+      label: "Generar copy",
+      description: "Crea el caption, hashtags y notas de publicación para Instagram.",
+      tone: "normal",
+    };
+  }
+  if (!input.hasExport) {
+    return {
+      label: "Exportar paquete",
+      description: "Prepara la imagen y texto final para publicación manual.",
+      tone: "normal",
+    };
+  }
+  return {
+    label: "Publicar manualmente y registrar URL",
+    description: "Publica en Instagram y guarda el enlace final en la consola.",
+    tone: "normal",
+  };
+}
+
 export default function PublicationsPanel({
   catalogOptions,
   catalogOptionsLoading = false,
@@ -211,6 +310,19 @@ export default function PublicationsPanel({
       generation?.status === "running" ||
       generationProviderStatus === "submitted" ||
       generationProviderStatus === "running");
+  const operatorNextAction = createdJob
+    ? getOperatorNextAction({
+        job: createdJob,
+        hasBrief: Boolean(briefText),
+        hasPromptPack: Boolean(promptPackText),
+        generationActive: isGenerationActive,
+        latestAsset,
+        selectedAsset,
+        hasCopyPack: Boolean(copyPackText),
+        hasExport: Boolean(publishingExport),
+        hasPublishedRecord: Boolean(publishedRecord),
+      })
+    : null;
   const latestAssetQa = readRecord(latestAsset?.metadata)?.qa as PublicationQaResult | undefined;
   const latestAssetQualityReview = readRecord(latestAsset?.metadata)?.publicationQualityReview as
     | PublicationQualityReview
@@ -1233,6 +1345,52 @@ export default function PublicationsPanel({
 
       {createdJob && (
         <SectionPanel
+          title="Recommended Action"
+          description="The current operator step for this publication job."
+        >
+          <div
+            className={`rounded-md border px-4 py-3 ${
+              operatorNextAction?.tone === "warning"
+                ? "border-amber-800/60 bg-amber-950/40"
+                : operatorNextAction?.tone === "success"
+                  ? "border-emerald-800/50 bg-emerald-950/30"
+                  : "border-border bg-surface"
+            }`}
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">
+                  {humanJobStatus(createdJob.status)}
+                </p>
+                <p className="mt-2 text-base font-medium text-gray-100">
+                  {operatorNextAction?.label || "Refresh timeline"}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-gray-400">
+                  {operatorNextAction?.description ||
+                    "Load the timeline to identify the next operator step."}
+                </p>
+              </div>
+              {technicalMode && (
+                <dl className="grid gap-2 text-xs text-gray-500 sm:grid-cols-2 lg:min-w-[360px]">
+                  <div>
+                    <dt>status</dt>
+                    <dd className="font-mono text-gray-300">{createdJob.status}</dd>
+                  </div>
+                  <div>
+                    <dt>publicationJobId</dt>
+                    <dd className="break-all font-mono text-gray-300">
+                      {createdJob.publicationJobId}
+                    </dd>
+                  </div>
+                </dl>
+              )}
+            </div>
+          </div>
+        </SectionPanel>
+      )}
+
+      {createdJob && (
+        <SectionPanel
           title="Job Timeline"
           description="Track what has happened and the next required operator action."
           actions={
@@ -1262,7 +1420,7 @@ export default function PublicationsPanel({
             <div className="rounded-md border border-border bg-surface p-4">
               <p className="text-xs uppercase tracking-wide text-gray-500">Current status</p>
               <p className="mt-2 text-lg font-medium text-gray-100">
-                {timeline?.status || createdJob.status}
+                {humanJobStatus(timeline?.status || createdJob.status)}
               </p>
               <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">Next action</p>
               <p className="mt-2 text-sm font-medium text-gray-100">
@@ -1421,7 +1579,7 @@ export default function PublicationsPanel({
                   Save edited prompt pack
                 </button>
               )}
-              {promptPackText && (
+              {technicalMode && promptPackText && (
                 <button
                   type="button"
                   onClick={() => void handlePrepareReferences()}

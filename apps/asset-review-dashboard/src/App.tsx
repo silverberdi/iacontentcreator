@@ -148,6 +148,12 @@ export default function App({ currentUser }: AppProps) {
   }, [canUseTechnicalMode, technicalMode]);
 
   useEffect(() => {
+    if (!technicalMode && activeTab === "content-cycle") {
+      setActiveTab("publications");
+    }
+  }, [activeTab, technicalMode]);
+
+  useEffect(() => {
     if (selectedAssetIndex === null) return;
     if (selectedAssetIndex >= filteredCandidates.length) {
       if (filteredCandidates.length === 0) {
@@ -409,7 +415,11 @@ export default function App({ currentUser }: AppProps) {
     <div className="min-h-screen bg-surface">
       <Header subtitle={headerSubtitle} filterPills={reviewFilterPills} />
 
-      <DashboardTabs activeTab={activeTab} onTabChange={handleTabChange} />
+      <DashboardTabs
+        activeTab={activeTab}
+        technicalMode={technicalMode}
+        onTabChange={handleTabChange}
+      />
 
       <main>
         <PageContainer className="space-y-6 py-6">
@@ -512,7 +522,7 @@ export default function App({ currentUser }: AppProps) {
             </div>
           )}
 
-          {activeTab === "content-cycle" && (
+          {technicalMode && activeTab === "content-cycle" && (
             <div role="tabpanel">
               <ContentCyclePanel />
             </div>

@@ -2,27 +2,34 @@ import PageContainer from "./PageContainer";
 
 export type DashboardTab = "home" | "review" | "publications" | "content-cycle" | "ops";
 
-const TABS: { id: DashboardTab; label: string }[] = [
+const BASE_TABS: { id: DashboardTab; label: string; technicalOnly?: boolean }[] = [
   { id: "home", label: "Home" },
   { id: "review", label: "Asset Review" },
   { id: "publications", label: "Publications" },
-  { id: "content-cycle", label: "Content Cycle" },
+  { id: "content-cycle", label: "Content Cycle", technicalOnly: true },
   { id: "ops", label: "Ops / Admin" },
 ];
 
 type DashboardTabsProps = {
   activeTab: DashboardTab;
+  technicalMode?: boolean;
   onTabChange: (tab: DashboardTab) => void;
 };
 
-export default function DashboardTabs({ activeTab, onTabChange }: DashboardTabsProps) {
+export default function DashboardTabs({
+  activeTab,
+  technicalMode = false,
+  onTabChange,
+}: DashboardTabsProps) {
+  const tabs = BASE_TABS.filter((tab) => !tab.technicalOnly || technicalMode);
+
   return (
     <nav
       className="border-b border-border bg-surface-raised"
       aria-label="Dashboard sections"
     >
       <PageContainer className="flex gap-1 overflow-x-auto">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
