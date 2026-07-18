@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-31T21:13:53.398Z",
+  "updatedAt": "2026-07-18T14:45:00.000Z",
   "createdAt": "2026-05-31T21:13:53.398Z",
   "id": "f7MMTbEpIvwmrmrI",
   "name": "Avatares AI - API - Reject Asset",
@@ -26,7 +26,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst input = $json.body || $json;\n\nif (!input.assetId) {\n  throw new Error('Missing required field: assetId');\n}\n\nreturn [{\n  json: {\n    assetId: input.assetId,\n    reviewNotes: input.reviewNotes || 'Rejected via Asset Review API',\n    baseUrl: input.baseUrl || 'http://192.168.0.194:9000'\n  }\n}];\n"
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\n\nconst input = $json.body || $json;\nconst assetId = String(input.assetId || '').trim();\nconst reviewNotes = String(input.reviewNotes || 'Rejected via Asset Review API').trim();\nconst baseUrl = String(input.baseUrl || 'http://192.168.0.194:9000').replace(/[/]$/, '');\n\nif (!assetId) {\n  throw new Error('Missing required field: assetId');\n}\n\nreturn [{\n  json: {\n    assetId,\n    assetIdSql: sql(assetId),\n    reviewNotes,\n    reviewNotesSql: sql(reviewNotes),\n    reviewNotesJsonSql: sql(JSON.stringify(reviewNotes)),\n    baseUrl\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -40,7 +40,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nUPDATE canonical_asset_registry\nSET\n  is_canonical = false,\n  status = 'rejected',\n  review_notes = '{{ $(\"Normalize Reject Request\").first().json.reviewNotes }}',\n  metadata = jsonb_set(\n    jsonb_set(\n      jsonb_set(\n        metadata,\n        '{status}',\n        '\"rejected\"'\n      ),\n      '{isCanonical}',\n      'false'\n    ),\n    '{reviewNotes}',\n    '\"{{ $(\"Normalize Reject Request\").first().json.reviewNotes }}\"'\n  )\nWHERE asset_id = '{{ $(\"Normalize Reject Request\").first().json.assetId }}'\n  AND status <> 'canonical'\nRETURNING\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  sha256,\n  canonical_group,\n  review_notes,\n  created_at;\n",
+        "query": "\nUPDATE canonical_asset_registry\nSET\n  is_canonical = false,\n  status = 'rejected',\n  review_notes = {{ $(\"Normalize Reject Request\").first().json.reviewNotesSql }},\n  metadata = jsonb_set(\n    jsonb_set(\n      jsonb_set(\n        COALESCE(metadata, '{}'::jsonb),\n        '{status}',\n        '\"rejected\"'::jsonb,\n        true\n      ),\n      '{isCanonical}',\n      'false'::jsonb,\n      true\n    ),\n    '{reviewNotes}',\n    {{ $(\"Normalize Reject Request\").first().json.reviewNotesJsonSql }}::jsonb,\n    true\n  )\nWHERE asset_id = {{ $(\"Normalize Reject Request\").first().json.assetIdSql }}\n  AND status <> 'canonical'\nRETURNING\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  sha256,\n  canonical_group,\n  review_notes,\n  created_at;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -141,9 +141,9 @@
   "staticData": null,
   "meta": null,
   "pinData": {},
-  "versionId": "d531c5b9-5491-4395-82bc-548669931a85",
-  "activeVersionId": "d531c5b9-5491-4395-82bc-548669931a85",
-  "versionCounter": 52,
+  "versionId": "asset-review-reject-sql-hardened-v1",
+  "activeVersionId": "asset-review-reject-sql-hardened-v1",
+  "versionCounter": 53,
   "triggerCount": 1,
   "tags": [],
   "shared": [
@@ -166,7 +166,7 @@
     }
   ],
   "versionMetadata": {
-    "name": "Reject asset v1",
-    "description": "Initial webhook endpoint"
+    "name": "Reject asset v2",
+    "description": "Harden SQL handling for review notes and metadata updates."
   }
 }

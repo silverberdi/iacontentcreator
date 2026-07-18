@@ -32,8 +32,8 @@ Completed:
 
 Remaining for Wave 1:
 
-- Harden legacy Asset Review workflow SQL handling for review notes with special characters.
 - Use the runbook in at least one live production cycle and capture gaps.
+- No known technical US remain open in Wave 1.
 
 ## Canonical Backlog
 

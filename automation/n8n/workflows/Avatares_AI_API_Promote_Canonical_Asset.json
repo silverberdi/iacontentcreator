@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-31T20:37:47.612Z",
+  "updatedAt": "2026-07-18T14:45:00.000Z",
   "createdAt": "2026-05-31T20:37:47.612Z",
   "id": "cyUCEEhmf08qOeAT",
   "name": "Avatares AI - API - Promote Canonical Asset",
@@ -26,7 +26,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst input = $json.body || $json;\n\nif (!input.assetId) {\n  throw new Error('Missing required field: assetId');\n}\n\nreturn [{\n  json: {\n    assetId: input.assetId,\n    reviewNotes: input.reviewNotes || 'Promoted via API',\n    baseUrl: input.baseUrl || 'http://192.168.0.194:9000'\n  }\n}];\n"
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\n\nconst input = $json.body || $json;\nconst assetId = String(input.assetId || '').trim();\nconst reviewNotes = String(input.reviewNotes || 'Promoted via API').trim();\nconst baseUrl = String(input.baseUrl || 'http://192.168.0.194:9000').replace(/[/]$/, '');\n\nif (!assetId) {\n  throw new Error('Missing required field: assetId');\n}\n\nreturn [{\n  json: {\n    assetId,\n    assetIdSql: sql(assetId),\n    reviewNotes,\n    reviewNotesSql: sql(reviewNotes),\n    reviewNotesJsonSql: sql(JSON.stringify(reviewNotes)),\n    baseUrl\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -40,7 +40,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nSELECT\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  sha256,\n  created_at,\n  CONCAT(avatar, ':', scene, ':', asset_type) AS target_canonical_group\nFROM canonical_asset_registry\nWHERE asset_id = '{{ $(\"Normalize Promote Request\").first().json.assetId }}'\nLIMIT 1;\n",
+        "query": "\nSELECT\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  sha256,\n  created_at,\n  CONCAT(avatar, ':', scene, ':', asset_type) AS target_canonical_group\nFROM canonical_asset_registry\nWHERE asset_id = {{ $(\"Normalize Promote Request\").first().json.assetIdSql }}\nLIMIT 1;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -62,7 +62,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nUPDATE canonical_asset_registry\nSET\n  is_canonical = false,\n  status = 'selected',\n  metadata = jsonb_set(\n    jsonb_set(\n      metadata,\n      '{status}',\n      '\"selected\"'\n    ),\n    '{isCanonical}',\n    'false'\n  )\nWHERE canonical_group = '{{ $(\"Get Target Asset\").first().json.target_canonical_group }}'\n  AND is_canonical = true\n  AND asset_id <> '{{ $(\"Get Target Asset\").first().json.asset_id }}';\n",
+        "query": "\nUPDATE canonical_asset_registry\nSET\n  is_canonical = false,\n  status = 'selected',\n  metadata = jsonb_set(\n    jsonb_set(\n      COALESCE(metadata, '{}'::jsonb),\n      '{status}',\n      '\"selected\"'::jsonb,\n      true\n    ),\n    '{isCanonical}',\n    'false'::jsonb,\n    true\n  )\nWHERE canonical_group = '{{ $(\"Get Target Asset\").first().json.target_canonical_group }}'\n  AND is_canonical = true\n  AND asset_id <> '{{ $(\"Get Target Asset\").first().json.asset_id }}';\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -84,7 +84,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nUPDATE canonical_asset_registry\nSET\n  is_canonical = true,\n  status = 'canonical',\n  canonical_group = '{{ $(\"Get Target Asset\").first().json.target_canonical_group }}',\n  review_notes = '{{ $(\"Normalize Promote Request\").first().json.reviewNotes }}',\n  metadata = jsonb_set(\n    jsonb_set(\n      jsonb_set(\n        jsonb_set(\n          metadata,\n          '{status}',\n          '\"canonical\"'\n        ),\n        '{isCanonical}',\n        'true'\n      ),\n      '{reviewNotes}',\n      '\"{{ $(\"Normalize Promote Request\").first().json.reviewNotes }}\"'\n    ),\n    '{canonicalGroup}',\n    '\"{{ $(\"Get Target Asset\").first().json.target_canonical_group }}\"'\n  )\nWHERE asset_id = '{{ $(\"Get Target Asset\").first().json.asset_id }}'\nRETURNING\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  sha256,\n  canonical_group,\n  review_notes,\n  created_at;\n",
+        "query": "\nUPDATE canonical_asset_registry\nSET\n  is_canonical = true,\n  status = 'canonical',\n  canonical_group = '{{ $(\"Get Target Asset\").first().json.target_canonical_group }}',\n  review_notes = {{ $(\"Normalize Promote Request\").first().json.reviewNotesSql }},\n  metadata = jsonb_set(\n    jsonb_set(\n      jsonb_set(\n        jsonb_set(\n          COALESCE(metadata, '{}'::jsonb),\n          '{status}',\n          '\"canonical\"'::jsonb,\n          true\n        ),\n        '{isCanonical}',\n        'true'::jsonb,\n        true\n      ),\n      '{reviewNotes}',\n      {{ $(\"Normalize Promote Request\").first().json.reviewNotesJsonSql }}::jsonb,\n      true\n    ),\n    '{canonicalGroup}',\n    to_jsonb('{{ $(\"Get Target Asset\").first().json.target_canonical_group }}'::text),\n    true\n  )\nWHERE asset_id = '{{ $(\"Get Target Asset\").first().json.asset_id }}'\nRETURNING\n  asset_id,\n  avatar,\n  asset_type,\n  scene,\n  bucket,\n  object_path,\n  mime_type,\n  status,\n  sha256,\n  canonical_group,\n  review_notes,\n  created_at;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -207,9 +207,9 @@
   "staticData": null,
   "meta": null,
   "pinData": {},
-  "versionId": "6258100a-65bb-4ced-b97b-2b1ecd2acef7",
-  "activeVersionId": "6258100a-65bb-4ced-b97b-2b1ecd2acef7",
-  "versionCounter": 53,
+  "versionId": "asset-review-promote-sql-hardened-v1",
+  "activeVersionId": "asset-review-promote-sql-hardened-v1",
+  "versionCounter": 54,
   "triggerCount": 1,
   "tags": [],
   "shared": [
@@ -232,7 +232,7 @@
     }
   ],
   "versionMetadata": {
-    "name": "Asset Review API v1",
-    "description": "Initial webhook endpoint for promoting canonical assets."
+    "name": "Asset Review API v2",
+    "description": "Harden SQL handling for review notes and metadata updates."
   }
 }

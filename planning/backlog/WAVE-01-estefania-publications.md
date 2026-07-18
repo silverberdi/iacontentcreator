@@ -810,7 +810,7 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 
 ## US-016 — Harden Legacy Asset Review Workflow SQL Handling
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-03 Asset Review  
 Wave: Wave 1  
@@ -821,20 +821,26 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 
 ### Acceptance Criteria
 
-- [ ] Promote canonical accepts review notes containing apostrophes and quotes.
-- [ ] Reject asset accepts review notes containing apostrophes and quotes.
-- [ ] Metadata updates always use `COALESCE(metadata, '{}'::jsonb)`.
-- [ ] Validation test covers normal notes and notes with special characters.
+- [x] Promote canonical accepts review notes containing apostrophes and quotes.
+- [x] Reject asset accepts review notes containing apostrophes and quotes.
+- [x] Metadata updates always use `COALESCE(metadata, '{}'::jsonb)`.
+- [x] Validation test covers normal notes and notes with special characters.
 
 ### Technical Tasks
 
-- [ ] Refactor SQL builders in legacy promote/reject workflows to use escaped values consistently.
-- [ ] Re-import and publish updated workflows in n8n.
-- [ ] Run endpoint tests and verify Postgres state.
+- [x] Refactor SQL builders in legacy promote/reject workflows to use escaped values consistently.
+- [x] Re-import and publish updated workflows in n8n.
+- [x] Run endpoint tests and verify Postgres state.
 
 ### Dependencies
 
 - US-014.
+
+### Notes
+
+- Hardened `Avatares AI - API - Promote Canonical Asset` and `Avatares AI - API - Reject Asset`.
+- Validated on July 18, 2026 with synthetic `us016-validation` assets and review notes containing apostrophes and double quotes.
+- Confirmed both `review_notes` and `metadata.reviewNotes` persist the exact text.
 
 ---
 
@@ -860,5 +866,5 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 - [x] US-010 — Publication Job Timeline
 - [x] US-012 — Operator Home / Next Action View
 - [x] US-013 — Publication Job Error Handling And Retry
-- [ ] US-016 — Harden Legacy Asset Review Workflow SQL Handling
+- [x] US-016 — Harden Legacy Asset Review Workflow SQL Handling
 - [x] US-015 — Wave 1 Runbook
