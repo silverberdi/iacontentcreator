@@ -1,0 +1,101 @@
+{
+  "updatedAt": "2026-07-18T00:00:00.000Z",
+  "createdAt": "2026-07-18T00:00:00.000Z",
+  "id": "AvAIPubError01",
+  "name": "Avatares AI - Publications - Record Error",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/record-error",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "record-error-001",
+      "name": "POST /publications/jobs/record-error",
+      "webhookId": "publication-job-record-error-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) { return sql(JSON.stringify(value ?? {})) + '::jsonb'; }\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst failedStep = String(body.failedStep || body.failed_step || '').trim();\nconst errorMessage = String(body.errorMessage || body.error_message || body.error || '').trim();\nconst technicalDetails = body.technicalDetails && typeof body.technicalDetails === 'object' ? body.technicalDetails : {};\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst retryableSteps = new Set(['generate-brief', 'generate-prompt-pack', 'generate-images', 'generate-copy-pack']);\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nif (!failedStep || !errorMessage) {\n  return [{ json: { query: \"SELECT false AS ok, 'failedStep and errorMessage are required' AS error;\" } }];\n}\nconst retryable = retryableSteps.has(failedStep);\nconst query = `\nCREATE TABLE IF NOT EXISTS publication_job_events (\n  event_id text PRIMARY KEY DEFAULT md5(random()::text || clock_timestamp()::text),\n  publication_job_id uuid NOT NULL,\n  event_type text NOT NULL,\n  event_label text NOT NULL,\n  event_status text NOT NULL DEFAULT 'completed',\n  event_payload jsonb NOT NULL DEFAULT '{}'::jsonb,\n  error_message text,\n  created_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_publication_job_events_job_created\n  ON publication_job_events (publication_job_id, created_at);\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), updated AS (\n  UPDATE publication_jobs pj\n  SET\n    status = 'failed',\n    error_message = ${sql(errorMessage)},\n    updated_at = now(),\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'lastError', jsonb_build_object(\n        'failedStep', ${sql(failedStep)},\n        'message', ${sql(errorMessage)},\n        'previousStatus', (SELECT status FROM job),\n        'retryable', ${retryable ? 'true' : 'false'},\n        'recordedAt', now(),\n        'technicalDetails', ${sqlJson(technicalDetails)}\n      )\n    )\n  WHERE pj.publication_job_id = ${sql(publicationJobId)}::uuid\n    AND EXISTS (SELECT 1 FROM job)\n  RETURNING pj.*\n), event AS (\n  INSERT INTO publication_job_events (\n    publication_job_id,\n    event_type,\n    event_label,\n    event_status,\n    event_payload,\n    error_message,\n    created_at\n  )\n  SELECT\n    publication_job_id,\n    'step-failed',\n    'Publication step failed',\n    'failed',\n    jsonb_build_object('failedStep', ${sql(failedStep)}, 'previousStatus', (SELECT status FROM job), 'retryable', ${retryable ? 'true' : 'false'}, 'technicalDetails', ${sqlJson(technicalDetails)}),\n    ${sql(errorMessage)},\n    now()\n  FROM updated\n  RETURNING event_id\n)\nSELECT\n  CASE WHEN EXISTS (SELECT 1 FROM updated) THEN true ELSE false END AS ok,\n  CASE WHEN EXISTS (SELECT 1 FROM updated) THEN NULL ELSE 'Publication job not found' END AS error,\n  (SELECT publication_job_id FROM updated) AS \"publicationJobId\",\n  (SELECT avatar FROM updated) AS avatar,\n  (SELECT scene FROM updated) AS scene,\n  (SELECT format FROM updated) AS format,\n  (SELECT objective FROM updated) AS objective,\n  (SELECT business_profile FROM updated) AS \"businessProfile\",\n  (SELECT asset_type FROM updated) AS \"assetType\",\n  (SELECT status FROM updated) AS status,\n  (SELECT brief FROM updated) AS brief,\n  (SELECT prompt_pack FROM updated) AS \"promptPack\",\n  (SELECT publishing_pack FROM updated) AS \"publishingPack\",\n  (SELECT metadata->'publishingExport' FROM updated) AS \"publishingExport\",\n  (SELECT metadata->'publishedRecord' FROM updated) AS \"publishedRecord\",\n  (SELECT error_message FROM updated) AS \"errorMessage\",\n  (SELECT created_at FROM updated) AS \"createdAt\",\n  (SELECT updated_at FROM updated) AS \"updatedAt\";\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [256, 0],
+      "id": "record-error-002",
+      "name": "Build Record Error Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [512, 0],
+      "id": "record-error-003",
+      "name": "Record Publication Error",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nconst row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, recorded: false, error: row.error || 'Publication job error was not recorded.' } }];\n}\nreturn [{ json: { ok: true, recorded: true, job: {\n  publicationJobId: row.publicationJobId,\n  avatar: row.avatar,\n  scene: row.scene,\n  format: row.format,\n  objective: row.objective,\n  businessProfile: row.businessProfile,\n  assetType: row.assetType,\n  status: row.status,\n  brief: parse(row.brief, null),\n  promptPack: parse(row.promptPack, null),\n  publishingPack: parse(row.publishingPack, null),\n  publishingExport: parse(row.publishingExport, null),\n  publishedRecord: parse(row.publishedRecord, null),\n  errorMessage: row.errorMessage,\n  createdAt: row.createdAt,\n  updatedAt: row.updatedAt\n} } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [768, 0],
+      "id": "record-error-004",
+      "name": "Return Recorded Error"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1024, 0],
+      "id": "record-error-005",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/record-error": {
+      "main": [[{ "node": "Build Record Error Query", "type": "main", "index": 0 }]]
+    },
+    "Build Record Error Query": {
+      "main": [[{ "node": "Record Publication Error", "type": "main", "index": 0 }]]
+    },
+    "Record Publication Error": {
+      "main": [[{ "node": "Return Recorded Error", "type": "main", "index": 0 }]]
+    },
+    "Return Recorded Error": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "publication-record-error-v1",
+  "activeVersionId": "publication-record-error-v1",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

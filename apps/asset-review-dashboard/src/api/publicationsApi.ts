@@ -26,6 +26,11 @@ import type {
   PublicationJobLoadItem,
   PublicationJobsSummary,
   PublicationJobTimeline,
+  PublicationRetryStep,
+  RecordPublicationJobErrorPayload,
+  RecordPublicationJobErrorResponse,
+  RetryPublicationJobPayload,
+  RetryPublicationJobResponse,
   SelectPublicationAssetPayload,
   SelectPublicationAssetResponse,
   SelectPublicationAssetResult,
@@ -169,6 +174,34 @@ export async function loadPublicationJobsSummary(
     throw new Error(data.error || data.reason || data.message || "Publication job summary could not be loaded.");
   }
   return data.summary;
+}
+
+export async function recordPublicationJobError(
+  payload: RecordPublicationJobErrorPayload,
+): Promise<PublicationJob> {
+  const data = await postN8nJson<RecordPublicationJobErrorResponse>(
+    "/publications/jobs/record-error",
+    payload,
+  );
+  const job = data.job;
+  if (!data.ok || !data.recorded || !job?.publicationJobId) {
+    throw new Error(data.error || data.reason || data.message || "Publication job error could not be recorded.");
+  }
+  return job;
+}
+
+export async function retryPublicationJob(
+  payload: RetryPublicationJobPayload,
+): Promise<{ job: PublicationJob; retryStep: PublicationRetryStep }> {
+  const data = await postN8nJson<RetryPublicationJobResponse>(
+    "/publications/jobs/retry",
+    payload,
+  );
+  const job = data.job;
+  if (!data.ok || !data.retry || !job?.publicationJobId || !data.retryStep) {
+    throw new Error(data.error || data.reason || data.message || "Publication job retry could not be prepared.");
+  }
+  return { job, retryStep: data.retryStep };
 }
 
 export async function ingestComfyOutput(

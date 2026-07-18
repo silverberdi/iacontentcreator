@@ -1,0 +1,101 @@
+{
+  "updatedAt": "2026-07-18T00:00:00.000Z",
+  "createdAt": "2026-07-18T00:00:00.000Z",
+  "id": "AvAIPubRetry01",
+  "name": "Avatares AI - Publications - Retry Job",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/retry",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "retry-001",
+      "name": "POST /publications/jobs/retry",
+      "webhookId": "publication-job-retry-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst requestedStep = String(body.retryStep || body.retry_step || '').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst retryableSteps = new Set(['generate-brief', 'generate-prompt-pack', 'generate-images', 'generate-copy-pack']);\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst query = `\nCREATE TABLE IF NOT EXISTS publication_job_events (\n  event_id text PRIMARY KEY DEFAULT md5(random()::text || clock_timestamp()::text),\n  publication_job_id uuid NOT NULL,\n  event_type text NOT NULL,\n  event_label text NOT NULL,\n  event_status text NOT NULL DEFAULT 'completed',\n  event_payload jsonb NOT NULL DEFAULT '{}'::jsonb,\n  error_message text,\n  created_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_publication_job_events_job_created\n  ON publication_job_events (publication_job_id, created_at);\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), retry_context AS (\n  SELECT\n    COALESCE(NULLIF(${sql(requestedStep)}, ''), metadata->'lastError'->>'failedStep') AS retry_step,\n    COALESCE(NULLIF(metadata->'lastError'->>'previousStatus', ''), status) AS previous_status,\n    COALESCE((metadata->'lastError'->>'retryable')::boolean, false) AS retryable\n  FROM job\n), validation AS (\n  SELECT CASE\n    WHEN NOT EXISTS (SELECT 1 FROM job) THEN 'Publication job not found'\n    WHEN (SELECT status FROM job) <> 'failed' THEN 'Only failed publication jobs can be retried'\n    WHEN NOT ((SELECT retry_step FROM retry_context) IN ('generate-brief', 'generate-prompt-pack', 'generate-images', 'generate-copy-pack')) THEN 'This failed step is not retryable from the console yet'\n    ELSE NULL\n  END AS error\n), updated AS (\n  UPDATE publication_jobs pj\n  SET\n    status = (SELECT previous_status FROM retry_context),\n    error_message = NULL,\n    updated_at = now(),\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'lastRetry', jsonb_build_object(\n        'retryStep', (SELECT retry_step FROM retry_context),\n        'restoredStatus', (SELECT previous_status FROM retry_context),\n        'requestedAt', now()\n      )\n    )\n  WHERE pj.publication_job_id = ${sql(publicationJobId)}::uuid\n    AND (SELECT error FROM validation) IS NULL\n  RETURNING pj.*\n), event AS (\n  INSERT INTO publication_job_events (\n    publication_job_id,\n    event_type,\n    event_label,\n    event_status,\n    event_payload,\n    created_at\n  )\n  SELECT\n    publication_job_id,\n    'retry-requested',\n    'Retry requested from console',\n    'completed',\n    jsonb_build_object('retryStep', (SELECT retry_step FROM retry_context), 'restoredStatus', (SELECT previous_status FROM retry_context)),\n    now()\n  FROM updated\n  RETURNING event_id\n)\nSELECT\n  CASE WHEN (SELECT error FROM validation) IS NULL THEN true ELSE false END AS ok,\n  (SELECT error FROM validation) AS error,\n  (SELECT retry_step FROM retry_context) AS \"retryStep\",\n  (SELECT publication_job_id FROM updated) AS \"publicationJobId\",\n  (SELECT avatar FROM updated) AS avatar,\n  (SELECT scene FROM updated) AS scene,\n  (SELECT format FROM updated) AS format,\n  (SELECT objective FROM updated) AS objective,\n  (SELECT business_profile FROM updated) AS \"businessProfile\",\n  (SELECT asset_type FROM updated) AS \"assetType\",\n  (SELECT status FROM updated) AS status,\n  (SELECT brief FROM updated) AS brief,\n  (SELECT prompt_pack FROM updated) AS \"promptPack\",\n  (SELECT publishing_pack FROM updated) AS \"publishingPack\",\n  (SELECT metadata->'publishingExport' FROM updated) AS \"publishingExport\",\n  (SELECT metadata->'publishedRecord' FROM updated) AS \"publishedRecord\",\n  (SELECT error_message FROM updated) AS \"errorMessage\",\n  (SELECT created_at FROM updated) AS \"createdAt\",\n  (SELECT updated_at FROM updated) AS \"updatedAt\";\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [256, 0],
+      "id": "retry-002",
+      "name": "Build Retry Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [512, 0],
+      "id": "retry-003",
+      "name": "Prepare Publication Retry",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nconst row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, retry: false, error: row.error || 'Publication job retry could not be prepared.' } }];\n}\nreturn [{ json: { ok: true, retry: true, retryStep: row.retryStep, job: {\n  publicationJobId: row.publicationJobId,\n  avatar: row.avatar,\n  scene: row.scene,\n  format: row.format,\n  objective: row.objective,\n  businessProfile: row.businessProfile,\n  assetType: row.assetType,\n  status: row.status,\n  brief: parse(row.brief, null),\n  promptPack: parse(row.promptPack, null),\n  publishingPack: parse(row.publishingPack, null),\n  publishingExport: parse(row.publishingExport, null),\n  publishedRecord: parse(row.publishedRecord, null),\n  errorMessage: row.errorMessage,\n  createdAt: row.createdAt,\n  updatedAt: row.updatedAt\n} } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [768, 0],
+      "id": "retry-004",
+      "name": "Return Retry"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1024, 0],
+      "id": "retry-005",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/retry": {
+      "main": [[{ "node": "Build Retry Query", "type": "main", "index": 0 }]]
+    },
+    "Build Retry Query": {
+      "main": [[{ "node": "Prepare Publication Retry", "type": "main", "index": 0 }]]
+    },
+    "Prepare Publication Retry": {
+      "main": [[{ "node": "Return Retry", "type": "main", "index": 0 }]]
+    },
+    "Return Retry": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "publication-retry-v1",
+  "activeVersionId": "publication-retry-v1",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

@@ -10,6 +10,8 @@ import {
   listPublicationJobs,
   loadPublicationTimeline,
   markPublicationPublished,
+  recordPublicationJobError,
+  retryPublicationJob,
   selectPublicationAsset,
 } from "../api/publicationsApi";
 import { avatarProfileSummaries } from "../data/avatarProfiles";
@@ -28,6 +30,7 @@ import type {
   PublicationJobTimeline,
   PublicationJob,
   PublicationPromptPack,
+  PublicationRetryStep,
 } from "../types/publications";
 import { findAvatarShort, optionLabel, scenesForAvatar } from "../utils/catalogNormalize";
 import CatalogSelect from "./CatalogSelect";
@@ -40,6 +43,7 @@ type PublicationsPanelProps = {
   catalogOptionsLoading?: boolean;
   initialPublicationJobId?: string | null;
   onInitialPublicationJobLoaded?: () => void;
+  technicalMode?: boolean;
 };
 
 const inputClass =
@@ -55,6 +59,7 @@ export default function PublicationsPanel({
   catalogOptionsLoading = false,
   initialPublicationJobId = null,
   onInitialPublicationJobLoaded,
+  technicalMode = false,
 }: PublicationsPanelProps) {
   const [avatar, setAvatar] = useState<string>(defaultFilters.avatar);
   const [scene, setScene] = useState<string>(defaultFilters.scene);
@@ -95,6 +100,7 @@ export default function PublicationsPanel({
   const [timeline, setTimeline] = useState<PublicationJobTimeline | null>(null);
   const [timelineBusy, setTimelineBusy] = useState(false);
   const [timelineMessage, setTimelineMessage] = useState<string | null>(null);
+  const [retryBusy, setRetryBusy] = useState(false);
   const [loadJobId, setLoadJobId] = useState("");
   const [recentJobs, setRecentJobs] = useState<PublicationJobLoadItem[]>([]);
   const [loadBusy, setLoadBusy] = useState(false);
@@ -127,6 +133,45 @@ export default function PublicationsPanel({
   const avatarShort = findAvatarShort(catalogOptions, avatar);
   const avatarProfile = avatarProfileSummaries[avatar];
   const canCreate = Boolean(avatar && scene && format && objective.trim());
+  const retryableFailedStep = useMemo(() => {
+    if (createdJob?.status !== "failed" || !timeline?.events.length) return null;
+    const failedEvent = [...timeline.events]
+      .reverse()
+      .find((event) => event.eventType === "step-failed");
+    const failedStep = failedEvent?.payload?.failedStep;
+    return typeof failedStep === "string" ? failedStep : null;
+  }, [createdJob?.status, timeline?.events]);
+
+  const canRetryFromConsole =
+    retryableFailedStep === "generate-brief" ||
+    retryableFailedStep === "generate-prompt-pack" ||
+    retryableFailedStep === "generate-images" ||
+    retryableFailedStep === "generate-copy-pack";
+
+  async function handleStepFailure(
+    failedStep: PublicationRetryStep,
+    err: unknown,
+    fallbackMessage: string,
+  ) {
+    const message = err instanceof Error ? err.message : fallbackMessage;
+    setError(message);
+    if (!createdJob?.publicationJobId) return;
+    try {
+      const failedJob = await recordPublicationJobError({
+        publicationJobId: createdJob.publicationJobId,
+        failedStep,
+        errorMessage: message,
+        technicalDetails: {
+          uiStep: failedStep,
+          previousStatus: createdJob.status,
+        },
+      });
+      setCreatedJob(failedJob);
+      void refreshTimeline(failedJob.publicationJobId);
+    } catch {
+      // Keep the original operator-facing error visible even if error recording fails.
+    }
+  }
 
   useEffect(() => {
     const publicationJobId = initialPublicationJobId?.trim();
@@ -352,7 +397,7 @@ export default function PublicationsPanel({
       }
       setBriefMessage(options.saveEdited ? "Brief saved." : "Brief generated.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate publication brief");
+      await handleStepFailure("generate-brief", err, "Failed to generate publication brief");
     } finally {
       setBriefBusy(false);
     }
@@ -391,7 +436,7 @@ export default function PublicationsPanel({
       setPublishMessage(null);
       setPromptPackMessage(options.saveEdited ? "Prompt pack saved." : "Prompt pack generated.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate publication prompt pack");
+      await handleStepFailure("generate-prompt-pack", err, "Failed to generate publication prompt pack");
     } finally {
       setPromptPackBusy(false);
     }
@@ -421,7 +466,7 @@ export default function PublicationsPanel({
       setPublishMessage(null);
       setGenerationMessage("Generation job submitted.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit image generation");
+      await handleStepFailure("generate-images", err, "Failed to submit image generation");
     } finally {
       setGenerationBusy(false);
     }
@@ -470,7 +515,7 @@ export default function PublicationsPanel({
       );
       setGenerationMessage("Comfy output ingested.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to ingest Comfy output");
+      await handleStepFailure("ingest-output", err, "Failed to ingest Comfy output");
     } finally {
       setIngestBusy(false);
     }
@@ -521,7 +566,7 @@ export default function PublicationsPanel({
       );
       setGenerationMessage("Publication asset selected.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to select publication asset");
+      await handleStepFailure("select-asset", err, "Failed to select publication asset");
     } finally {
       setSelectAssetBusy(false);
     }
@@ -555,7 +600,7 @@ export default function PublicationsPanel({
       setPublishedRecord(null);
       setPublishMessage(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate publication copy pack");
+      await handleStepFailure("generate-copy-pack", err, "Failed to generate publication copy pack");
     } finally {
       setCopyPackBusy(false);
     }
@@ -581,7 +626,7 @@ export default function PublicationsPanel({
       setPublishPlatform(result.publishingExport.platform || "instagram");
       setExportMessage("Publishing pack exported.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to export publishing pack");
+      await handleStepFailure("export-pack", err, "Failed to export publishing pack");
     } finally {
       setExportBusy(false);
     }
@@ -606,9 +651,65 @@ export default function PublicationsPanel({
       setPublishedRecord(result.publishedRecord);
       setPublishMessage("Publication marked as published.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to mark publication as published");
+      await handleStepFailure("mark-published", err, "Failed to mark publication as published");
     } finally {
       setPublishBusy(false);
+    }
+  }
+
+  async function handleRetryFailedStep() {
+    if (!createdJob?.publicationJobId || !canRetryFromConsole || !retryableFailedStep) return;
+    setRetryBusy(true);
+    setError(null);
+    setTimelineMessage(null);
+
+    try {
+      const prepared = await retryPublicationJob({
+        publicationJobId: createdJob.publicationJobId,
+        retryStep: retryableFailedStep,
+      });
+      setCreatedJob(prepared.job);
+
+      if (prepared.retryStep === "generate-brief") {
+        const result = await generatePublicationBrief({
+          publicationJobId: prepared.job.publicationJobId,
+        });
+        setCreatedJob(result.job);
+        setBriefText(JSON.stringify(result.brief, null, 2));
+        setBriefMessage("Brief generated after retry.");
+      } else if (prepared.retryStep === "generate-prompt-pack") {
+        const result = await generatePublicationPromptPack({
+          publicationJobId: prepared.job.publicationJobId,
+        });
+        setCreatedJob(result.job);
+        setPromptPackText(JSON.stringify(result.promptPack, null, 2));
+        setPromptPackMessage("Prompt pack generated after retry.");
+      } else if (prepared.retryStep === "generate-images") {
+        const result = await generatePublicationImages({
+          publicationJobId: prepared.job.publicationJobId,
+          mode: "comfy-cloud-api",
+        });
+        setCreatedJob(result.job);
+        setGeneration(result.generation);
+        setGenerationMessage("Generation job submitted after retry.");
+      } else if (prepared.retryStep === "generate-copy-pack") {
+        const result = await generatePublicationCopyPack({
+          publicationJobId: prepared.job.publicationJobId,
+        });
+        setCreatedJob(result.job);
+        setCopyPackText(JSON.stringify(result.copyPack, null, 2));
+        setCopyPackMessage("Copy pack generated after retry.");
+      }
+
+      void refreshTimeline(prepared.job.publicationJobId);
+    } catch (err) {
+      await handleStepFailure(
+        retryableFailedStep,
+        err,
+        "Failed to retry publication step",
+      );
+    } finally {
+      setRetryBusy(false);
     }
   }
 
@@ -921,6 +1022,21 @@ export default function PublicationsPanel({
                   {timeline.errorMessage}
                 </p>
               )}
+              {canRetryFromConsole && (
+                <button
+                  type="button"
+                  onClick={() => void handleRetryFailedStep()}
+                  disabled={retryBusy}
+                  className="mt-4 w-full rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                >
+                  {retryBusy ? "Retrying..." : `Retry ${retryableFailedStep}`}
+                </button>
+              )}
+              {createdJob.status === "failed" && !canRetryFromConsole && (
+                <p className="mt-4 rounded-md border border-amber-800/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
+                  This failure needs manual review or a dedicated retry handler.
+                </p>
+              )}
             </div>
 
             <div className="rounded-md border border-border bg-surface p-4">
@@ -946,9 +1062,11 @@ export default function PublicationsPanel({
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-100">{event.label}</p>
-                        <p className="mt-1 font-mono text-xs text-gray-500">
-                          {event.eventType}
-                        </p>
+                        {technicalMode && (
+                          <p className="mt-1 font-mono text-xs text-gray-500">
+                            {event.eventType}
+                          </p>
+                        )}
                         {event.errorMessage && (
                           <p className="mt-2 rounded-md border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
                             {event.errorMessage}

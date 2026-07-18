@@ -507,6 +507,7 @@ export default function App({ currentUser }: AppProps) {
                 catalogOptionsLoading={catalogOptionsLoading}
                 initialPublicationJobId={publicationJobToOpen}
                 onInitialPublicationJobLoaded={() => setPublicationJobToOpen(null)}
+                technicalMode={technicalMode}
               />
             </div>
           )}

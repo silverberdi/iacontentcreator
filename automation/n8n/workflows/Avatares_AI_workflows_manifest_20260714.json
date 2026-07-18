@@ -1,8 +1,8 @@
 {
   "exportedAt": "2026-07-14",
   "source": "ssh://silverman@192.168.0.194 docker exec local-ai-stack-n8n-1 n8n export:workflow --all",
-  "totalExported": 55,
-  "avataresWorkflows": 55,
+  "totalExported": 57,
+  "avataresWorkflows": 57,
   "workflows": [
     {
       "name": "Avatares AI - Admin - Auto Ingest Health",
@@ -727,6 +727,34 @@
           "node": "POST /publications/jobs/summary",
           "method": "POST",
           "path": "publications/jobs/summary"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Publications - Record Error",
+      "id": "AvAIPubError01",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Publications_Record_Error.json",
+      "webhooks": [
+        {
+          "node": "POST /publications/jobs/record-error",
+          "method": "POST",
+          "path": "publications/jobs/record-error"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Publications - Retry Job",
+      "id": "AvAIPubRetry01",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Publications_Retry_Job.json",
+      "webhooks": [
+        {
+          "node": "POST /publications/jobs/retry",
+          "method": "POST",
+          "path": "publications/jobs/retry"
         }
       ]
     },

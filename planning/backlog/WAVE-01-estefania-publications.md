@@ -697,7 +697,7 @@ As an operator, I want a simple home screen that tells me what to do next, so th
 
 ## US-013 — Publication Job Error Handling And Retry
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-04 Admin Operations  
 Wave: Wave 1  
@@ -708,17 +708,17 @@ As an operator, I want clear errors and retry actions, so that failures do not r
 
 ### Acceptance Criteria
 
-- [ ] Failed jobs show a clear error message.
-- [ ] Operator can retry failed brief/copy/generation steps.
-- [ ] Retry creates a new event.
-- [ ] Technical error details are available only in technical mode.
+- [x] Failed jobs show a clear error message.
+- [x] Operator can retry failed brief/copy/generation steps.
+- [x] Retry creates a new event.
+- [x] Technical error details are available only in technical mode.
 
 ### Technical Tasks
 
-- [ ] Define retryable statuses.
-- [ ] Store error type, message, and raw details.
-- [ ] Add retry endpoints.
-- [ ] Add retry buttons in console.
+- [x] Define retryable statuses.
+- [x] Store error type, message, and raw details.
+- [x] Add retry endpoints.
+- [x] Add retry buttons in console.
 
 ### Dependencies
 
@@ -727,6 +727,7 @@ As an operator, I want clear errors and retry actions, so that failures do not r
 ### Notes
 
 - This can be incremental per step.
+- Implemented error recording with `POST /publications/jobs/record-error` and retry preparation with `POST /publications/jobs/retry`. Console retry is enabled for brief, prompt pack, image generation, and copy generation.
 
 ---
 
@@ -823,5 +824,5 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 
 - [x] US-010 — Publication Job Timeline
 - [x] US-012 — Operator Home / Next Action View
-- [ ] US-013 — Publication Job Error Handling And Retry
+- [x] US-013 — Publication Job Error Handling And Retry
 - [ ] US-015 — Wave 1 Runbook

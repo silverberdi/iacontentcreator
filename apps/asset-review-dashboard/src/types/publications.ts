@@ -27,6 +27,7 @@ export type PublicationJob = {
   publishingPack?: PublicationCopyPack | null;
   publishingExport?: PublicationPublishingExport | null;
   publishedRecord?: PublicationPublishedRecord | null;
+  errorMessage?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -250,6 +251,48 @@ export type LoadPublicationTimelineResponse = {
   message?: string;
   error?: string;
   reason?: string;
+};
+
+export type PublicationRetryStep =
+  | "generate-brief"
+  | "generate-prompt-pack"
+  | "generate-images"
+  | "generate-copy-pack"
+  | "ingest-output"
+  | "select-asset"
+  | "export-pack"
+  | "mark-published"
+  | string;
+
+export type RecordPublicationJobErrorPayload = {
+  publicationJobId: string;
+  failedStep: PublicationRetryStep;
+  errorMessage: string;
+  technicalDetails?: Record<string, unknown>;
+};
+
+export type RecordPublicationJobErrorResponse = {
+  ok?: boolean;
+  recorded?: boolean;
+  job?: PublicationJob;
+  error?: string;
+  reason?: string;
+  message?: string;
+};
+
+export type RetryPublicationJobPayload = {
+  publicationJobId: string;
+  retryStep?: PublicationRetryStep;
+};
+
+export type RetryPublicationJobResponse = {
+  ok?: boolean;
+  retry?: boolean;
+  retryStep?: PublicationRetryStep;
+  job?: PublicationJob;
+  error?: string;
+  reason?: string;
+  message?: string;
 };
 
 export type GeneratePublicationCopyPackPayload = {
