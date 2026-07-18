@@ -374,18 +374,37 @@ async function getComfyPublicationStatus(input = {}) {
   }
 
   const started = Date.now();
-  const historyUrl = `${COMFYUI_BASE_URL}${COMFYUI_API_PREFIX}/history/${encodeURIComponent(promptId)}`;
-  const response = await fetch(historyUrl, {
-    headers: {
-      [COMFYUI_AUTH_HEADER_NAME]: COMFYUI_API_KEY,
-    },
-  });
-  const text = await response.text();
+  const headers = {
+    [COMFYUI_AUTH_HEADER_NAME]: COMFYUI_API_KEY,
+  };
+  const endpoints = [
+    `${COMFYUI_BASE_URL}${COMFYUI_API_PREFIX}/jobs/${encodeURIComponent(promptId)}`,
+    `${COMFYUI_BASE_URL}${COMFYUI_API_PREFIX}/history/${encodeURIComponent(promptId)}`,
+  ];
+
+  let response;
+  let text = "";
   let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = null;
+  let endpoint = endpoints[0];
+  for (const candidate of endpoints) {
+    endpoint = candidate;
+    response = await fetch(candidate, { headers });
+    text = await response.text();
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+
+    const unavailableMessage = String(data?.error?.message || "");
+    if (
+      response.ok &&
+      data?.error?.type === "not_found" &&
+      unavailableMessage.includes("/api/jobs")
+    ) {
+      continue;
+    }
+    break;
   }
 
   if (response.status === 404) {
@@ -397,11 +416,12 @@ async function getComfyPublicationStatus(input = {}) {
       completed: false,
       outputs: [],
       response: data || text,
+      endpoint,
       latencyMs: Date.now() - started,
     };
   }
 
-  if (!response.ok) {
+  if (!response.ok || data?.error) {
     return {
       ok: false,
       provider: "comfy-cloud",
@@ -410,19 +430,24 @@ async function getComfyPublicationStatus(input = {}) {
       error: data?.error?.message || data?.message || text.slice(0, 300) || response.statusText,
       category: "provider_error",
       httpStatus: response.status,
+      endpoint,
       latencyMs: Date.now() - started,
     };
   }
 
   const outputs = collectComfyOutputImages(data, promptId);
+  const providerStatus = String(data?.status || data?.execution_status?.status_str || "").toLowerCase();
+  const completed = outputs.length > 0 || data?.execution_status?.completed === true || providerStatus === "completed" || providerStatus === "success";
+  const failed = providerStatus === "failed" || providerStatus === "error";
   return {
-    ok: true,
+    ok: !failed,
     provider: "comfy-cloud",
     promptId,
-    status: outputs.length ? "completed" : "running",
-    completed: outputs.length > 0,
+    status: failed ? "error" : completed ? "completed" : "running",
+    completed,
     outputs,
     response: data || text,
+    endpoint,
     latencyMs: Date.now() - started,
   };
 }
