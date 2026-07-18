@@ -733,7 +733,7 @@ As an operator, I want clear errors and retry actions, so that failures do not r
 
 ## US-014 — Validate Existing Asset Review Against Publication Flow
 
-Status: Ready  
+Status: Done  
 Priority: P0  
 Epic: EPIC-03 Asset Review  
 Wave: Wave 1  
@@ -744,19 +744,19 @@ As the product owner, I want to validate the existing Asset Review behavior agai
 
 ### Acceptance Criteria
 
-- [ ] Select asset works end-to-end.
-- [ ] Promote canonical works end-to-end.
-- [ ] Reject asset works end-to-end.
-- [ ] MinIO image URLs work from public/mobile access.
-- [ ] Actions update Postgres as expected.
-- [ ] Any mismatch is captured as follow-up US.
+- [x] Select asset works end-to-end.
+- [x] Promote canonical works end-to-end.
+- [x] Reject asset works end-to-end.
+- [x] MinIO image URLs work from public/mobile access.
+- [x] Actions update Postgres as expected.
+- [x] Any mismatch is captured as follow-up US.
 
 ### Technical Tasks
 
-- [ ] Test actions in deployed console.
-- [ ] Verify DB state after each action.
-- [ ] Verify UI refresh behavior.
-- [ ] Document issues as backlog items.
+- [x] Test actions in deployed console.
+- [x] Verify DB state after each action.
+- [x] Verify UI refresh behavior.
+- [x] Document issues as backlog items.
 
 ### Dependencies
 
@@ -765,8 +765,11 @@ As the product owner, I want to validate the existing Asset Review behavior agai
 ### Notes
 
 - This should be done before heavy publication-job integration.
-
----
+- Validated against deployed n8n/Postgres on July 18, 2026 with synthetic `us014-validation` assets.
+- `select`, `promote canonical`, and `reject` all update `canonical_asset_registry` as expected.
+- Fixed a URL mismatch where `/assets/select` returned the internal MinIO fallback (`http://192.168.0.194:9000`) because the console was not sending `baseUrl`. The console now sends the configured MinIO base URL for select actions too.
+- Public/mobile image access is through the authenticated console gateway URL, not anonymous MinIO access. Anonymous `HEAD` to `/minio/...` returns `401`, which is expected while the console is protected by login.
+- Follow-up captured in US-016 for SQL/string hardening in legacy Asset Review n8n workflows.
 
 ## US-015 — Wave 1 Runbook
 
@@ -803,6 +806,36 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 
 ---
 
+## US-016 — Harden Legacy Asset Review Workflow SQL Handling
+
+Status: Backlog  
+Priority: P1  
+Epic: EPIC-03 Asset Review  
+Wave: Wave 1  
+
+### User Story
+
+As a technical operator, I want legacy Asset Review workflows to handle free-text notes safely, so that review notes with quotes or special characters do not break SQL updates.
+
+### Acceptance Criteria
+
+- [ ] Promote canonical accepts review notes containing apostrophes and quotes.
+- [ ] Reject asset accepts review notes containing apostrophes and quotes.
+- [ ] Metadata updates always use `COALESCE(metadata, '{}'::jsonb)`.
+- [ ] Validation test covers normal notes and notes with special characters.
+
+### Technical Tasks
+
+- [ ] Refactor SQL builders in legacy promote/reject workflows to use escaped values consistently.
+- [ ] Re-import and publish updated workflows in n8n.
+- [ ] Run endpoint tests and verify Postgres state.
+
+### Dependencies
+
+- US-014.
+
+---
+
 ## Wave 1 Checklist
 
 ### P0
@@ -818,11 +851,12 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 - [x] US-008 — Export Publishing Pack
 - [x] US-009 — Mark Publication As Published
 - [x] US-011 — Estefanía Business Profile Configuration
-- [ ] US-014 — Validate Existing Asset Review Against Publication Flow
+- [x] US-014 — Validate Existing Asset Review Against Publication Flow
 
 ### P1
 
 - [x] US-010 — Publication Job Timeline
 - [x] US-012 — Operator Home / Next Action View
 - [x] US-013 — Publication Job Error Handling And Retry
+- [ ] US-016 — Harden Legacy Asset Review Workflow SQL Handling
 - [ ] US-015 — Wave 1 Runbook

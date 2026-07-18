@@ -131,6 +131,7 @@ export async function selectAsset(
   const result = await postN8nRequest<SelectAssetResponse>("/assets/select", {
     assetId,
     reviewNotes,
+    baseUrl: getMinioBaseUrl(),
   });
 
   return parseSelectAssetResponse(result.status, result.data, result.rawText);
