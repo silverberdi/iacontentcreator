@@ -196,6 +196,50 @@ export type PublicationJobTimeline = {
   events: PublicationTimelineEvent[];
 };
 
+export type PublicationJobSummary = {
+  publicationJobId: string;
+  avatar: string;
+  scene: string;
+  format: PublicationFormat | string;
+  objective: string;
+  businessProfile: string;
+  status: PublicationJobStatus;
+  createdAt: string;
+  updatedAt: string;
+  nextAction: PublicationNextAction;
+  errorMessage?: string | null;
+  generationJobId?: string | null;
+  selectedAssetId?: string | null;
+  publishedUrl?: string | null;
+};
+
+export type PublicationJobSummaryGroup = {
+  status: PublicationJobStatus;
+  count: number;
+  jobs: PublicationJobSummary[];
+};
+
+export type PublicationJobsSummary = {
+  groups: PublicationJobSummaryGroup[];
+  jobs: PublicationJobSummary[];
+  counts: Record<string, number>;
+};
+
+export type LoadPublicationJobsSummaryPayload = {
+  avatar?: string;
+  scene?: string;
+  includePublished?: boolean;
+  limit?: number;
+};
+
+export type LoadPublicationJobsSummaryResponse = {
+  ok?: boolean;
+  summary?: PublicationJobsSummary;
+  message?: string;
+  error?: string;
+  reason?: string;
+};
+
 export type LoadPublicationTimelinePayload = {
   publicationJobId: string;
 };

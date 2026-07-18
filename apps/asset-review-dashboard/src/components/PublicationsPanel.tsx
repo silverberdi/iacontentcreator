@@ -38,6 +38,8 @@ import SectionPanel from "./SectionPanel";
 type PublicationsPanelProps = {
   catalogOptions: CatalogOptionsBundle;
   catalogOptionsLoading?: boolean;
+  initialPublicationJobId?: string | null;
+  onInitialPublicationJobLoaded?: () => void;
 };
 
 const inputClass =
@@ -51,6 +53,8 @@ const formatOptions: { value: PublicationFormat; label: string }[] = [
 export default function PublicationsPanel({
   catalogOptions,
   catalogOptionsLoading = false,
+  initialPublicationJobId = null,
+  onInitialPublicationJobLoaded,
 }: PublicationsPanelProps) {
   const [avatar, setAvatar] = useState<string>(defaultFilters.avatar);
   const [scene, setScene] = useState<string>(defaultFilters.scene);
@@ -123,6 +127,44 @@ export default function PublicationsPanel({
   const avatarShort = findAvatarShort(catalogOptions, avatar);
   const avatarProfile = avatarProfileSummaries[avatar];
   const canCreate = Boolean(avatar && scene && format && objective.trim());
+
+  useEffect(() => {
+    const publicationJobId = initialPublicationJobId?.trim();
+    if (!publicationJobId) return;
+    const requestedPublicationJobId = publicationJobId;
+
+    let cancelled = false;
+    async function loadInitialJob() {
+      setLoadBusy(true);
+      setError(null);
+      setLoadMessage(null);
+      try {
+        const jobs = await listPublicationJobs({ publicationJobId: requestedPublicationJobId, limit: 1 });
+        if (cancelled) return;
+        if (!jobs[0]) {
+          throw new Error("Publication job was not found.");
+        }
+        applyLoadedJob(jobs[0]);
+        setLoadJobId(requestedPublicationJobId);
+        setLoadMessage("Existing publication job loaded.");
+        onInitialPublicationJobLoaded?.();
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load publication job");
+          onInitialPublicationJobLoaded?.();
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadBusy(false);
+        }
+      }
+    }
+
+    void loadInitialJob();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPublicationJobId, onInitialPublicationJobLoaded]);
 
   async function refreshTimeline(publicationJobId: string) {
     setTimelineBusy(true);

@@ -659,7 +659,7 @@ As the system, I need a structured Estefanía business profile, so that prompts 
 
 ## US-012 — Operator Home / Next Action View
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-04 Admin Operations  
 Wave: Wave 1  
@@ -670,18 +670,18 @@ As an operator, I want a simple home screen that tells me what to do next, so th
 
 ### Acceptance Criteria
 
-- [ ] Home screen shows active publication jobs.
-- [ ] Jobs are grouped by status.
-- [ ] Each job shows the next action.
-- [ ] Operator can jump directly to the required step.
-- [ ] Technical details are hidden unless technical mode is enabled.
+- [x] Home screen shows active publication jobs.
+- [x] Jobs are grouped by status.
+- [x] Each job shows the next action.
+- [x] Operator can jump directly to the required step.
+- [x] Technical details are hidden unless technical mode is enabled.
 
 ### Technical Tasks
 
-- [ ] Add dashboard/home route or tab.
-- [ ] Create job summary endpoint.
-- [ ] Add next-action mapping by status.
-- [ ] Add UI cards/table for job queue.
+- [x] Add dashboard/home route or tab.
+- [x] Create job summary endpoint.
+- [x] Add next-action mapping by status.
+- [x] Add UI cards/table for job queue.
 
 ### Dependencies
 
@@ -691,6 +691,7 @@ As an operator, I want a simple home screen that tells me what to do next, so th
 ### Notes
 
 - This is important for making the system operable by someone other than the builder.
+- Implemented as the console `Home` tab backed by `POST /publications/jobs/summary`, grouped by status with next-action labels and direct jump into the publication job.
 
 ---
 
@@ -821,6 +822,6 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 ### P1
 
 - [x] US-010 — Publication Job Timeline
-- [ ] US-012 — Operator Home / Next Action View
+- [x] US-012 — Operator Home / Next Action View
 - [ ] US-013 — Publication Job Error Handling And Retry
 - [ ] US-015 — Wave 1 Runbook

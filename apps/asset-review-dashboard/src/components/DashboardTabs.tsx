@@ -1,8 +1,9 @@
 import PageContainer from "./PageContainer";
 
-export type DashboardTab = "review" | "publications" | "content-cycle" | "ops";
+export type DashboardTab = "home" | "review" | "publications" | "content-cycle" | "ops";
 
 const TABS: { id: DashboardTab; label: string }[] = [
+  { id: "home", label: "Home" },
   { id: "review", label: "Asset Review" },
   { id: "publications", label: "Publications" },
   { id: "content-cycle", label: "Content Cycle" },

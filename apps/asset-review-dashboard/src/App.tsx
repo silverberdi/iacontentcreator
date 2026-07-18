@@ -18,6 +18,7 @@ import ContentCyclePanel from "./components/content-cycle/ContentCyclePanel";
 import DashboardTabs, { type DashboardTab } from "./components/DashboardTabs";
 import PageContainer from "./components/PageContainer";
 import PublicationsPanel from "./components/PublicationsPanel";
+import OperatorHomePanel from "./components/OperatorHomePanel";
 import UserAccessPanel from "./components/UserAccessPanel";
 import { logout } from "./api/authApi";
 import { defaultFilters } from "./data/catalogs";
@@ -58,7 +59,8 @@ export default function App({ currentUser }: AppProps) {
     refresh: refreshCatalogOptions,
   } = useCatalogOptions();
 
-  const [activeTab, setActiveTab] = useState<DashboardTab>("review");
+  const [activeTab, setActiveTab] = useState<DashboardTab>("home");
+  const [publicationJobToOpen, setPublicationJobToOpen] = useState<string | null>(null);
   const [activeOpsSection, setActiveOpsSection] = useState<OpsSection>("auto-ingest");
   const [technicalMode, setTechnicalMode] = useState(false);
   const [filters, setFilters] = useState<ReviewFilters>({ ...defaultFilters });
@@ -171,6 +173,8 @@ export default function App({ currentUser }: AppProps) {
 
   const headerSubtitle = useMemo(() => {
     switch (activeTab) {
+      case "home":
+        return "What needs attention next";
       case "review":
         return "Review, promote, and reject generated avatar assets";
       case "publications":
@@ -186,6 +190,13 @@ export default function App({ currentUser }: AppProps) {
 
   const handleTabChange = (tab: DashboardTab) => {
     setActiveTab(tab);
+    setOperationMessage(null);
+    setError(null);
+  };
+
+  const handleOpenPublicationJob = (publicationJobId: string) => {
+    setPublicationJobToOpen(publicationJobId);
+    setActiveTab("publications");
     setOperationMessage(null);
     setError(null);
   };
@@ -424,6 +435,16 @@ export default function App({ currentUser }: AppProps) {
             </p>
           )}
 
+          {activeTab === "home" && (
+            <div role="tabpanel">
+              <OperatorHomePanel
+                catalogOptions={catalogOptions}
+                technicalMode={technicalMode}
+                onOpenPublicationJob={handleOpenPublicationJob}
+              />
+            </div>
+          )}
+
           {activeTab === "review" && (
             <div role="tabpanel" className="space-y-6">
               <FiltersPanel
@@ -484,6 +505,8 @@ export default function App({ currentUser }: AppProps) {
               <PublicationsPanel
                 catalogOptions={catalogOptions}
                 catalogOptionsLoading={catalogOptionsLoading}
+                initialPublicationJobId={publicationJobToOpen}
+                onInitialPublicationJobLoaded={() => setPublicationJobToOpen(null)}
               />
             </div>
           )}

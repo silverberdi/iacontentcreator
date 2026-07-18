@@ -17,11 +17,14 @@ import type {
   IngestComfyOutputResult,
   LoadPublicationTimelinePayload,
   LoadPublicationTimelineResponse,
+  LoadPublicationJobsSummaryPayload,
+  LoadPublicationJobsSummaryResponse,
   ListPublicationJobsPayload,
   ListPublicationJobsResponse,
   MarkPublicationPublishedPayload,
   MarkPublicationPublishedResponse,
   PublicationJobLoadItem,
+  PublicationJobsSummary,
   PublicationJobTimeline,
   SelectPublicationAssetPayload,
   SelectPublicationAssetResponse,
@@ -153,6 +156,19 @@ export async function loadPublicationTimeline(
     throw new Error(data.error || data.reason || data.message || "Publication timeline could not be loaded.");
   }
   return data.timeline;
+}
+
+export async function loadPublicationJobsSummary(
+  payload: LoadPublicationJobsSummaryPayload = {},
+): Promise<PublicationJobsSummary> {
+  const data = await postN8nJson<LoadPublicationJobsSummaryResponse>(
+    "/publications/jobs/summary",
+    payload,
+  );
+  if (!data.ok || !data.summary) {
+    throw new Error(data.error || data.reason || data.message || "Publication job summary could not be loaded.");
+  }
+  return data.summary;
 }
 
 export async function ingestComfyOutput(
