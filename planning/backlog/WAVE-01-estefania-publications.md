@@ -926,7 +926,7 @@ As the system, I want to make required reference images available to Comfy Cloud
 
 ## US-019 — Comfy Generation Preflight And Operator Error
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-04 Admin Operations  
 Wave: Wave 1  
@@ -1077,6 +1077,47 @@ As an operator, I want the console to refresh generating jobs automatically, so 
 
 ---
 
+## US-023 — Stabilize Estefania Identity And Safe Composition
+
+Status: Done  
+Priority: P0  
+Epic: EPIC-01 Publications  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want Estefania image generations to use safer composition and stronger identity guidance, so that outputs are less likely to drift from the approved face or produce bad feet/hands.
+
+### Acceptance Criteria
+
+- [x] Prompt packs include an explicit safe-composition policy for Estefania.
+- [x] Default publication prompts avoid full-body framing and visible feet.
+- [x] Negative prompts include face drift, asymmetry, bad feet, malformed toes, and distorted hands.
+- [x] Prompt packs separate identity references from scene references in metadata.
+- [x] The generated prompt pack explains that the first reference is the primary identity/scene anchor.
+- [x] Existing broken/incomplete publication jobs are cleaned from the live server so operators do not continue from bad state.
+
+### Technical Tasks
+
+- [x] Update `Avatares AI - Publications - Generate Prompt Pack`.
+- [x] Add `compositionPolicy` to prompt packs.
+- [x] Add `identityReferences` and `sceneReferences` arrays derived from approved registry assets.
+- [x] Deploy the updated workflow to n8n.
+- [x] Clean incomplete `publication_jobs` rows and orphaned failed/running `generation_jobs` rows from live Postgres.
+
+### Dependencies
+
+- US-017.
+- US-020.
+- US-021.
+
+### Notes
+
+- This does not solve high-fidelity identity by itself. It reduces obvious failure cases while US-018 and future identity-control work make reference handling stronger.
+- Operators should reject images with face drift, malformed feet, bad hands, or full-body artifacts.
+
+---
+
 ## Wave 1 Checklist
 
 ### P0
@@ -1097,6 +1138,7 @@ As an operator, I want the console to refresh generating jobs automatically, so 
 - [ ] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
 - [x] US-020 — Poll Comfy Cloud Generation Status
 - [x] US-021 — Auto-Ingest Completed Comfy Output
+- [x] US-023 — Stabilize Estefania Identity And Safe Composition
 
 ### P1
 
