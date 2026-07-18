@@ -46,6 +46,18 @@ export type PublicationGenerationSubmission = {
   [key: string]: unknown;
 };
 
+export type PublicationGenerationRefreshResult = {
+  ok?: boolean;
+  autoIngested?: boolean;
+  error?: string | null;
+  job?: PublicationJob | null;
+  generation?: PublicationGenerationSubmission | null;
+  provider?: Record<string, unknown> | null;
+  ingest?: IngestComfyOutputResult | Record<string, unknown> | null;
+  message?: string;
+  reason?: string;
+};
+
 export type CreatePublicationJobPayload = {
   avatar: string;
   scene: string;
@@ -364,6 +376,13 @@ export type GeneratePublicationImagesResponse = {
   reason?: string;
 };
 
+export type RefreshPublicationGenerationPayload = {
+  publicationJobId: string;
+  generationJobId?: string;
+};
+
+export type RefreshPublicationGenerationResponse = PublicationGenerationRefreshResult;
+
 export type IngestComfyOutputPayload = {
   publicationJobId: string;
   generationJobId: string;
@@ -409,6 +428,7 @@ export type IngestComfyOutputResponse = {
 export type PublicationJobLoadItem = {
   job: PublicationJob;
   generation?: PublicationGenerationSubmission | null;
+  generationAttempts?: PublicationGenerationSubmission[];
   latestAsset?: PublicationAssetSummary | null;
   selectedAsset?: PublicationAssetSummary | null;
 };

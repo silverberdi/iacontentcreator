@@ -1002,7 +1002,7 @@ As an operator, I want the system to check whether a submitted Comfy Cloud gener
 
 ## US-021 — Auto-Ingest Completed Comfy Output
 
-Status: Backlog  
+Status: Done  
 Priority: P0  
 Epic: EPIC-01 Publications  
 Wave: Wave 1  
@@ -1053,18 +1053,18 @@ As an operator, I want the console to refresh generating jobs automatically, so 
 
 ### Acceptance Criteria
 
-- [ ] When an open publication job is `generating`, the console periodically calls the refresh-generation endpoint.
-- [ ] The operator sees a clear status such as `Submitted`, `Running`, `Completed`, `Ingesting`, or `Failed`.
-- [ ] When auto-ingest succeeds, the UI shows the generated asset and enables selection.
-- [ ] Polling stops when the job reaches `review-ready`, `failed`, or another terminal/recoverable state.
-- [ ] Manual `Refresh` remains available.
+- [x] When an open publication job is `generating`, the console periodically calls the refresh-generation endpoint.
+- [x] The operator sees a clear status such as `Submitted`, `Running`, `Completed`, `Ingesting`, or `Failed`.
+- [x] When auto-ingest succeeds, the UI shows the generated asset and enables selection.
+- [x] Polling stops when the job reaches `review-ready`, `failed`, or another terminal/recoverable state.
+- [x] Manual `Refresh` remains available.
 
 ### Technical Tasks
 
-- [ ] Add polling to `PublicationsPanel` for `generating` jobs.
-- [ ] Add UI copy/status for provider progress.
-- [ ] Refresh timeline after each status change.
-- [ ] Avoid duplicate concurrent refresh requests.
+- [x] Add polling to `PublicationsPanel` for `generating` jobs.
+- [x] Add UI copy/status for provider progress.
+- [x] Refresh timeline after each status change.
+- [x] Avoid duplicate concurrent refresh requests.
 
 ### Dependencies
 
@@ -1074,6 +1074,169 @@ As an operator, I want the console to refresh generating jobs automatically, so 
 ### Notes
 
 - This is the visible operator experience after provider polling and auto-ingest exist.
+
+---
+
+## US-024 — Anatomy-Aware Composition Policy
+
+Status: Done  
+Priority: P0  
+Epic: EPIC-01 Publications  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want the system to improve visible hands and feet instead of hiding them by default, so that Estefania can produce realistic lifestyle scenes without over-cropping every image.
+
+### Acceptance Criteria
+
+- [x] Prompt packs no longer reject visible feet by default.
+- [x] Prompt packs ask for anatomically correct feet when visible.
+- [x] Prompts avoid making hands or feet the focal point unless intentionally requested.
+- [x] Negative prompts reject malformed feet, distorted toes, awkward foot crops, and distorted hands.
+- [x] Composition policy explains when visible feet are acceptable.
+
+### Technical Tasks
+
+- [x] Update `Avatares AI - Publications - Generate Prompt Pack`.
+- [x] Replace safe-crop-only policy with anatomy-aware composition.
+- [x] Rename generator version to `n8n-publication-prompt-pack-v4-anatomy-aware-composition`.
+
+### Dependencies
+
+- US-023.
+
+### Notes
+
+- This improves prompt behavior but does not replace a future image QA/correction pass.
+
+---
+
+## US-026 — Generation Attempt History
+
+Status: Done  
+Priority: P0  
+Epic: EPIC-04 Admin Operations  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want to see every generation attempt for a publication job, so that repeated submissions do not hide previous outputs or create confusion about which image is current.
+
+### Acceptance Criteria
+
+- [x] The publication job loader returns recent generation attempts.
+- [x] The console shows attempt id, generation status, provider status, linked asset, and updated time.
+- [x] The newest attempt remains the active generation while older attempts remain visible.
+- [x] The operator can distinguish submitted/running attempts from review-ready attempts.
+
+### Technical Tasks
+
+- [x] Extend `POST /publications/jobs/list` to include `generationAttempts`.
+- [x] Add generation-attempt types to the console.
+- [x] Add attempts table to `PublicationsPanel`.
+
+### Dependencies
+
+- US-020.
+- US-021.
+
+### Notes
+
+- This does not yet add side-by-side candidate comparison; it makes the existing attempts visible.
+
+---
+
+## US-027 — Publication Candidate Quality Review Criteria
+
+Status: Backlog  
+Priority: P1  
+Epic: EPIC-03 Asset Review  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want a clear quality checklist for generated publication candidates, so that I can consistently reject bad identity, bad hands/feet, or unusable compositions.
+
+### Acceptance Criteria
+
+- [ ] The publication review UI shows quality criteria: identity, face, hands, feet, composition, brand fit, publishability.
+- [ ] Rejection reasons can be selected from a structured list.
+- [ ] Rejection notes are saved with the asset/job.
+- [ ] Candidate quality criteria distinguish `reject for publication` from `reject as canonical identity`.
+
+### Technical Tasks
+
+- [ ] Add quality criteria metadata to docs/product.
+- [ ] Add rejection reason controls to publication candidate UI.
+- [ ] Persist structured review metadata.
+
+### Dependencies
+
+- US-026.
+
+---
+
+## US-028 — Dedicated Identity Reference Sync
+
+Status: Backlog  
+Priority: P0  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1  
+
+### User Story
+
+As the system, I want approved identity references from MinIO to be prepared as Comfy-loadable inputs, so that generation uses the actual canonical Estefania images instead of relying on manually uploaded Comfy files.
+
+### Acceptance Criteria
+
+- [ ] Canonical MinIO assets can be prepared for Comfy Cloud input usage.
+- [ ] Prepared references store `comfyInputName` in registry metadata.
+- [ ] Prompt pack `identityReferences` prefer prepared canonical references.
+- [ ] Generation submission fails with a clear error if no prepared identity reference exists.
+
+### Technical Tasks
+
+- [ ] Complete or replace US-018 with a Comfy Cloud-compatible upload/prepare path.
+- [ ] Add prepared-reference cache metadata.
+- [ ] Add operator-facing preflight error.
+
+### Dependencies
+
+- US-018.
+- US-019.
+
+---
+
+## US-029 — Automated Image QA And Correction Pass
+
+Status: Backlog  
+Priority: P1  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1  
+
+### User Story
+
+As the system, I want to detect obvious anatomy and identity problems after generation, so that bad candidates are flagged or corrected before the operator wastes time reviewing them.
+
+### Acceptance Criteria
+
+- [ ] Generated outputs can be scored for face consistency, hand/foot risk, and composition risk.
+- [ ] High-risk outputs are flagged in the console.
+- [ ] The system can optionally trigger a correction/inpaint pass for hands/feet.
+- [ ] QA results are stored with generated asset metadata.
+
+### Technical Tasks
+
+- [ ] Evaluate lightweight visual QA provider/model options.
+- [ ] Add QA metadata schema.
+- [ ] Add n8n QA workflow after auto-ingest.
+- [ ] Add console QA badges.
+
+### Dependencies
+
+- US-027.
+- US-028.
 
 ---
 
@@ -1139,6 +1302,8 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-020 — Poll Comfy Cloud Generation Status
 - [x] US-021 — Auto-Ingest Completed Comfy Output
 - [x] US-023 — Stabilize Estefania Identity And Safe Composition
+- [x] US-024 — Anatomy-Aware Composition Policy
+- [x] US-026 — Generation Attempt History
 
 ### P1
 
@@ -1148,4 +1313,7 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-016 — Harden Legacy Asset Review Workflow SQL Handling
 - [x] US-015 — Wave 1 Runbook
 - [ ] US-019 — Comfy Generation Preflight And Operator Error
-- [ ] US-022 — Console Auto-Refresh For Generating Jobs
+- [x] US-022 — Console Auto-Refresh For Generating Jobs
+- [ ] US-027 — Publication Candidate Quality Review Criteria
+- [ ] US-028 — Dedicated Identity Reference Sync
+- [ ] US-029 — Automated Image QA And Correction Pass

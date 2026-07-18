@@ -8,6 +8,8 @@ import type {
   GeneratePublicationBriefResponse,
   GeneratePublicationImagesPayload,
   GeneratePublicationImagesResponse,
+  RefreshPublicationGenerationPayload,
+  RefreshPublicationGenerationResponse,
   GeneratePublicationCopyPackPayload,
   GeneratePublicationCopyPackResponse,
   GeneratePublicationPromptPackPayload,
@@ -103,6 +105,19 @@ export async function generatePublicationImages(
     throw new Error(data.error || data.reason || data.message || "Image generation was not submitted.");
   }
   return { job, generation: data.generation };
+}
+
+export async function refreshPublicationGeneration(
+  payload: RefreshPublicationGenerationPayload,
+): Promise<RefreshPublicationGenerationResponse> {
+  const data = await postN8nJson<RefreshPublicationGenerationResponse>(
+    "/publications/jobs/refresh-generation",
+    payload,
+  );
+  if (!data.ok) {
+    throw new Error(data.error || data.reason || data.message || "Generation status could not be refreshed.");
+  }
+  return data;
 }
 
 export async function generatePublicationCopyPack(

@@ -11,6 +11,7 @@ import {
   loadPublicationTimeline,
   markPublicationPublished,
   recordPublicationJobError,
+  refreshPublicationGeneration,
   retryPublicationJob,
   selectPublicationAsset,
 } from "../api/publicationsApi";
@@ -75,8 +76,10 @@ export default function PublicationsPanel({
   const [promptPackBusy, setPromptPackBusy] = useState(false);
   const [promptPackMessage, setPromptPackMessage] = useState<string | null>(null);
   const [generation, setGeneration] = useState<PublicationGenerationSubmission | null>(null);
+  const [generationAttempts, setGenerationAttempts] = useState<PublicationGenerationSubmission[]>([]);
   const [generationBusy, setGenerationBusy] = useState(false);
   const [generationMessage, setGenerationMessage] = useState<string | null>(null);
+  const [generationRefreshBusy, setGenerationRefreshBusy] = useState(false);
   const [comfyOutputUrl, setComfyOutputUrl] = useState("");
   const [ingestBusy, setIngestBusy] = useState(false);
   const [ingestResult, setIngestResult] = useState<IngestComfyOutputResult | null>(null);
@@ -147,6 +150,33 @@ export default function PublicationsPanel({
     retryableFailedStep === "generate-prompt-pack" ||
     retryableFailedStep === "generate-images" ||
     retryableFailedStep === "generate-copy-pack";
+
+  const generationProviderStatus =
+    typeof generation?.providerStatus === "string"
+      ? generation.providerStatus
+      : typeof generation?.resultPayload === "object" &&
+          generation.resultPayload !== null &&
+          "providerStatus" in generation.resultPayload
+        ? String((generation.resultPayload as { providerStatus?: unknown }).providerStatus || "")
+        : "";
+  const isGenerationActive =
+    Boolean(createdJob?.publicationJobId && generation?.generationJobId) &&
+    (createdJob?.status === "generating" ||
+      generation?.status === "running" ||
+      generationProviderStatus === "submitted" ||
+      generationProviderStatus === "running");
+
+  function readGenerationValue(item: PublicationGenerationSubmission | null, key: string) {
+    if (!item) return "";
+    const direct = item[key];
+    if (typeof direct === "string") return direct;
+    const resultPayload = item.resultPayload;
+    if (resultPayload && typeof resultPayload === "object" && key in resultPayload) {
+      const value = (resultPayload as Record<string, unknown>)[key];
+      return typeof value === "string" ? value : "";
+    }
+    return "";
+  }
 
   async function handleStepFailure(
     failedStep: PublicationRetryStep,
@@ -268,6 +298,7 @@ export default function PublicationsPanel({
       setPublishPlatform(job.publishingExport.platform || "instagram");
     }
     setGeneration(item.generation || null);
+    setGenerationAttempts(item.generationAttempts || (item.generation ? [item.generation] : []));
     setGenerationMessage("Publication job loaded.");
     setComfyOutputUrl("");
     setLatestAsset(item.latestAsset || null);
@@ -285,6 +316,55 @@ export default function PublicationsPanel({
           }
         : null,
     );
+  }
+
+  async function reloadPublicationJob(publicationJobId: string, message?: string) {
+    const jobs = await listPublicationJobs({ publicationJobId, limit: 1 });
+    if (!jobs[0]) {
+      throw new Error("Publication job was not found.");
+    }
+    applyLoadedJob(jobs[0]);
+    if (message) {
+      setGenerationMessage(message);
+    }
+    return jobs[0];
+  }
+
+  async function handleRefreshGeneration(options: { silent?: boolean } = {}) {
+    if (!createdJob?.publicationJobId || !generation?.generationJobId || generationRefreshBusy) {
+      return;
+    }
+    setGenerationRefreshBusy(true);
+    if (!options.silent) {
+      setGenerationMessage("Refreshing generation status...");
+    }
+    try {
+      const result = await refreshPublicationGeneration({
+        publicationJobId: createdJob.publicationJobId,
+        generationJobId: generation.generationJobId,
+      });
+      const refreshed = await reloadPublicationJob(
+        createdJob.publicationJobId,
+        result.autoIngested ? "Generation completed and ingested." : "Generation status refreshed.",
+      );
+      if (result.ingest && typeof result.ingest === "object" && "assetId" in result.ingest) {
+        const ingest = result.ingest as IngestComfyOutputResult;
+        setIngestResult(ingest);
+        setLatestAsset(refreshed.latestAsset || {
+          assetId: ingest.assetId,
+          objectPath: ingest.objectPath,
+          bucket: ingest.bucket,
+          status: "raw",
+        });
+      }
+      void refreshTimeline(createdJob.publicationJobId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to refresh generation status";
+      setGenerationMessage(message);
+      setError(message);
+    } finally {
+      setGenerationRefreshBusy(false);
+    }
   }
 
   async function handleLoadJobById() {
@@ -306,6 +386,14 @@ export default function PublicationsPanel({
       setLoadBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!isGenerationActive) return;
+    const interval = window.setInterval(() => {
+      void handleRefreshGeneration({ silent: true });
+    }, 7000);
+    return () => window.clearInterval(interval);
+  }, [isGenerationActive, createdJob?.publicationJobId, generation?.generationJobId, generationRefreshBusy]);
 
   async function handleLoadRecentJobs() {
     setLoadBusy(true);
@@ -455,6 +543,7 @@ export default function PublicationsPanel({
       });
       setCreatedJob(result.job);
       setGeneration(result.generation);
+      setGenerationAttempts((current) => [result.generation, ...current.filter((item) => item.generationJobId !== result.generation.generationJobId)]);
       setIngestResult(null);
       setLatestAsset(null);
       setSelectedAsset(null);
@@ -464,7 +553,8 @@ export default function PublicationsPanel({
       setExportMessage(null);
       setPublishedRecord(null);
       setPublishMessage(null);
-      setGenerationMessage("Generation job submitted.");
+      setGenerationMessage("Generation submitted. The console will refresh until the output is ready.");
+      void refreshTimeline(result.job.publicationJobId);
     } catch (err) {
       await handleStepFailure("generate-images", err, "Failed to submit image generation");
     } finally {
@@ -1199,14 +1289,26 @@ export default function PublicationsPanel({
           title="Image Generation"
           description="Submit the prompt pack to the image-generation stage."
           actions={
-            <button
-              type="button"
-              onClick={() => void handleGenerateImages()}
-              disabled={generationBusy}
-              className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-            >
-              {generationBusy ? "Submitting..." : generation ? "Submit again" : "Generate images"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {generation && (
+                <button
+                  type="button"
+                  onClick={() => void handleRefreshGeneration()}
+                  disabled={generationRefreshBusy}
+                  className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs font-medium text-gray-200 hover:border-gray-500 disabled:opacity-50"
+                >
+                  {generationRefreshBusy ? "Refreshing..." : "Refresh status"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleGenerateImages()}
+                disabled={generationBusy}
+                className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              >
+                {generationBusy ? "Submitting..." : generation ? "Submit again" : "Generate images"}
+              </button>
+            </div>
           }
         >
           {generationMessage && (
@@ -1230,6 +1332,18 @@ export default function PublicationsPanel({
                   <dt className="text-xs text-gray-500">runMode</dt>
                   <dd className="mt-0.5 text-gray-200">{generation.runMode}</dd>
                 </div>
+                <div>
+                  <dt className="text-xs text-gray-500">providerStatus</dt>
+                  <dd className="mt-0.5 text-gray-200">
+                    {readGenerationValue(generation, "providerStatus") || generationProviderStatus || "unknown"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">tracking</dt>
+                  <dd className="mt-0.5 text-gray-200">
+                    {isGenerationActive ? "Auto-refreshing" : "Idle"}
+                  </dd>
+                </div>
               </dl>
               {generation.instructions && generation.instructions.length > 0 && (
                 <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-400">
@@ -1239,29 +1353,66 @@ export default function PublicationsPanel({
                 </ol>
               )}
 
-              <div className="rounded-md border border-border bg-surface p-4">
-                <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-gray-400">Comfy output URL</span>
-                    <input
-                      value={comfyOutputUrl}
-                      onChange={(event) => setComfyOutputUrl(event.target.value)}
-                      disabled={ingestBusy}
-                      placeholder="https://cloud.comfy.org/api/view?filename=..."
-                      className={inputClass}
-                    />
-                  </label>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      onClick={() => void handleIngestComfyOutput()}
-                      disabled={ingestBusy || !comfyOutputUrl.trim()}
-                      className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-                    >
-                      {ingestBusy ? "Ingesting..." : "Ingest output"}
-                    </button>
-                  </div>
+              {generationAttempts.length > 0 && (
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <table className="min-w-full divide-y divide-border text-sm">
+                    <thead className="bg-surface">
+                      <tr className="text-left text-xs uppercase text-gray-500">
+                        <th className="px-3 py-2 font-medium">Attempt</th>
+                        <th className="px-3 py-2 font-medium">Status</th>
+                        <th className="px-3 py-2 font-medium">Provider</th>
+                        <th className="px-3 py-2 font-medium">Asset</th>
+                        <th className="px-3 py-2 font-medium">Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {generationAttempts.map((attempt) => (
+                        <tr key={attempt.generationJobId} className="text-gray-300">
+                          <td className="px-3 py-2 font-mono text-xs">
+                            {attempt.generationJobId.slice(0, 8)}...
+                          </td>
+                          <td className="px-3 py-2">{attempt.status || "unknown"}</td>
+                          <td className="px-3 py-2">
+                            {readGenerationValue(attempt, "providerStatus") || "unknown"}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs">
+                            {(readGenerationValue(attempt, "assetId") || "").slice(0, 8) || "none"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {String(attempt.updatedAt || attempt.completedAt || attempt.startedAt || "")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+              )}
+
+              <div className="rounded-md border border-border bg-surface p-4">
+                {technicalMode && (
+                  <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-gray-400">Comfy output URL</span>
+                      <input
+                        value={comfyOutputUrl}
+                        onChange={(event) => setComfyOutputUrl(event.target.value)}
+                        disabled={ingestBusy}
+                        placeholder="https://cloud.comfy.org/api/view?filename=..."
+                        className={inputClass}
+                      />
+                    </label>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleIngestComfyOutput()}
+                        disabled={ingestBusy || !comfyOutputUrl.trim()}
+                        className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                      >
+                        {ingestBusy ? "Ingesting..." : "Ingest output"}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {ingestResult && (
                   <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
