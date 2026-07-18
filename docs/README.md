@@ -10,6 +10,7 @@ Use `docs/product/` for business intent, product scope, avatar business lines, a
 - `docs/product/avatar-taxonomy.md`
 - `docs/product/avatar-profile-contract.md`
 - `docs/product/avatar-profile-readiness.md`
+- `docs/product/publication-quality-review.md`
 - `docs/product/mvp-portfolio.md`
 - `docs/product/wave-1-status.md`
 

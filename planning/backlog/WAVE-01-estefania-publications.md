@@ -1042,7 +1042,7 @@ As an operator, I want completed Comfy outputs to be ingested automatically, so 
 
 ## US-022 — Console Auto-Refresh For Generating Jobs
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-04 Admin Operations  
 Wave: Wave 1  
@@ -1160,16 +1160,16 @@ As an operator, I want a clear quality checklist for generated publication candi
 
 ### Acceptance Criteria
 
-- [ ] The publication review UI shows quality criteria: identity, face, hands, feet, composition, brand fit, publishability.
-- [ ] Rejection reasons can be selected from a structured list.
-- [ ] Rejection notes are saved with the asset/job.
-- [ ] Candidate quality criteria distinguish `reject for publication` from `reject as canonical identity`.
+- [x] The publication review UI shows quality criteria: identity, face, hands, feet, composition, brand fit, publishability.
+- [x] Rejection reasons can be selected from a structured list.
+- [x] Rejection notes are saved with the asset/job.
+- [x] Candidate quality criteria distinguish `reject for publication` from `reject as canonical identity`.
 
 ### Technical Tasks
 
-- [ ] Add quality criteria metadata to docs/product.
-- [ ] Add rejection reason controls to publication candidate UI.
-- [ ] Persist structured review metadata.
+- [x] Add quality criteria metadata to docs/product.
+- [x] Add rejection reason controls to publication candidate UI.
+- [x] Persist structured review metadata.
 
 ### Dependencies
 
@@ -1179,7 +1179,7 @@ As an operator, I want a clear quality checklist for generated publication candi
 
 ## US-028 — Dedicated Identity Reference Sync
 
-Status: Backlog  
+Status: Done  
 Priority: P0  
 Epic: EPIC-06 AI Provider Router  
 Wave: Wave 1  
@@ -1190,16 +1190,16 @@ As the system, I want approved identity references from MinIO to be prepared as 
 
 ### Acceptance Criteria
 
-- [ ] Canonical MinIO assets can be prepared for Comfy Cloud input usage.
-- [ ] Prepared references store `comfyInputName` in registry metadata.
-- [ ] Prompt pack `identityReferences` prefer prepared canonical references.
-- [ ] Generation submission fails with a clear error if no prepared identity reference exists.
+- [x] Canonical MinIO assets can be prepared for Comfy Cloud input usage through `metadata.comfyInputName`.
+- [x] Prepared references store `comfyInputName` in registry metadata.
+- [x] Prompt pack `identityReferences` prefer prepared canonical references.
+- [x] Generation submission fails with a clear error if no prepared identity reference exists.
 
 ### Technical Tasks
 
-- [ ] Complete or replace US-018 with a Comfy Cloud-compatible upload/prepare path.
-- [ ] Add prepared-reference cache metadata.
-- [ ] Add operator-facing preflight error.
+- [x] Complete the Wave 1 reference contract by requiring `comfyInputName` before submission.
+- [x] Add prepared-reference cache metadata.
+- [x] Add operator-facing preflight error.
 
 ### Dependencies
 
@@ -1210,7 +1210,7 @@ As the system, I want approved identity references from MinIO to be prepared as 
 
 ## US-029 — Automated Image QA And Correction Pass
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-06 AI Provider Router  
 Wave: Wave 1  
@@ -1221,22 +1221,86 @@ As the system, I want to detect obvious anatomy and identity problems after gene
 
 ### Acceptance Criteria
 
-- [ ] Generated outputs can be scored for face consistency, hand/foot risk, and composition risk.
-- [ ] High-risk outputs are flagged in the console.
-- [ ] The system can optionally trigger a correction/inpaint pass for hands/feet.
-- [ ] QA results are stored with generated asset metadata.
+- [x] Generated outputs can be scored for face consistency, hand/foot risk, and composition risk.
+- [x] High-risk outputs are flagged in the console.
+- [x] The system can optionally flag a correction/inpaint recommendation for hands/feet.
+- [x] QA results are stored with generated asset metadata.
 
 ### Technical Tasks
 
-- [ ] Evaluate lightweight visual QA provider/model options.
-- [ ] Add QA metadata schema.
-- [ ] Add n8n QA workflow after auto-ingest.
-- [ ] Add console QA badges.
+- [x] Evaluate lightweight visual QA provider/model options.
+- [x] Add QA metadata schema.
+- [x] Add n8n QA metadata step after auto-ingest.
+- [x] Add console QA badges.
 
 ### Dependencies
 
 - US-027.
 - US-028.
+
+---
+
+## US-030 — Comfy Cloud Reference Upload Adapter
+
+Status: Backlog  
+Priority: P0  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1 Stabilization  
+
+### User Story
+
+As the system, I want to upload or register approved MinIO identity references into Comfy Cloud automatically, so that operators do not manually upload reference files before generation.
+
+### Acceptance Criteria
+
+- [ ] `ai-gateway` exposes a reference preparation endpoint for canonical assets.
+- [ ] The adapter downloads the MinIO object and uploads/registers it with the Comfy Cloud API.
+- [ ] The resulting Comfy input filename is stored as `metadata.comfyInputName` on the registry asset.
+- [ ] Repeated preparations reuse cached `comfyInputName` when the source asset SHA has not changed.
+- [ ] Operator receives a clear failure if the Comfy upload API rejects the file.
+
+### Technical Tasks
+
+- [ ] Confirm current Comfy Cloud upload/input API contract.
+- [ ] Add `/comfy/prepare-reference` to `ai-gateway`.
+- [ ] Add n8n workflow or callable node to prepare canonical references.
+- [ ] Add console action/status for reference preparation.
+
+### Dependencies
+
+- US-028.
+
+---
+
+## US-031 — Pixel-Level Visual QA Provider
+
+Status: Backlog  
+Priority: P1  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1 Stabilization  
+
+### User Story
+
+As the system, I want a visual QA provider to inspect generated images, so that face drift, hands, feet, and composition problems are detected from pixels instead of prompt heuristics.
+
+### Acceptance Criteria
+
+- [ ] QA provider receives the generated image URL or object bytes.
+- [ ] QA returns identity, face, hands, feet, composition, and publishability scores.
+- [ ] QA flags are stored in `metadata.qa`.
+- [ ] Console shows QA flags and blocks one-click selection when status is `blocked`.
+- [ ] Correction recommendations can be routed to a future inpaint/correction workflow.
+
+### Technical Tasks
+
+- [ ] Compare provider candidates for vision QA.
+- [ ] Add `/publication-image-qa` to `ai-gateway`.
+- [ ] Call QA after ingest and before `review-ready`.
+- [ ] Add tests with known bad hands/feet samples.
+
+### Dependencies
+
+- US-029.
 
 ---
 
@@ -1304,6 +1368,8 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-023 — Stabilize Estefania Identity And Safe Composition
 - [x] US-024 — Anatomy-Aware Composition Policy
 - [x] US-026 — Generation Attempt History
+- [x] US-028 — Dedicated Identity Reference Sync
+- [ ] US-030 — Comfy Cloud Reference Upload Adapter
 
 ### P1
 
@@ -1314,6 +1380,6 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-015 — Wave 1 Runbook
 - [ ] US-019 — Comfy Generation Preflight And Operator Error
 - [x] US-022 — Console Auto-Refresh For Generating Jobs
-- [ ] US-027 — Publication Candidate Quality Review Criteria
-- [ ] US-028 — Dedicated Identity Reference Sync
-- [ ] US-029 — Automated Image QA And Correction Pass
+- [x] US-027 — Publication Candidate Quality Review Criteria
+- [x] US-029 — Automated Image QA And Correction Pass
+- [ ] US-031 — Pixel-Level Visual QA Provider

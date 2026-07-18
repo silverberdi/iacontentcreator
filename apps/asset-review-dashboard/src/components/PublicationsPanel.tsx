@@ -15,6 +15,7 @@ import {
   retryPublicationJob,
   selectPublicationAsset,
 } from "../api/publicationsApi";
+import { rejectAsset } from "../api/assetReviewApi";
 import { avatarProfileSummaries } from "../data/avatarProfiles";
 import { defaultFilters } from "../data/catalogs";
 import type { CatalogOptionsBundle } from "../types/catalogs";
@@ -30,6 +31,8 @@ import type {
   PublicationJobLoadItem,
   PublicationJobTimeline,
   PublicationJob,
+  PublicationQualityReview,
+  PublicationQaResult,
   PublicationPromptPack,
   PublicationRetryStep,
 } from "../types/publications";
@@ -38,6 +41,35 @@ import CatalogSelect from "./CatalogSelect";
 import CopyButton from "./CopyButton";
 import LoadingSpinner from "./LoadingSpinner";
 import SectionPanel from "./SectionPanel";
+
+const QUALITY_CRITERIA = [
+  { id: "identity", label: "Identity", help: "Same Estefania face and recognizable visual identity." },
+  { id: "face", label: "Face", help: "Natural expression, no warped smile, eyes, or skin." },
+  { id: "hands", label: "Hands", help: "Hands are natural if visible; no extra or malformed fingers." },
+  { id: "feet", label: "Feet", help: "Feet are natural if visible; no malformed toes or awkward distortion." },
+  { id: "composition", label: "Composition", help: "Usable crop, clear subject, no distracting body geometry." },
+  { id: "brandFit", label: "Brand fit", help: "Matches Estefania's lifestyle, warm, authentic positioning." },
+  { id: "publishability", label: "Publishability", help: "Safe to use as a real Instagram candidate." },
+] as const;
+
+const REJECTION_REASONS = [
+  { id: "identity-drift", label: "Identity drift" },
+  { id: "face-artifact", label: "Face artifact" },
+  { id: "hand-artifact", label: "Hand artifact" },
+  { id: "foot-artifact", label: "Foot artifact" },
+  { id: "bad-composition", label: "Bad composition" },
+  { id: "brand-mismatch", label: "Brand mismatch" },
+  { id: "not-publishable", label: "Not publishable" },
+  { id: "not-canonical-quality", label: "Not canonical quality" },
+] as const;
+
+type QualityCriterionId = (typeof QUALITY_CRITERIA)[number]["id"];
+
+function readRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
 
 type PublicationsPanelProps = {
   catalogOptions: CatalogOptionsBundle;
@@ -86,6 +118,18 @@ export default function PublicationsPanel({
   const [latestAsset, setLatestAsset] = useState<PublicationAssetSummary | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<PublicationAssetSummary | null>(null);
   const [selectAssetBusy, setSelectAssetBusy] = useState(false);
+  const [qualityCriteria, setQualityCriteria] = useState<Record<QualityCriterionId, boolean>>({
+    identity: true,
+    face: true,
+    hands: true,
+    feet: true,
+    composition: true,
+    brandFit: true,
+    publishability: true,
+  });
+  const [rejectionReasons, setRejectionReasons] = useState<string[]>([]);
+  const [qualityNotes, setQualityNotes] = useState("");
+  const [rejectAssetBusy, setRejectAssetBusy] = useState(false);
   const [copyPackText, setCopyPackText] = useState("");
   const [copyPackBusy, setCopyPackBusy] = useState(false);
   const [copyPackMessage, setCopyPackMessage] = useState<string | null>(null);
@@ -165,6 +209,12 @@ export default function PublicationsPanel({
       generation?.status === "running" ||
       generationProviderStatus === "submitted" ||
       generationProviderStatus === "running");
+  const latestAssetQa = readRecord(latestAsset?.metadata)?.qa as PublicationQaResult | undefined;
+  const latestAssetQualityReview = readRecord(latestAsset?.metadata)?.publicationQualityReview as
+    | PublicationQualityReview
+    | undefined;
+  const qaStatus = latestAssetQa?.status || "not-run";
+  const qaFlags = Array.isArray(latestAssetQa?.flags) ? latestAssetQa.flags : [];
 
   function readGenerationValue(item: PublicationGenerationSubmission | null, key: string) {
     if (!item) return "";
@@ -303,6 +353,34 @@ export default function PublicationsPanel({
     setComfyOutputUrl("");
     setLatestAsset(item.latestAsset || null);
     setSelectedAsset(item.selectedAsset || null);
+    const savedQualityReview = readRecord(item.latestAsset?.metadata).publicationQualityReview as
+      | PublicationQualityReview
+      | undefined;
+    if (savedQualityReview) {
+      setQualityCriteria({
+        identity: savedQualityReview.criteria.identity !== false,
+        face: savedQualityReview.criteria.face !== false,
+        hands: savedQualityReview.criteria.hands !== false,
+        feet: savedQualityReview.criteria.feet !== false,
+        composition: savedQualityReview.criteria.composition !== false,
+        brandFit: savedQualityReview.criteria.brandFit !== false,
+        publishability: savedQualityReview.criteria.publishability !== false,
+      });
+      setRejectionReasons(savedQualityReview.reasons || []);
+      setQualityNotes(savedQualityReview.notes || "");
+    } else {
+      setQualityCriteria({
+        identity: true,
+        face: true,
+        hands: true,
+        feet: true,
+        composition: true,
+        brandFit: true,
+        publishability: true,
+      });
+      setRejectionReasons([]);
+      setQualityNotes("");
+    }
     setIngestResult(
       item.latestAsset?.assetId
         ? {
@@ -620,10 +698,18 @@ export default function PublicationsPanel({
     setGenerationMessage(null);
 
     try {
+      const review: PublicationQualityReview = {
+        contractVersion: "publication-quality-review-v1",
+        decision: "select-for-publication",
+        criteria: qualityCriteria,
+        reasons: [],
+        notes: qualityNotes.trim() || "Selected for publication job via Avatares AI Console",
+        reviewedAt: new Date().toISOString(),
+      };
       const result = await selectPublicationAsset({
         publicationJobId: createdJob.publicationJobId,
         assetId: latestAsset.assetId,
-        reviewNotes: "Selected for publication job via Avatares AI Console",
+        reviewNotes: JSON.stringify(review),
       });
       setSelectedAsset(result.asset || latestAsset);
       if (result.job) {
@@ -659,6 +745,55 @@ export default function PublicationsPanel({
       await handleStepFailure("select-asset", err, "Failed to select publication asset");
     } finally {
       setSelectAssetBusy(false);
+    }
+  }
+
+  async function handleRejectPublicationAsset(decision: PublicationQualityReview["decision"]) {
+    if (!latestAsset?.assetId) {
+      return;
+    }
+    setRejectAssetBusy(true);
+    setError(null);
+    setGenerationMessage(null);
+
+    try {
+      const review: PublicationQualityReview = {
+        contractVersion: "publication-quality-review-v1",
+        decision,
+        criteria: qualityCriteria,
+        reasons: rejectionReasons,
+        notes: qualityNotes.trim() || "Rejected for publication quality reasons.",
+        reviewedAt: new Date().toISOString(),
+      };
+      const result = await rejectAsset(latestAsset.assetId, JSON.stringify(review));
+      if (!result.rejected) {
+        throw new Error(result.reason || "Publication asset was not rejected.");
+      }
+      setLatestAsset((current) =>
+        current
+          ? {
+              ...current,
+              status: "rejected",
+              reviewNotes: JSON.stringify(review),
+              metadata: {
+                ...readRecord(current.metadata),
+                publicationQualityReview: review,
+              },
+            }
+          : current,
+      );
+      setSelectedAsset(null);
+      setGenerationMessage(
+        decision === "reject-as-canonical"
+          ? "Asset rejected for publication and canonical identity use."
+          : "Asset rejected for this publication.",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to reject publication asset";
+      setGenerationMessage(message);
+      setError(message);
+    } finally {
+      setRejectAssetBusy(false);
     }
   }
 
@@ -1452,23 +1587,126 @@ export default function PublicationsPanel({
                             Selected for this publication job.
                           </p>
                         )}
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                          <span
+                            className={`rounded-full px-2 py-1 ${
+                              qaStatus === "pass"
+                                ? "bg-emerald-950 text-emerald-200"
+                                : qaStatus === "review_required"
+                                  ? "bg-amber-950 text-amber-200"
+                                  : qaStatus === "blocked"
+                                    ? "bg-red-950 text-red-200"
+                                    : "bg-gray-800 text-gray-300"
+                            }`}
+                          >
+                            QA: {qaStatus}
+                          </span>
+                          {qaFlags.slice(0, 4).map((flag) => (
+                            <span key={flag} className="rounded-full bg-gray-800 px-2 py-1 text-gray-300">
+                              {flag}
+                            </span>
+                          ))}
+                        </div>
+                        {latestAssetQualityReview && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            Last review: {latestAssetQualityReview.decision}
+                          </p>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleSelectPublicationAsset()}
-                        disabled={
-                          selectAssetBusy ||
-                          selectedAsset?.assetId === latestAsset.assetId ||
-                          !latestAsset.assetId
-                        }
-                        className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-                      >
-                        {selectAssetBusy
-                          ? "Selecting..."
-                          : selectedAsset?.assetId === latestAsset.assetId
-                            ? "Selected"
-                            : "Select for publication"}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleRejectPublicationAsset("reject-for-publication")}
+                          disabled={rejectAssetBusy || selectedAsset?.assetId === latestAsset.assetId}
+                          className="rounded-md border border-red-900 bg-red-950 px-3 py-2 text-xs font-medium text-red-100 hover:border-red-600 disabled:opacity-50"
+                        >
+                          {rejectAssetBusy ? "Rejecting..." : "Reject for publication"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleRejectPublicationAsset("reject-as-canonical")}
+                          disabled={rejectAssetBusy || selectedAsset?.assetId === latestAsset.assetId}
+                          className="rounded-md border border-amber-900 bg-amber-950 px-3 py-2 text-xs font-medium text-amber-100 hover:border-amber-600 disabled:opacity-50"
+                        >
+                          Reject as canonical
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSelectPublicationAsset()}
+                          disabled={
+                            selectAssetBusy ||
+                            selectedAsset?.assetId === latestAsset.assetId ||
+                            !latestAsset.assetId
+                          }
+                          className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                        >
+                          {selectAssetBusy
+                            ? "Selecting..."
+                            : selectedAsset?.assetId === latestAsset.assetId
+                              ? "Selected"
+                              : "Select for publication"}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      <div>
+                        <p className="text-xs font-medium uppercase text-gray-500">Quality checklist</p>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {QUALITY_CRITERIA.map((criterion) => (
+                            <label
+                              key={criterion.id}
+                              className="flex gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-gray-300"
+                              title={criterion.help}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={qualityCriteria[criterion.id]}
+                                onChange={(event) =>
+                                  setQualityCriteria((current) => ({
+                                    ...current,
+                                    [criterion.id]: event.target.checked,
+                                  }))
+                                }
+                              />
+                              <span>{criterion.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase text-gray-500">Rejection reasons</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {REJECTION_REASONS.map((reason) => (
+                            <label
+                              key={reason.id}
+                              className="flex gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-gray-300"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={rejectionReasons.includes(reason.id)}
+                                onChange={(event) =>
+                                  setRejectionReasons((current) =>
+                                    event.target.checked
+                                      ? [...current, reason.id]
+                                      : current.filter((item) => item !== reason.id),
+                                  )
+                                }
+                              />
+                              <span>{reason.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <label className="mt-3 flex flex-col gap-1 text-sm">
+                          <span className="text-gray-400">Review notes</span>
+                          <textarea
+                            value={qualityNotes}
+                            onChange={(event) => setQualityNotes(event.target.value)}
+                            rows={3}
+                            className={inputClass}
+                            placeholder="Describe identity, anatomy, composition, or publishing concerns."
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
                 )}

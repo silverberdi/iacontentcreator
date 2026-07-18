@@ -28,6 +28,7 @@ export type PublicationJob = {
   publishingExport?: PublicationPublishingExport | null;
   publishedRecord?: PublicationPublishedRecord | null;
   errorMessage?: string | null;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -104,8 +105,36 @@ export type PublicationReferenceImage = {
   assetId?: string;
   status?: string;
   isCanonical?: boolean;
+  minioBucket?: string;
+  minioObjectPath?: string;
   objectPath?: string;
   url?: string;
+  publicUrl?: string;
+  comfyInputName?: string | null;
+  comfyLoadable?: boolean;
+  source?: string;
+};
+
+export type PublicationQualityReview = {
+  contractVersion: "publication-quality-review-v1";
+  decision: "select-for-publication" | "reject-for-publication" | "reject-as-canonical";
+  criteria: Record<string, boolean>;
+  reasons: string[];
+  notes: string;
+  reviewedAt: string;
+};
+
+export type PublicationQaResult = {
+  contractVersion?: string;
+  provider?: string;
+  status?: "pass" | "review_required" | "blocked" | string;
+  scores?: Record<string, number>;
+  flags?: string[];
+  notes?: string[];
+  correctionRecommended?: boolean;
+  correctionMode?: string | null;
+  reviewedAt?: string;
+  [key: string]: unknown;
 };
 
 export type PublicationPromptPack = {
@@ -406,6 +435,8 @@ export type PublicationAssetSummary = {
   bucket?: string | null;
   status?: string | null;
   createdAt?: string | null;
+  reviewNotes?: string | null;
+  metadata?: Record<string, unknown> | null;
   [key: string]: unknown;
 };
 

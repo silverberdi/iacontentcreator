@@ -31,12 +31,15 @@ Completed:
 - Submit image generation to Comfy Cloud through `ai-gateway`.
 - Poll Comfy Cloud generation status after submission.
 - Auto-ingest completed Comfy outputs into MinIO/Postgres.
+- Auto-refresh the console while a publication job is generating.
+- Add structured publication quality review criteria and rejection reasons.
+- Prefer prepared Comfy identity references and block generation with a clear error when none exists.
+- Store initial QA metadata and show QA badges in the console.
 
 Remaining for Wave 1:
 
-- Prepare or sync required reference assets for Comfy Cloud without manual operator upload.
-- Add preflight validation and clear operator errors for missing Comfy references.
-- Auto-refresh the console while a publication job is generating.
+- Implement automatic Comfy Cloud reference upload/registration, so `metadata.comfyInputName` is created without manual operator work.
+- Replace heuristic QA with pixel-level visual QA for identity, hands, feet, composition, and publishability.
 - Use the runbook in at least one live production cycle and capture gaps.
 
 ## Canonical Backlog
@@ -60,7 +63,7 @@ dc539e40-c15f-47bb-9d7f-68ca901334e2
 Validated state:
 
 ```text
-comfy-output-generated-but-not-auto-ingested
+review-ready-after-auto-ingest
 ```
 
 Selected asset:
