@@ -961,6 +961,121 @@ As an operator, I want the console to detect invalid Comfy references before sub
 
 ---
 
+## US-020 — Poll Comfy Cloud Generation Status
+
+Status: Ready  
+Priority: P0  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want the system to check whether a submitted Comfy Cloud generation has finished, so that the console does not stay in `generating` after the image already exists.
+
+### Acceptance Criteria
+
+- [ ] After `Generate images`, the system stores the Comfy provider job/prompt id in `generation_jobs.result_payload` or metadata.
+- [ ] `ai-gateway` exposes a status endpoint that can query Comfy Cloud for that provider job/prompt id.
+- [ ] A n8n endpoint can refresh one publication job's generation status.
+- [ ] Completed Comfy status returns output image metadata, including a `cloud.comfy.org/api/view` URL or enough data to build one.
+- [ ] Failed Comfy status updates the publication job to `failed` with an operator-readable error.
+
+### Technical Tasks
+
+- [ ] Inspect actual Comfy Cloud submit response shape from `generation.providerResponse`.
+- [ ] Add `POST /comfy/publication-status` or equivalent to `ai-gateway`.
+- [ ] Add n8n workflow `POST /publications/jobs/refresh-generation`.
+- [ ] Update `generation_jobs` with provider status, output metadata, and completed/failed timestamps.
+- [ ] Add timeline events for submitted, running, completed, and failed provider states.
+
+### Dependencies
+
+- US-004.
+- US-017.
+
+### Notes
+
+- Live testing confirmed Comfy can finish while the console remains `generating`.
+- This story should not ingest yet; it only makes provider state visible and durable.
+
+---
+
+## US-021 — Auto-Ingest Completed Comfy Output
+
+Status: Backlog  
+Priority: P0  
+Epic: EPIC-01 Publications  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want completed Comfy outputs to be ingested automatically, so that I do not have to copy/paste the output URL after every successful generation.
+
+### Acceptance Criteria
+
+- [ ] When a refreshed generation is completed and has output metadata, the system downloads the output through `ai-gateway`.
+- [ ] The output is stored in MinIO.
+- [ ] The asset is registered in `canonical_asset_registry`.
+- [ ] The asset is linked to the publication job and generation job.
+- [ ] The publication job moves from `generating` to `review-ready`.
+- [ ] Auto-ingest is idempotent; refreshing the same completed output twice does not create duplicate canonical registry rows.
+
+### Technical Tasks
+
+- [ ] Reuse the current `/publications/jobs/ingest-comfy-output` logic where possible.
+- [ ] Add an auto-ingest path that accepts provider output metadata instead of a manually pasted URL.
+- [ ] Store `latestGeneratedAssetId`, bucket, object path, sha256, and source output URL in job metadata.
+- [ ] Add timeline event `output-ingested`.
+- [ ] Validate against an already completed Comfy job.
+
+### Dependencies
+
+- US-020.
+- US-005.
+
+### Notes
+
+- Manual ingest remains useful as fallback, but it should not be the normal happy path.
+
+---
+
+## US-022 — Console Auto-Refresh For Generating Jobs
+
+Status: Backlog  
+Priority: P1  
+Epic: EPIC-04 Admin Operations  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want the console to refresh generating jobs automatically, so that the next action appears when Comfy finishes without manual reloads or guesswork.
+
+### Acceptance Criteria
+
+- [ ] When an open publication job is `generating`, the console periodically calls the refresh-generation endpoint.
+- [ ] The operator sees a clear status such as `Submitted`, `Running`, `Completed`, `Ingesting`, or `Failed`.
+- [ ] When auto-ingest succeeds, the UI shows the generated asset and enables selection.
+- [ ] Polling stops when the job reaches `review-ready`, `failed`, or another terminal/recoverable state.
+- [ ] Manual `Refresh` remains available.
+
+### Technical Tasks
+
+- [ ] Add polling to `PublicationsPanel` for `generating` jobs.
+- [ ] Add UI copy/status for provider progress.
+- [ ] Refresh timeline after each status change.
+- [ ] Avoid duplicate concurrent refresh requests.
+
+### Dependencies
+
+- US-020.
+- US-021.
+
+### Notes
+
+- This is the visible operator experience after provider polling and auto-ingest exist.
+
+---
+
 ## Wave 1 Checklist
 
 ### P0
@@ -979,6 +1094,8 @@ As an operator, I want the console to detect invalid Comfy references before sub
 - [x] US-014 — Validate Existing Asset Review Against Publication Flow
 - [x] US-017 — Resolve Comfy Reference Image Contract
 - [ ] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
+- [ ] US-020 — Poll Comfy Cloud Generation Status
+- [ ] US-021 — Auto-Ingest Completed Comfy Output
 
 ### P1
 
@@ -988,3 +1105,4 @@ As an operator, I want the console to detect invalid Comfy references before sub
 - [x] US-016 — Harden Legacy Asset Review Workflow SQL Handling
 - [x] US-015 — Wave 1 Runbook
 - [ ] US-019 — Comfy Generation Preflight And Operator Error
+- [ ] US-022 — Console Auto-Refresh For Generating Jobs

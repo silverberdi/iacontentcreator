@@ -37,6 +37,9 @@ Remaining for Wave 1:
 
 - Prepare or sync required reference assets for Comfy Cloud without manual operator upload.
 - Add preflight validation and clear operator errors for missing Comfy references.
+- Poll Comfy Cloud after submission so `generating` jobs update when the provider finishes.
+- Auto-ingest completed Comfy outputs without manual copy/paste of the output URL.
+- Auto-refresh the console while a publication job is generating.
 - Use the runbook in at least one live production cycle and capture gaps.
 
 ## Canonical Backlog
@@ -60,7 +63,7 @@ dc539e40-c15f-47bb-9d7f-68ca901334e2
 Validated state:
 
 ```text
-comfy-reference-contract-resolved
+comfy-output-generated-but-not-auto-ingested
 ```
 
 Selected asset:
