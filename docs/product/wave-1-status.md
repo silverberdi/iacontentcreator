@@ -17,7 +17,6 @@ Completed:
 - Create publication job.
 - Generate publication brief through `ai-gateway` and DeepSeek.
 - Generate Comfy-ready prompt pack.
-- Submit image generation to Comfy Cloud through `ai-gateway`.
 - Ingest generated Comfy output into MinIO/Postgres.
 - Reopen existing publication jobs from the console.
 - Select the publication asset.
@@ -30,10 +29,16 @@ Completed:
 - Validate existing Asset Review against the publication flow.
 - Create the Wave 1 operator runbook.
 
+Partially implemented but blocked in live testing:
+
+- Submit image generation to Comfy Cloud through `ai-gateway`.
+
 Remaining for Wave 1:
 
+- Resolve Comfy reference-image contract so MinIO object paths are not treated as Comfy local `LoadImage` filenames.
+- Prepare or sync required reference assets for Comfy Cloud without manual operator upload.
+- Add preflight validation and clear operator errors for missing Comfy references.
 - Use the runbook in at least one live production cycle and capture gaps.
-- No known technical US remain open in Wave 1.
 
 ## Canonical Backlog
 
@@ -56,7 +61,7 @@ dc539e40-c15f-47bb-9d7f-68ca901334e2
 Validated state:
 
 ```text
-published-flow-capable
+blocked-at-comfy-reference-input
 ```
 
 Selected asset:

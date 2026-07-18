@@ -844,6 +844,121 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 
 ---
 
+## US-017 — Resolve Comfy Reference Image Contract
+
+Status: Ready  
+Priority: P0  
+Epic: EPIC-01 Publications  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want image generation to use reference images that Comfy Cloud can actually load, so that generation does not fail with missing `LoadImage` files.
+
+### Acceptance Criteria
+
+- [ ] Prompt pack no longer passes MinIO `objectPath` as if it were a Comfy local input filename.
+- [ ] The Comfy handoff contract clearly distinguishes `minioObjectPath`, public/proxy URL, and Comfy input filename.
+- [ ] `Generate images` submits only reference inputs that are valid for the target Comfy Cloud workflow.
+- [ ] Existing canonical/reference images can still be used for identity guidance without manual upload by the operator.
+- [ ] Failure message explains the exact missing reference asset and the expected remediation.
+
+### Technical Tasks
+
+- [ ] Inspect the ai-gateway Comfy workflow patcher and identify how node `47: LoadImage` is populated.
+- [ ] Define a `referenceImage` object contract instead of a plain string.
+- [ ] Update prompt-pack generation to emit structured reference image metadata.
+- [ ] Update generation submission to send the new contract to ai-gateway.
+- [ ] Update ai-gateway patching logic to avoid writing raw MinIO paths into `LoadImage`.
+- [ ] Validate with an Estefania job using the same scene that failed.
+
+### Dependencies
+
+- US-003.
+- US-004.
+
+### Notes
+
+- Root cause found during live Wave 1 testing: Comfy Cloud failed with `The system couldn't load this image` because `LoadImage` received `avatars/estefania-montealegre/raw-image/estefania-raw-image-night-city-20260604T055247-2Z.png`, which exists as a MinIO object path but not as a Comfy Cloud input file.
+- We should not require the operator to upload images manually to Comfy Cloud.
+
+---
+
+## US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
+
+Status: Backlog  
+Priority: P0  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1  
+
+### User Story
+
+As the system, I want to make required reference images available to Comfy Cloud before submission, so that workflows using `LoadImage` can run without manual file uploads.
+
+### Acceptance Criteria
+
+- [ ] Given a MinIO canonical/reference asset, the system can prepare a Comfy-loadable input.
+- [ ] If Comfy Cloud supports upload-by-API, the system uploads the asset and receives/stores the Comfy input filename.
+- [ ] If Comfy Cloud supports URL-based loading instead, the workflow patcher uses the URL-compatible node/field.
+- [ ] Prepared reference mapping is stored with the generation job metadata.
+- [ ] Repeated generation can reuse an already prepared reference image when possible.
+
+### Technical Tasks
+
+- [ ] Confirm Comfy Cloud API support for file upload or URL image input.
+- [ ] Add ai-gateway function to download from authenticated MinIO/public proxy and prepare the Comfy input.
+- [ ] Store mapping `{ assetId, minioObjectPath, comfyInputName, preparedAt }`.
+- [ ] Update generation submission to call preparation before workflow submit.
+- [ ] Add server-side validation when preparation fails.
+
+### Dependencies
+
+- US-017.
+
+### Notes
+
+- This is the operational fix if the current Comfy workflow must keep `LoadImage`.
+- If US-017 can replace `LoadImage` with URL-compatible input safely, this story may shrink or become unnecessary.
+
+---
+
+## US-019 — Comfy Generation Preflight And Operator Error
+
+Status: Backlog  
+Priority: P1  
+Epic: EPIC-04 Admin Operations  
+Wave: Wave 1  
+
+### User Story
+
+As an operator, I want the console to detect invalid Comfy references before submitting generation, so that failures are clear and recoverable from the console.
+
+### Acceptance Criteria
+
+- [ ] Before Comfy submission, the system validates required reference images and workflow inputs.
+- [ ] Missing/unprepared reference images block submission with a clear operator-facing error.
+- [ ] The publication job is marked `failed` with a timeline `step-failed` event.
+- [ ] Retry becomes available after the missing reference condition is fixed.
+- [ ] Technical details are visible only in technical mode.
+
+### Technical Tasks
+
+- [ ] Add preflight validation to `/publications/jobs/generate-images`.
+- [ ] Return structured error payloads from ai-gateway.
+- [ ] Map Comfy validation errors into `record-error`/timeline.
+- [ ] Add a test using the failed `night-city` reference path.
+
+### Dependencies
+
+- US-017.
+- US-013.
+
+### Notes
+
+- This prevents silent or confusing Comfy-side failures from becoming an operator guessing game.
+
+---
+
 ## Wave 1 Checklist
 
 ### P0
@@ -860,6 +975,8 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 - [x] US-009 — Mark Publication As Published
 - [x] US-011 — Estefanía Business Profile Configuration
 - [x] US-014 — Validate Existing Asset Review Against Publication Flow
+- [ ] US-017 — Resolve Comfy Reference Image Contract
+- [ ] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
 
 ### P1
 
@@ -868,3 +985,4 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 - [x] US-013 — Publication Job Error Handling And Retry
 - [x] US-016 — Harden Legacy Asset Review Workflow SQL Handling
 - [x] US-015 — Wave 1 Runbook
+- [ ] US-019 — Comfy Generation Preflight And Operator Error
