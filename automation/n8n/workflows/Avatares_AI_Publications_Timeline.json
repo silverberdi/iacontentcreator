@@ -1,0 +1,148 @@
+{
+  "updatedAt": "2026-07-18T00:00:00.000Z",
+  "createdAt": "2026-07-18T00:00:00.000Z",
+  "id": "AvAIPubTimeline01",
+  "name": "Avatares AI - Publications - Timeline",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/timeline",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "timeline-001",
+      "name": "POST /publications/jobs/timeline",
+      "webhookId": "publication-job-timeline-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(publicationJobId)) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId is required' AS error;\" } }];\n}\nconst query = `\nCREATE TABLE IF NOT EXISTS publication_job_events (\n  event_id text PRIMARY KEY DEFAULT md5(random()::text || clock_timestamp()::text),\n  publication_job_id uuid NOT NULL,\n  event_type text NOT NULL,\n  event_label text NOT NULL,\n  event_status text NOT NULL DEFAULT 'completed',\n  event_payload jsonb NOT NULL DEFAULT '{}'::jsonb,\n  error_message text,\n  created_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_publication_job_events_job_created\n  ON publication_job_events (publication_job_id, created_at);\nWITH job AS (\n  SELECT *\n  FROM publication_jobs\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n  LIMIT 1\n), metadata_events AS (\n  SELECT * FROM (\n    VALUES\n      ('job-created', 'Publication job created', 'completed', (SELECT created_at FROM job), jsonb_build_object('status', (SELECT status FROM job)), NULL),\n      ('brief-ready', 'Creative brief ready', 'completed', COALESCE(((SELECT metadata FROM job)->>'briefGeneratedAt')::timestamptz, (SELECT updated_at FROM job)), jsonb_build_object('provider', (SELECT metadata FROM job)->>'briefProvider'), NULL),\n      ('prompt-ready', 'Prompt pack ready', 'completed', COALESCE(((SELECT metadata FROM job)->>'promptPackGeneratedAt')::timestamptz, (SELECT updated_at FROM job)), jsonb_build_object('assetType', (SELECT asset_type FROM job)), NULL),\n      ('generation-submitted', 'Image generation submitted', 'completed', COALESCE(((SELECT metadata FROM job)->>'generationSubmittedAt')::timestamptz, (SELECT updated_at FROM job)), jsonb_build_object('generationJobId', (SELECT metadata FROM job)->>'generationJobId', 'provider', (SELECT metadata FROM job)->>'generationProvider'), NULL),\n      ('generated-output-ingested', 'Generated image ingested', 'completed', COALESCE(((SELECT metadata FROM job)->>'generatedAssetReadyAt')::timestamptz, (SELECT updated_at FROM job)), jsonb_build_object('assetId', (SELECT metadata FROM job)->>'latestGeneratedAssetId', 'objectPath', (SELECT metadata FROM job)->>'latestGeneratedAssetObjectPath'), NULL),\n      ('asset-selected', 'Publication asset selected', 'completed', COALESCE(((SELECT metadata FROM job)->>'selectedAssetAt')::timestamptz, (SELECT updated_at FROM job)), jsonb_build_object('assetId', (SELECT metadata FROM job)->>'selectedAssetId', 'objectPath', (SELECT metadata FROM job)->>'selectedAssetObjectPath'), NULL),\n      ('copy-ready', 'Caption and copy ready', 'completed', COALESCE(((SELECT metadata FROM job)->>'copyPackGeneratedAt')::timestamptz, (SELECT updated_at FROM job)), jsonb_build_object('language', COALESCE((SELECT publishing_pack FROM job)->>'language', '')), NULL),\n      ('ready-to-publish', 'Publishing pack exported', 'completed', COALESCE(((SELECT metadata FROM job)->>'publishingExportedAt')::timestamptz, (SELECT updated_at FROM job)), COALESCE((SELECT metadata FROM job)->'publishingExport', '{}'::jsonb), NULL),\n      ('published', 'Publication marked as published', 'completed', COALESCE(((SELECT metadata FROM job)->>'publishedAt')::timestamptz, (SELECT updated_at FROM job)), COALESCE((SELECT metadata FROM job)->'publishedRecord', '{}'::jsonb), NULL),\n      ('failed', 'Workflow error', 'failed', (SELECT updated_at FROM job), jsonb_build_object('status', (SELECT status FROM job)), (SELECT error_message FROM job))\n  ) AS e(event_type, event_label, event_status, created_at, event_payload, error_message)\n  WHERE EXISTS (SELECT 1 FROM job)\n    AND CASE event_type\n      WHEN 'job-created' THEN true\n      WHEN 'brief-ready' THEN (SELECT brief FROM job) IS NOT NULL\n      WHEN 'prompt-ready' THEN (SELECT prompt_pack FROM job) IS NOT NULL\n      WHEN 'generation-submitted' THEN (SELECT metadata FROM job)->>'generationJobId' IS NOT NULL\n      WHEN 'generated-output-ingested' THEN (SELECT metadata FROM job)->>'latestGeneratedAssetId' IS NOT NULL\n      WHEN 'asset-selected' THEN (SELECT metadata FROM job)->>'selectedAssetId' IS NOT NULL\n      WHEN 'copy-ready' THEN (SELECT publishing_pack FROM job) IS NOT NULL\n      WHEN 'ready-to-publish' THEN (SELECT metadata FROM job)->'publishingExport' IS NOT NULL\n      WHEN 'published' THEN (SELECT metadata FROM job)->'publishedRecord' IS NOT NULL OR (SELECT status FROM job) = 'published'\n      WHEN 'failed' THEN (SELECT status FROM job) = 'failed' OR COALESCE((SELECT error_message FROM job), '') <> ''\n      ELSE false\n    END\n), persisted_events AS (\n  SELECT\n    event_type,\n    event_label,\n    event_status,\n    created_at,\n    event_payload,\n    error_message\n  FROM publication_job_events\n  WHERE publication_job_id = ${sql(publicationJobId)}::uuid\n), all_events AS (\n  SELECT * FROM metadata_events\n  UNION ALL\n  SELECT * FROM persisted_events\n), ordered_events AS (\n  SELECT DISTINCT ON (event_type, event_label, created_at)\n    event_type,\n    event_label,\n    event_status,\n    created_at,\n    event_payload,\n    error_message\n  FROM all_events\n  ORDER BY event_type, event_label, created_at, event_status\n), next_action AS (\n  SELECT CASE (SELECT status FROM job)\n    WHEN 'draft' THEN jsonb_build_object('action', 'generate-brief', 'label', 'Generate brief', 'description', 'Generate or paste the creative brief for this publication.')\n    WHEN 'brief-ready' THEN jsonb_build_object('action', 'generate-prompt-pack', 'label', 'Generate prompt pack', 'description', 'Create the Comfy-ready prompt pack from the approved brief.')\n    WHEN 'prompt-ready' THEN jsonb_build_object('action', 'generate-images', 'label', 'Generate images', 'description', 'Submit the prompt pack to Comfy Cloud.')\n    WHEN 'generating' THEN jsonb_build_object('action', 'ingest-output', 'label', 'Ingest Comfy output', 'description', 'Wait for the generated image, then paste the Comfy output URL.')\n    WHEN 'review-ready' THEN jsonb_build_object('action', 'select-asset', 'label', 'Select publication asset', 'description', 'Review the generated image and select it for this publication job.')\n    WHEN 'assets-ready' THEN jsonb_build_object('action', 'generate-copy-pack', 'label', 'Generate copy', 'description', 'Generate or edit the caption and publishing copy.')\n    WHEN 'copy-ready' THEN jsonb_build_object('action', 'export-pack', 'label', 'Export publishing pack', 'description', 'Prepare the image URL, caption, hashtags, and manual publishing instructions.')\n    WHEN 'ready-to-publish' THEN jsonb_build_object('action', 'publish-manually', 'label', 'Publish manually and record URL', 'description', 'Post from the Instagram account, then mark the job as published.')\n    WHEN 'published' THEN jsonb_build_object('action', 'complete', 'label', 'Complete', 'description', 'This publication has been recorded as published.')\n    WHEN 'failed' THEN jsonb_build_object('action', 'review-error', 'label', 'Review error', 'description', 'Read the error, fix the cause, and retry the failed step.')\n    ELSE jsonb_build_object('action', 'inspect-status', 'label', 'Inspect status', 'description', 'Review the current job status and continue from the matching section.')\n  END AS value\n  WHERE EXISTS (SELECT 1 FROM job)\n)\nSELECT\n  EXISTS (SELECT 1 FROM job) AS ok,\n  CASE WHEN EXISTS (SELECT 1 FROM job) THEN NULL ELSE 'Publication job not found' END AS error,\n  CASE WHEN EXISTS (SELECT 1 FROM job) THEN jsonb_build_object(\n    'publicationJobId', (SELECT publication_job_id FROM job),\n    'status', (SELECT status FROM job),\n    'errorMessage', (SELECT error_message FROM job),\n    'nextAction', (SELECT value FROM next_action),\n    'events', COALESCE((\n      SELECT jsonb_agg(jsonb_build_object(\n        'eventType', event_type,\n        'label', event_label,\n        'status', event_status,\n        'createdAt', created_at,\n        'payload', event_payload,\n        'errorMessage', error_message\n      ) ORDER BY created_at ASC NULLS LAST)\n      FROM ordered_events\n    ), '[]'::jsonb)\n  ) ELSE NULL END AS timeline;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "timeline-002",
+      "name": "Build Timeline Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "timeline-003",
+      "name": "Load Publication Timeline",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nconst row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, error: row.error || 'Publication timeline could not be loaded.' } }];\n}\nreturn [{ json: { ok: true, timeline: parse(row.timeline, null) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "timeline-004",
+      "name": "Return Publication Timeline"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "timeline-005",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/timeline": {
+      "main": [
+        [
+          {
+            "node": "Build Timeline Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Timeline Query": {
+      "main": [
+        [
+          {
+            "node": "Load Publication Timeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Publication Timeline": {
+      "main": [
+        [
+          {
+            "node": "Return Publication Timeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Publication Timeline": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "publication-timeline-v1",
+  "activeVersionId": "publication-timeline-v1",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "tags": []
+}

@@ -1,8 +1,8 @@
 {
   "exportedAt": "2026-07-14",
   "source": "ssh://silverman@192.168.0.194 docker exec local-ai-stack-n8n-1 n8n export:workflow --all",
-  "totalExported": 52,
-  "avataresWorkflows": 52,
+  "totalExported": 53,
+  "avataresWorkflows": 53,
   "workflows": [
     {
       "name": "Avatares AI - Admin - Auto Ingest Health",
@@ -699,6 +699,20 @@
           "node": "POST /publications/jobs/mark-published",
           "method": "POST",
           "path": "publications/jobs/mark-published"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Publications - Timeline",
+      "id": "AvAIPubTimeline01",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Publications_Timeline.json",
+      "webhooks": [
+        {
+          "node": "POST /publications/jobs/timeline",
+          "method": "POST",
+          "path": "publications/jobs/timeline"
         }
       ]
     }

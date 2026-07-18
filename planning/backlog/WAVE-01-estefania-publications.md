@@ -583,7 +583,7 @@ As an operator, I want to mark a publication as published, so that the system re
 
 ## US-010 — Publication Job Timeline
 
-Status: Backlog  
+Status: Done  
 Priority: P1  
 Epic: EPIC-04 Admin Operations  
 Wave: Wave 1  
@@ -594,17 +594,17 @@ As an operator, I want to see the timeline of a publication job, so that I under
 
 ### Acceptance Criteria
 
-- [ ] Each important event is recorded.
-- [ ] Console shows job status and timeline.
-- [ ] Errors are visible in human-readable form.
-- [ ] Operator can identify the next required action.
+- [x] Each important event is recorded.
+- [x] Console shows job status and timeline.
+- [x] Errors are visible in human-readable form.
+- [x] Operator can identify the next required action.
 
 ### Technical Tasks
 
-- [ ] Create `publication_job_events` table.
-- [ ] Add event writes in n8n workflows.
-- [ ] Add event list endpoint.
-- [ ] Add timeline component.
+- [x] Create `publication_job_events` table.
+- [x] Add event writes in n8n workflows.
+- [x] Add event list endpoint.
+- [x] Add timeline component.
 
 ### Dependencies
 
@@ -613,6 +613,7 @@ As an operator, I want to see the timeline of a publication job, so that I under
 ### Notes
 
 - This is the bridge from technical workflow to operator trust.
+- Implemented with a timeline endpoint that creates `publication_job_events` and reconstructs key events from the current `publication_jobs` status/metadata, so existing Wave 1 jobs have an operational timeline immediately.
 
 ---
 
@@ -818,7 +819,7 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 
 ### P1
 
-- [ ] US-010 — Publication Job Timeline
+- [x] US-010 — Publication Job Timeline
 - [ ] US-012 — Operator Home / Next Action View
 - [ ] US-013 — Publication Job Error Handling And Retry
 - [ ] US-015 — Wave 1 Runbook

@@ -15,11 +15,14 @@ import type {
   IngestComfyOutputPayload,
   IngestComfyOutputResponse,
   IngestComfyOutputResult,
+  LoadPublicationTimelinePayload,
+  LoadPublicationTimelineResponse,
   ListPublicationJobsPayload,
   ListPublicationJobsResponse,
   MarkPublicationPublishedPayload,
   MarkPublicationPublishedResponse,
   PublicationJobLoadItem,
+  PublicationJobTimeline,
   SelectPublicationAssetPayload,
   SelectPublicationAssetResponse,
   SelectPublicationAssetResult,
@@ -137,6 +140,19 @@ export async function markPublicationPublished(
     throw new Error(data.error || data.reason || data.message || "Publication was not marked as published.");
   }
   return { job, publishedRecord };
+}
+
+export async function loadPublicationTimeline(
+  payload: LoadPublicationTimelinePayload,
+): Promise<PublicationJobTimeline> {
+  const data = await postN8nJson<LoadPublicationTimelineResponse>(
+    "/publications/jobs/timeline",
+    payload,
+  );
+  if (!data.ok || !data.timeline) {
+    throw new Error(data.error || data.reason || data.message || "Publication timeline could not be loaded.");
+  }
+  return data.timeline;
 }
 
 export async function ingestComfyOutput(

@@ -8,6 +8,7 @@ import {
   generatePublicationPromptPack,
   ingestComfyOutput,
   listPublicationJobs,
+  loadPublicationTimeline,
   markPublicationPublished,
   selectPublicationAsset,
 } from "../api/publicationsApi";
@@ -23,6 +24,7 @@ import type {
   IngestComfyOutputResult,
   PublicationAssetSummary,
   PublicationJobLoadItem,
+  PublicationJobTimeline,
   PublicationJob,
   PublicationPromptPack,
 } from "../types/publications";
@@ -85,6 +87,9 @@ export default function PublicationsPanel({
   const [publishedNotes, setPublishedNotes] = useState("");
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<PublicationJobTimeline | null>(null);
+  const [timelineBusy, setTimelineBusy] = useState(false);
+  const [timelineMessage, setTimelineMessage] = useState<string | null>(null);
   const [loadJobId, setLoadJobId] = useState("");
   const [recentJobs, setRecentJobs] = useState<PublicationJobLoadItem[]>([]);
   const [loadBusy, setLoadBusy] = useState(false);
@@ -117,6 +122,30 @@ export default function PublicationsPanel({
   const avatarShort = findAvatarShort(catalogOptions, avatar);
   const canCreate = Boolean(avatar && scene && format && objective.trim());
 
+  async function refreshTimeline(publicationJobId: string) {
+    setTimelineBusy(true);
+    setTimelineMessage(null);
+    try {
+      const loadedTimeline = await loadPublicationTimeline({ publicationJobId });
+      setTimeline(loadedTimeline);
+      setTimelineMessage("Timeline refreshed.");
+    } catch (err) {
+      setTimeline(null);
+      setTimelineMessage(err instanceof Error ? err.message : "Timeline could not be loaded.");
+    } finally {
+      setTimelineBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!createdJob?.publicationJobId) {
+      setTimeline(null);
+      setTimelineMessage(null);
+      return;
+    }
+    void refreshTimeline(createdJob.publicationJobId);
+  }, [createdJob?.publicationJobId, createdJob?.status, createdJob?.updatedAt]);
+
   function applyLoadedJob(item: PublicationJobLoadItem) {
     const job = item.job;
     setCreatedJob(job);
@@ -137,6 +166,8 @@ export default function PublicationsPanel({
     setPublishedUrl("");
     setPublishedAt("");
     setPublishedNotes("");
+    setTimeline(null);
+    setTimelineMessage(null);
     const existingPublication = job.publishedRecord || null;
     if (existingPublication) {
       setPublishPlatform(existingPublication.platform || "instagram");
@@ -230,6 +261,8 @@ export default function PublicationsPanel({
     setIngestResult(null);
     setLatestAsset(null);
     setSelectedAsset(null);
+    setTimeline(null);
+    setTimelineMessage(null);
     try {
       const job = await createPublicationJob({
         avatar,
@@ -748,6 +781,99 @@ export default function PublicationsPanel({
           </div>
         )}
       </SectionPanel>
+
+      {createdJob && (
+        <SectionPanel
+          title="Job Timeline"
+          description="Track what has happened and the next required operator action."
+          actions={
+            <button
+              type="button"
+              onClick={() => void refreshTimeline(createdJob.publicationJobId)}
+              disabled={timelineBusy}
+              className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs font-medium text-gray-200 hover:border-gray-500 disabled:opacity-50"
+            >
+              {timelineBusy ? "Refreshing..." : "Refresh timeline"}
+            </button>
+          }
+        >
+          {timelineMessage && (
+            <p
+              className={`mb-3 rounded-md border px-3 py-2 text-sm ${
+                timeline
+                  ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-200"
+                  : "border-amber-800/60 bg-amber-950/40 text-amber-200"
+              }`}
+            >
+              {timelineMessage}
+            </p>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+            <div className="rounded-md border border-border bg-surface p-4">
+              <p className="text-xs uppercase tracking-wide text-gray-500">Current status</p>
+              <p className="mt-2 text-lg font-medium text-gray-100">
+                {timeline?.status || createdJob.status}
+              </p>
+              <p className="mt-4 text-xs uppercase tracking-wide text-gray-500">Next action</p>
+              <p className="mt-2 text-sm font-medium text-gray-100">
+                {timeline?.nextAction.label || "Refresh timeline"}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-400">
+                {timeline?.nextAction.description ||
+                  "Load the timeline to identify the next operator step."}
+              </p>
+              {timeline?.errorMessage && (
+                <p className="mt-4 rounded-md border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+                  {timeline.errorMessage}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-md border border-border bg-surface p-4">
+              {timelineBusy && !timeline ? (
+                <div className="flex items-center justify-center py-8 text-sm text-gray-500">
+                  <LoadingSpinner className="mr-2 size-4" label="Loading timeline..." />
+                  Loading timeline...
+                </div>
+              ) : timeline?.events.length ? (
+                <ol className="space-y-3">
+                  {timeline.events.map((event, index) => (
+                    <li
+                      key={`${event.eventType}-${event.createdAt || index}`}
+                      className="grid gap-3 rounded-md border border-border bg-surface-overlay p-3 md:grid-cols-[150px_1fr]"
+                    >
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-gray-500">
+                          {event.status}
+                        </p>
+                        <p className="mt-1 break-words text-xs text-gray-400">
+                          {event.createdAt || "pending"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-100">{event.label}</p>
+                        <p className="mt-1 font-mono text-xs text-gray-500">
+                          {event.eventType}
+                        </p>
+                        {event.errorMessage && (
+                          <p className="mt-2 rounded-md border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+                            {event.errorMessage}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="rounded-md border border-dashed border-border bg-surface px-4 py-8 text-center text-sm text-gray-500">
+                  No timeline events loaded yet.
+                </div>
+              )}
+            </div>
+          </div>
+        </SectionPanel>
+      )}
 
       {createdJob && (
         <SectionPanel

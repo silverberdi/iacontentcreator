@@ -173,6 +173,41 @@ export type PublicationPublishedRecord = {
   [key: string]: unknown;
 };
 
+export type PublicationTimelineEvent = {
+  eventType: string;
+  label: string;
+  status: "completed" | "pending" | "failed" | string;
+  createdAt?: string | null;
+  payload?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+};
+
+export type PublicationNextAction = {
+  action: string;
+  label: string;
+  description: string;
+};
+
+export type PublicationJobTimeline = {
+  publicationJobId: string;
+  status: PublicationJobStatus;
+  errorMessage?: string | null;
+  nextAction: PublicationNextAction;
+  events: PublicationTimelineEvent[];
+};
+
+export type LoadPublicationTimelinePayload = {
+  publicationJobId: string;
+};
+
+export type LoadPublicationTimelineResponse = {
+  ok?: boolean;
+  timeline?: PublicationJobTimeline;
+  message?: string;
+  error?: string;
+  reason?: string;
+};
+
 export type GeneratePublicationCopyPackPayload = {
   publicationJobId: string;
   copyPack?: PublicationCopyPack;
