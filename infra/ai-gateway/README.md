@@ -19,6 +19,7 @@ GET /health
 POST /publication-brief
 POST /publication-copy-pack
 POST /comfy/publication-submit
+POST /comfy/publication-status
 POST /comfy/download-output
 ```
 
@@ -79,6 +80,8 @@ Do not publish this service to the LAN or internet. It should only be reachable 
 `POST /comfy/publication-submit` patches the Estefania Comfy Cloud API workflow from a publication prompt pack and submits it using the configured Comfy Cloud credentials.
 
 Set `dryRun: true` in the request body to return the patched workflow without calling Comfy Cloud.
+
+`POST /comfy/publication-status` checks Comfy Cloud history for a submitted `promptId` or `providerResponse.prompt_id`. It returns `running`, `completed`, or `error` plus output metadata. Completed image outputs include a gateway-built `https://cloud.comfy.org/api/view` URL for downstream ingest.
 
 Reference images use an explicit handoff contract:
 

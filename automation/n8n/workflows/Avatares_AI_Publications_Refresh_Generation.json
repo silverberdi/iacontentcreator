@@ -1,0 +1,197 @@
+{
+  "name": "Avatares AI - Publications - Refresh Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publications/jobs/refresh-generation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "refresh-generation-001",
+      "name": "POST /publications/jobs/refresh-generation",
+      "webhookId": "refresh-generation-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst publicationJobId = String(body.publicationJobId || body.publication_job_id || '').trim();\nconst generationJobId = String(body.generationJobId || body.generation_job_id || '').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst hasPublicationJobId = uuidRegex.test(publicationJobId);\nconst hasGenerationJobId = uuidRegex.test(generationJobId);\nif (!hasPublicationJobId && !hasGenerationJobId) {\n  return [{ json: { query: \"SELECT false AS ok, 'publicationJobId or generationJobId is required' AS error;\" } }];\n}\nconst generationConditions = [];\nif (hasGenerationJobId) generationConditions.push(`gj.job_id = ${sql(generationJobId)}::uuid`);\nif (hasPublicationJobId) generationConditions.push(`gj.request_payload->>'publicationJobId' = ${sql(publicationJobId)}`);\nif (hasPublicationJobId) generationConditions.push(`gj.job_id::text = (SELECT metadata->>'generationJobId' FROM publication_jobs WHERE publication_job_id = ${sql(publicationJobId)}::uuid LIMIT 1)`);\nconst publicationConditions = [];\nif (hasPublicationJobId) publicationConditions.push(`pj.publication_job_id = ${sql(publicationJobId)}::uuid`);\nif (hasGenerationJobId) publicationConditions.push(`pj.metadata->>'generationJobId' = ${sql(generationJobId)}`);\nconst query = `\nWITH selected_generation AS (\n  SELECT gj.*\n  FROM generation_jobs gj\n  WHERE ${generationConditions.join(' OR ')}\n  ORDER BY gj.updated_at DESC\n  LIMIT 1\n), selected_publication AS (\n  SELECT pj.*\n  FROM publication_jobs pj\n  LEFT JOIN selected_generation sg ON true\n  WHERE ${publicationConditions.length ? publicationConditions.join(' OR ') + ' OR ' : ''}(sg.job_id IS NOT NULL AND pj.publication_job_id::text = sg.request_payload->>'publicationJobId')\n  ORDER BY pj.updated_at DESC\n  LIMIT 1\n)\nSELECT\n  CASE WHEN EXISTS (SELECT 1 FROM selected_generation) THEN true ELSE false END AS ok,\n  CASE WHEN NOT EXISTS (SELECT 1 FROM selected_generation) THEN 'Generation job not found' ELSE NULL END AS error,\n  (SELECT jsonb_build_object(\n    'publicationJobId', publication_job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'format', format,\n    'status', status,\n    'metadata', metadata\n  ) FROM selected_publication) AS job,\n  (SELECT jsonb_build_object(\n    'generationJobId', job_id,\n    'status', status,\n    'runMode', run_mode,\n    'requestPayload', request_payload,\n    'resultPayload', result_payload,\n    'providerPromptId', COALESCE(result_payload->>'providerPromptId', result_payload->'providerResponse'->>'prompt_id', result_payload->'gateway'->'response'->>'prompt_id'),\n    'providerResponse', COALESCE(result_payload->'providerResponse', result_payload->'gateway'->'response')\n  ) FROM selected_generation) AS generation;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        0
+      ],
+      "id": "refresh-generation-002",
+      "name": "Build Load Generation Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        0
+      ],
+      "id": "refresh-generation-003",
+      "name": "Load Generation Context",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nfunction sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { query: `SELECT false AS ok, ${sql(row.error || 'Generation job not found')} AS error;` } }];\n}\nconst job = parse(row.job, null);\nconst generation = parse(row.generation, null);\nif (!job || !generation) {\n  return [{ json: { query: `SELECT false AS ok, ${sql('Generation context is incomplete')} AS error;` } }];\n}\nlet gateway;\ntry {\n  gateway = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://ai-gateway:8095/comfy/publication-status',\n    headers: { 'Content-Type': 'application/json', 'X-Request-Id': `publication-comfy-status-${generation.generationJobId}` },\n    body: {\n      promptId: generation.providerPromptId,\n      providerResponse: generation.providerResponse,\n      generationJobId: generation.generationJobId,\n      publicationJobId: job.publicationJobId\n    },\n    json: true,\n    timeout: 120000\n  });\n} catch (error) {\n  gateway = { ok: false, status: 'error', error: error?.message || 'Comfy status request failed.' };\n}\nconst providerStatus = gateway?.status || (gateway?.completed ? 'completed' : (gateway?.ok ? 'running' : 'error'));\nconst failed = providerStatus === 'error' || gateway?.ok === false;\nconst completed = providerStatus === 'completed' || gateway?.completed === true;\nconst generationStatus = failed ? 'failed' : (completed ? 'completed' : 'running');\nconst publicationStatus = failed ? 'failed' : 'generating';\nconst eventType = failed ? 'generation-provider-failed' : (completed ? 'generation-provider-completed' : 'generation-provider-running');\nconst errorMessage = failed ? (gateway?.error || 'Comfy generation failed.') : null;\nconst outputs = Array.isArray(gateway?.outputs) ? gateway.outputs : [];\nconst statusPayload = {\n  provider: 'comfy-cloud',\n  providerPromptId: gateway?.promptId || generation.providerPromptId || null,\n  providerStatus,\n  providerOutputs: outputs,\n  providerStatusResponse: gateway,\n  providerLastCheckedAt: new Date().toISOString()\n};\nconst query = `\nCREATE TABLE IF NOT EXISTS publication_job_events (\n  event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  publication_job_id uuid NOT NULL REFERENCES publication_jobs(publication_job_id) ON DELETE CASCADE,\n  event_type text NOT NULL,\n  event_payload jsonb NOT NULL DEFAULT '{}'::jsonb,\n  created_at timestamptz NOT NULL DEFAULT now()\n);\nWITH updated_generation AS (\n  UPDATE generation_jobs\n  SET\n    status = ${sql(generationStatus)},\n    result_payload = COALESCE(result_payload, '{}'::jsonb) || ${sqlJson(statusPayload)},\n    error_message = ${sql(errorMessage)},\n    completed_at = CASE WHEN ${completed ? 'true' : 'false'} THEN COALESCE(completed_at, now()) ELSE completed_at END,\n    failed_at = CASE WHEN ${failed ? 'true' : 'false'} THEN COALESCE(failed_at, now()) ELSE failed_at END,\n    updated_at = now()\n  WHERE job_id = ${sql(generation.generationJobId)}::uuid\n  RETURNING *\n), updated_publication AS (\n  UPDATE publication_jobs pj\n  SET\n    status = ${sql(publicationStatus)},\n    error_message = ${sql(errorMessage)},\n    updated_at = now(),\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'generationJobId', ${sql(generation.generationJobId)}::uuid,\n      'generationProviderStatus', ${sql(providerStatus)},\n      'generationProviderPromptId', ${sql(statusPayload.providerPromptId)},\n      'generationProviderOutputs', ${sqlJson(outputs)},\n      'generationLastCheckedAt', now()\n    )\n  WHERE pj.publication_job_id = ${sql(job.publicationJobId)}::uuid\n  RETURNING *\n), event AS (\n  INSERT INTO publication_job_events (publication_job_id, event_type, event_payload)\n  VALUES (${sql(job.publicationJobId)}::uuid, ${sql(eventType)}, ${sqlJson(statusPayload)})\n  RETURNING *\n)\nSELECT\n  ${failed ? 'false' : 'true'} AS ok,\n  ${sql(errorMessage)} AS error,\n  (SELECT row_to_json(updated_publication) FROM updated_publication) AS job,\n  (SELECT jsonb_build_object(\n    'generationJobId', job_id,\n    'status', status,\n    'provider', 'comfy-cloud',\n    'providerPromptId', result_payload->>'providerPromptId',\n    'providerStatus', result_payload->>'providerStatus',\n    'providerOutputs', result_payload->'providerOutputs',\n    'completedAt', completed_at,\n    'failedAt', failed_at\n  ) FROM updated_generation) AS generation,\n  ${sqlJson(statusPayload)} AS provider;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "refresh-generation-004",
+      "name": "Refresh Comfy Status And Build Persist Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "refresh-generation-005",
+      "name": "Persist Generation Status",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, error: row.error || 'Generation refresh failed.', job: parse(row.job, null), generation: parse(row.generation, null), provider: parse(row.provider, null) } }];\n}\nreturn [{ json: { ok: true, job: parse(row.job, null), generation: parse(row.generation, null), provider: parse(row.provider, null) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "refresh-generation-006",
+      "name": "Return Refresh Generation"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "refresh-generation-007",
+      "name": "Respond"
+    }
+  ],
+  "connections": {
+    "POST /publications/jobs/refresh-generation": {
+      "main": [
+        [
+          {
+            "node": "Build Load Generation Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Load Generation Query": {
+      "main": [
+        [
+          {
+            "node": "Load Generation Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Generation Context": {
+      "main": [
+        [
+          {
+            "node": "Refresh Comfy Status And Build Persist Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Comfy Status And Build Persist Query": {
+      "main": [
+        [
+          {
+            "node": "Persist Generation Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Generation Status": {
+      "main": [
+        [
+          {
+            "node": "Return Refresh Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Refresh Generation": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "refresh-generation-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "AvAIPubRefreshGeneration01",
+  "tags": []
+}

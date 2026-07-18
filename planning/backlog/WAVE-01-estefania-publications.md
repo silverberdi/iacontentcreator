@@ -963,7 +963,7 @@ As an operator, I want the console to detect invalid Comfy references before sub
 
 ## US-020 — Poll Comfy Cloud Generation Status
 
-Status: Ready  
+Status: Done  
 Priority: P0  
 Epic: EPIC-06 AI Provider Router  
 Wave: Wave 1  
@@ -974,19 +974,19 @@ As an operator, I want the system to check whether a submitted Comfy Cloud gener
 
 ### Acceptance Criteria
 
-- [ ] After `Generate images`, the system stores the Comfy provider job/prompt id in `generation_jobs.result_payload` or metadata.
-- [ ] `ai-gateway` exposes a status endpoint that can query Comfy Cloud for that provider job/prompt id.
-- [ ] A n8n endpoint can refresh one publication job's generation status.
-- [ ] Completed Comfy status returns output image metadata, including a `cloud.comfy.org/api/view` URL or enough data to build one.
-- [ ] Failed Comfy status updates the publication job to `failed` with an operator-readable error.
+- [x] After `Generate images`, the system stores the Comfy provider job/prompt id in `generation_jobs.result_payload` or metadata.
+- [x] `ai-gateway` exposes a status endpoint that can query Comfy Cloud for that provider job/prompt id.
+- [x] A n8n endpoint can refresh one publication job's generation status.
+- [x] Completed Comfy status returns output image metadata, including a `cloud.comfy.org/api/view` URL or enough data to build one.
+- [x] Failed Comfy status updates the publication job to `failed` with an operator-readable error.
 
 ### Technical Tasks
 
-- [ ] Inspect actual Comfy Cloud submit response shape from `generation.providerResponse`.
-- [ ] Add `POST /comfy/publication-status` or equivalent to `ai-gateway`.
-- [ ] Add n8n workflow `POST /publications/jobs/refresh-generation`.
-- [ ] Update `generation_jobs` with provider status, output metadata, and completed/failed timestamps.
-- [ ] Add timeline events for submitted, running, completed, and failed provider states.
+- [x] Inspect actual Comfy Cloud submit response shape from `generation.providerResponse`.
+- [x] Add `POST /comfy/publication-status` or equivalent to `ai-gateway`.
+- [x] Add n8n workflow `POST /publications/jobs/refresh-generation`.
+- [x] Update `generation_jobs` with provider status, output metadata, and completed/failed timestamps.
+- [x] Add timeline events for submitted, running, completed, and failed provider states.
 
 ### Dependencies
 
@@ -996,7 +996,7 @@ As an operator, I want the system to check whether a submitted Comfy Cloud gener
 ### Notes
 
 - Live testing confirmed Comfy can finish while the console remains `generating`.
-- This story should not ingest yet; it only makes provider state visible and durable.
+- This story does not ingest yet; it only makes provider state visible and durable. Auto-ingest belongs to US-021.
 
 ---
 
@@ -1094,7 +1094,7 @@ As an operator, I want the console to refresh generating jobs automatically, so 
 - [x] US-014 — Validate Existing Asset Review Against Publication Flow
 - [x] US-017 — Resolve Comfy Reference Image Contract
 - [ ] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
-- [ ] US-020 — Poll Comfy Cloud Generation Status
+- [x] US-020 — Poll Comfy Cloud Generation Status
 - [ ] US-021 — Auto-Ingest Completed Comfy Output
 
 ### P1

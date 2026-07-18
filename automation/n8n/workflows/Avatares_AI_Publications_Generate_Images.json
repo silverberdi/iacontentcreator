@@ -60,7 +60,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, error: row.error || 'Image generation was not submitted.' } }];\n}\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nconst job = parse(row.job, null);\nconst generation = parse(row.generation, null);\nif (!job || !generation) {\n  return [{ json: { ok: false, error: 'Generation submission did not return job metadata.' } }];\n}\n\nconst promptPack = generation.promptPack || job.promptPack || {};\nconst referenceImages = Array.isArray(promptPack.referenceImages) ? promptPack.referenceImages : [];\nconst primaryReference = referenceImages[0] || null;\nconst referenceImage = primaryReference\n  ? {\n      contractVersion: 'comfy-reference-image-v1',\n      assetId: primaryReference.assetId || null,\n      minioBucket: primaryReference.minioBucket || primaryReference.bucket || null,\n      minioObjectPath: primaryReference.minioObjectPath || primaryReference.objectPath || null,\n      publicUrl: primaryReference.publicUrl || primaryReference.url || null,\n      comfyInputName: primaryReference.comfyInputName || null,\n      comfyLoadable: Boolean(primaryReference.comfyInputName),\n      source: primaryReference.source || 'prompt-pack-reference-images'\n    }\n  : null;\n\ntry {\n  const gateway = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://ai-gateway:8095/comfy/publication-submit',\n    headers: {\n      'Content-Type': 'application/json',\n      'X-Request-Id': `publication-comfy-${job.publicationJobId}`\n    },\n    body: {\n      job,\n      promptPack,\n      generationJobId: generation.generationJobId,\n      referenceImage,\n      dryRun: false\n    },\n    json: true,\n    timeout: 120000\n  });\n\n  if (!gateway?.ok) {\n    return [{\n      json: {\n        ok: false,\n        submitted: false,\n        error: gateway?.error || 'Comfy Cloud submission failed.',\n        job,\n        generation: {\n          ...generation,\n          status: 'error',\n          runMode: 'comfy-cloud-api',\n          provider: 'comfy-cloud',\n          providerRequestId: gateway?.requestId || null,\n          providerError: gateway || null\n        }\n      }\n    }];\n  }\n\n  return [{\n    json: {\n      ok: true,\n      submitted: true,\n      job,\n      generation: {\n        ...generation,\n        runMode: 'comfy-cloud-api',\n        provider: 'comfy-cloud',\n        providerRequestId: gateway.requestId || null,\n        providerResponse: gateway.response || null,\n        patched: gateway.patched || null\n      }\n    }\n  }];\n} catch (error) {\n  return [{\n    json: {\n      ok: false,\n      submitted: false,\n      error: error?.message || 'Comfy Cloud gateway request failed.',\n      job,\n      generation: {\n        ...generation,\n        status: 'error',\n        runMode: 'comfy-cloud-api',\n        provider: 'comfy-cloud'\n      }\n    }\n  }];\n}"
+        "jsCode": "const row = $input.first()?.json || {};\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nfunction sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { query: `SELECT false AS ok, ${sql(row.error || 'Image generation was not submitted.')} AS error;` } }];\n}\nconst job = parse(row.job, null);\nconst generation = parse(row.generation, null);\nif (!job || !generation) {\n  return [{ json: { query: `SELECT false AS ok, ${sql('Generation submission did not return job metadata.')} AS error;` } }];\n}\nconst promptPack = generation.promptPack || job.promptPack || {};\nconst referenceImages = Array.isArray(promptPack.referenceImages) ? promptPack.referenceImages : [];\nconst primaryReference = referenceImages[0] || null;\nconst referenceImage = primaryReference\n  ? {\n      contractVersion: 'comfy-reference-image-v1',\n      assetId: primaryReference.assetId || null,\n      minioBucket: primaryReference.minioBucket || primaryReference.bucket || null,\n      minioObjectPath: primaryReference.minioObjectPath || primaryReference.objectPath || null,\n      publicUrl: primaryReference.publicUrl || primaryReference.url || null,\n      comfyInputName: primaryReference.comfyInputName || null,\n      comfyLoadable: Boolean(primaryReference.comfyInputName),\n      source: primaryReference.source || 'prompt-pack-reference-images'\n    }\n  : null;\nlet gateway;\ntry {\n  gateway = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'http://ai-gateway:8095/comfy/publication-submit',\n    headers: {\n      'Content-Type': 'application/json',\n      'X-Request-Id': `publication-comfy-${job.publicationJobId}`\n    },\n    body: {\n      job,\n      promptPack,\n      generationJobId: generation.generationJobId,\n      referenceImage,\n      dryRun: false\n    },\n    json: true,\n    timeout: 120000\n  });\n} catch (error) {\n  gateway = { ok: false, error: error?.message || 'Comfy Cloud gateway request failed.' };\n}\nconst providerPromptId = gateway?.promptId || gateway?.response?.prompt_id || gateway?.response?.promptId || null;\nconst providerPayload = {\n  provider: 'comfy-cloud',\n  providerRequestId: gateway?.requestId || null,\n  providerPromptId,\n  providerResponse: gateway?.response || null,\n  providerStatus: gateway?.ok ? 'submitted' : 'submission_failed',\n  providerSubmittedAt: new Date().toISOString(),\n  patched: gateway?.patched || null,\n  gateway\n};\nconst generationStatus = gateway?.ok ? 'running' : 'failed';\nconst publicationStatus = gateway?.ok ? 'generating' : 'failed';\nconst eventType = gateway?.ok ? 'generation-submitted' : 'generation-submit-failed';\nconst errorMessage = gateway?.ok ? null : (gateway?.error || 'Comfy Cloud submission failed.');\nconst query = `\nCREATE TABLE IF NOT EXISTS publication_job_events (\n  event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  publication_job_id uuid NOT NULL REFERENCES publication_jobs(publication_job_id) ON DELETE CASCADE,\n  event_type text NOT NULL,\n  event_payload jsonb NOT NULL DEFAULT '{}'::jsonb,\n  created_at timestamptz NOT NULL DEFAULT now()\n);\nWITH updated_generation AS (\n  UPDATE generation_jobs\n  SET\n    status = ${sql(generationStatus)},\n    result_payload = COALESCE(result_payload, '{}'::jsonb) || ${sqlJson(providerPayload)},\n    error_message = ${sql(errorMessage)},\n    failed_at = CASE WHEN ${sql(generationStatus)} = 'failed' THEN now() ELSE failed_at END,\n    updated_at = now()\n  WHERE job_id = ${sql(generation.generationJobId)}::uuid\n  RETURNING *\n), updated_publication AS (\n  UPDATE publication_jobs pj\n  SET\n    status = ${sql(publicationStatus)},\n    error_message = ${sql(errorMessage)},\n    updated_at = now(),\n    metadata = COALESCE(pj.metadata, '{}'::jsonb) || jsonb_build_object(\n      'generationJobId', ${sql(generation.generationJobId)}::uuid,\n      'generationProviderStatus', ${sql(providerPayload.providerStatus)},\n      'generationProviderPromptId', ${sql(providerPromptId)},\n      'generationProviderSubmittedAt', now()\n    )\n  WHERE pj.publication_job_id = ${sql(job.publicationJobId)}::uuid\n  RETURNING *\n), event AS (\n  INSERT INTO publication_job_events (publication_job_id, event_type, event_payload)\n  VALUES (${sql(job.publicationJobId)}::uuid, ${sql(eventType)}, ${sqlJson(providerPayload)})\n  RETURNING *\n)\nSELECT\n  ${gateway?.ok ? 'true' : 'false'} AS ok,\n  ${sql(errorMessage)} AS error,\n  (SELECT row_to_json(updated_publication) FROM updated_publication) AS job,\n  (SELECT jsonb_build_object(\n    'generationJobId', job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'assetType', asset_type,\n    'platform', platform,\n    'status', status,\n    'runMode', run_mode,\n    'startedAt', started_at,\n    'provider', 'comfy-cloud',\n    'providerPromptId', result_payload->>'providerPromptId',\n    'providerStatus', result_payload->>'providerStatus',\n    'providerRequestId', result_payload->>'providerRequestId',\n    'providerResponse', result_payload->'providerResponse',\n    'patched', result_payload->'patched',\n    'promptPack', prompt_pack\n  ) FROM updated_generation) AS generation;\n`;\nreturn [{ json: { query } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -69,7 +69,7 @@
         0
       ],
       "id": "b7fd1c70-0001-4dd7-a001-000000000004",
-      "name": "Return Generation Submission"
+      "name": "Build Persist Generation Submission Query"
     },
     {
       "parameters": {
@@ -80,11 +80,45 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1024,
+        1536,
         0
       ],
       "id": "b7fd1c70-0001-4dd7-a001-000000000005",
       "name": "Respond"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "id": "bd6d4964-8d2f-4d5e-91af-7edba5cff4b1",
+      "name": "Persist Generation Submission",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1024,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') {\n    try { return JSON.parse(value); } catch { return fallback; }\n  }\n  return value;\n}\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, submitted: false, error: row.error || 'Comfy Cloud submission failed.' } }];\n}\nreturn [{ json: { ok: true, submitted: true, job: parse(row.job, null), generation: parse(row.generation, null) } }];"
+      },
+      "id": "77e210b9-5138-4573-9494-3b956220134e",
+      "name": "Return Generation Submission",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ]
     }
   ],
   "connections": {
@@ -111,6 +145,28 @@
       ]
     },
     "Submit Generation Job": {
+      "main": [
+        [
+          {
+            "node": "Build Persist Generation Submission Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Persist Generation Submission Query": {
+      "main": [
+        [
+          {
+            "node": "Persist Generation Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Generation Submission": {
       "main": [
         [
           {

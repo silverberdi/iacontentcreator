@@ -1,8 +1,8 @@
 {
   "exportedAt": "2026-07-14",
   "source": "ssh://silverman@192.168.0.194 docker exec local-ai-stack-n8n-1 n8n export:workflow --all",
-  "totalExported": 57,
-  "avataresWorkflows": 57,
+  "totalExported": 58,
+  "avataresWorkflows": 58,
   "workflows": [
     {
       "name": "Avatares AI - Admin - Auto Ingest Health",
@@ -769,6 +769,20 @@
           "node": "POST /publications/jobs/timeline",
           "method": "POST",
           "path": "publications/jobs/timeline"
+        }
+      ]
+    },
+    {
+      "name": "Avatares AI - Publications - Refresh Generation",
+      "id": "AvAIPubRefreshGeneration01",
+      "active": true,
+      "isArchived": false,
+      "filename": "Avatares_AI_Publications_Refresh_Generation.json",
+      "webhooks": [
+        {
+          "node": "POST /publications/jobs/refresh-generation",
+          "method": "POST",
+          "path": "publications/jobs/refresh-generation"
         }
       ]
     }

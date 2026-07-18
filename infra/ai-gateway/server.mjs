@@ -310,6 +310,123 @@ async function submitComfyPrompt({ workflow, clientId }) {
   };
 }
 
+function extractComfyPromptId(input = {}) {
+  const candidates = [
+    input.promptId,
+    input.prompt_id,
+    input.providerPromptId,
+    input.provider_prompt_id,
+    input.response?.prompt_id,
+    input.response?.promptId,
+    input.providerResponse?.prompt_id,
+    input.providerResponse?.promptId,
+    input.resultPayload?.providerResponse?.prompt_id,
+    input.resultPayload?.providerResponse?.promptId,
+  ];
+  return String(candidates.find(Boolean) || "").trim();
+}
+
+function collectComfyOutputImages(historyPayload, promptId) {
+  const root =
+    historyPayload?.[promptId] ||
+    historyPayload?.history?.[promptId] ||
+    historyPayload?.prompt ||
+    historyPayload ||
+    {};
+  const outputs = root.outputs || root.output || {};
+  const images = [];
+  for (const [nodeId, nodeOutput] of Object.entries(outputs || {})) {
+    const nodeImages = Array.isArray(nodeOutput?.images) ? nodeOutput.images : [];
+    for (const image of nodeImages) {
+      if (!image?.filename) continue;
+      const type = image.type || "output";
+      const subfolder = image.subfolder || "";
+      const params = new URLSearchParams({ filename: image.filename, type });
+      if (subfolder) params.set("subfolder", subfolder);
+      images.push({
+        nodeId,
+        filename: image.filename,
+        type,
+        subfolder,
+        outputUrl: `${COMFYUI_BASE_URL}${COMFYUI_API_PREFIX}/view?${params.toString()}`,
+      });
+    }
+  }
+  return images;
+}
+
+async function getComfyPublicationStatus(input = {}) {
+  if (!COMFYUI_API_KEY) {
+    return {
+      ok: false,
+      error: "COMFY_CLOUD_API_KEY is not configured",
+      category: "missing_credentials",
+    };
+  }
+
+  const promptId = extractComfyPromptId(input);
+  if (!promptId) {
+    return {
+      ok: false,
+      error: "Comfy prompt id is required to refresh generation status",
+      category: "invalid_request",
+    };
+  }
+
+  const started = Date.now();
+  const historyUrl = `${COMFYUI_BASE_URL}${COMFYUI_API_PREFIX}/history/${encodeURIComponent(promptId)}`;
+  const response = await fetch(historyUrl, {
+    headers: {
+      [COMFYUI_AUTH_HEADER_NAME]: COMFYUI_API_KEY,
+    },
+  });
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+
+  if (response.status === 404) {
+    return {
+      ok: true,
+      provider: "comfy-cloud",
+      promptId,
+      status: "running",
+      completed: false,
+      outputs: [],
+      response: data || text,
+      latencyMs: Date.now() - started,
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      provider: "comfy-cloud",
+      promptId,
+      status: "error",
+      error: data?.error?.message || data?.message || text.slice(0, 300) || response.statusText,
+      category: "provider_error",
+      httpStatus: response.status,
+      latencyMs: Date.now() - started,
+    };
+  }
+
+  const outputs = collectComfyOutputImages(data, promptId);
+  return {
+    ok: true,
+    provider: "comfy-cloud",
+    promptId,
+    status: outputs.length ? "completed" : "running",
+    completed: outputs.length > 0,
+    outputs,
+    response: data || text,
+    latencyMs: Date.now() - started,
+  };
+}
+
 function validateComfyViewUrl(outputUrl) {
   let url;
   try {
@@ -864,6 +981,34 @@ async function handleComfyPublicationSubmit(req, res, requestId) {
   });
 }
 
+async function handleComfyPublicationStatus(req, res, requestId) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    jsonResponse(res, 400, { ok: false, requestId, error: "Invalid JSON body", category: "invalid_request" });
+    return;
+  }
+
+  const result = await getComfyPublicationStatus(body);
+  console.log(
+    JSON.stringify({
+      requestId,
+      route: "comfy/publication-status",
+      ok: result.ok,
+      provider: "comfy-cloud",
+      category: result.category || "ok",
+      status: result.status || "unknown",
+      promptId: result.promptId || null,
+      latencyMs: result.latencyMs || 0,
+    }),
+  );
+  jsonResponse(res, result.ok ? 200 : result.category === "missing_credentials" ? 503 : 400, {
+    requestId,
+    ...result,
+  });
+}
+
 async function handleComfyDownloadOutput(req, res, requestId) {
   let body;
   try {
@@ -941,6 +1086,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/comfy/publication-submit") {
       await handleComfyPublicationSubmit(req, res, requestId);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/comfy/publication-status") {
+      await handleComfyPublicationStatus(req, res, requestId);
       return;
     }
 

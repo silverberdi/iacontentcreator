@@ -28,16 +28,13 @@ Completed:
 - Add operator-oriented next-action guidance.
 - Validate existing Asset Review against the publication flow.
 - Create the Wave 1 operator runbook.
-
-Partially implemented but blocked in live testing:
-
 - Submit image generation to Comfy Cloud through `ai-gateway`.
+- Poll Comfy Cloud generation status after submission.
 
 Remaining for Wave 1:
 
 - Prepare or sync required reference assets for Comfy Cloud without manual operator upload.
 - Add preflight validation and clear operator errors for missing Comfy references.
-- Poll Comfy Cloud after submission so `generating` jobs update when the provider finishes.
 - Auto-ingest completed Comfy outputs without manual copy/paste of the output URL.
 - Auto-refresh the console while a publication job is generating.
 - Use the runbook in at least one live production cycle and capture gaps.
