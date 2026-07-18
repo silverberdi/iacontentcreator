@@ -888,7 +888,7 @@ As an operator, I want image generation to use reference images that Comfy Cloud
 
 ## US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
 
-Status: Backlog  
+Status: Done  
 Priority: P0  
 Epic: EPIC-06 AI Provider Router  
 Wave: Wave 1  
@@ -1013,20 +1013,20 @@ As an operator, I want completed Comfy outputs to be ingested automatically, so 
 
 ### Acceptance Criteria
 
-- [ ] When a refreshed generation is completed and has output metadata, the system downloads the output through `ai-gateway`.
-- [ ] The output is stored in MinIO.
-- [ ] The asset is registered in `canonical_asset_registry`.
-- [ ] The asset is linked to the publication job and generation job.
-- [ ] The publication job moves from `generating` to `review-ready`.
-- [ ] Auto-ingest is idempotent; refreshing the same completed output twice does not create duplicate canonical registry rows.
+- [x] When a refreshed generation is completed and has output metadata, the system downloads the output through `ai-gateway`.
+- [x] The output is stored in MinIO.
+- [x] The asset is registered in `canonical_asset_registry`.
+- [x] The asset is linked to the publication job and generation job.
+- [x] The publication job moves from `generating` to `review-ready`.
+- [x] Auto-ingest is idempotent; refreshing the same completed output twice does not create duplicate canonical registry rows.
 
 ### Technical Tasks
 
-- [ ] Reuse the current `/publications/jobs/ingest-comfy-output` logic where possible.
-- [ ] Add an auto-ingest path that accepts provider output metadata instead of a manually pasted URL.
-- [ ] Store `latestGeneratedAssetId`, bucket, object path, sha256, and source output URL in job metadata.
-- [ ] Add timeline event `output-ingested`.
-- [ ] Validate against an already completed Comfy job.
+- [x] Reuse the current `/publications/jobs/ingest-comfy-output` logic where possible.
+- [x] Add an auto-ingest path that accepts provider output metadata instead of a manually pasted URL.
+- [x] Store `latestGeneratedAssetId`, bucket, object path, sha256, and source output URL in job metadata.
+- [x] Add timeline event `output-ingested`.
+- [x] Validate against an already completed Comfy job.
 
 ### Dependencies
 
@@ -1036,6 +1036,7 @@ As an operator, I want completed Comfy outputs to be ingested automatically, so 
 ### Notes
 
 - Manual ingest remains useful as fallback, but it should not be the normal happy path.
+- `Avatares AI - Publications - Ingest Comfy Output` is now both webhook-callable and workflow-callable so `refresh-generation` can trigger it automatically.
 
 ---
 
@@ -1095,7 +1096,7 @@ As an operator, I want the console to refresh generating jobs automatically, so 
 - [x] US-017 — Resolve Comfy Reference Image Contract
 - [ ] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
 - [x] US-020 — Poll Comfy Cloud Generation Status
-- [ ] US-021 — Auto-Ingest Completed Comfy Output
+- [x] US-021 — Auto-Ingest Completed Comfy Output
 
 ### P1
 

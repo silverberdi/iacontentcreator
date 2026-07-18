@@ -7,6 +7,17 @@
   "isArchived": false,
   "nodes": [
     {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -220
+      ],
+      "id": "ingest-callable-001",
+      "name": "When Executed by Another Workflow"
+    },
+    {
       "parameters": {
         "httpMethod": "POST",
         "path": "publications/jobs/ingest-comfy-output",
@@ -352,6 +363,17 @@
         [
           {
             "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Build Load Context Query",
             "type": "main",
             "index": 0
           }

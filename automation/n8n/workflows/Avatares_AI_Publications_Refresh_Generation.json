@@ -93,8 +93,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1280,
-        0
+        1792,
+        140
       ],
       "id": "refresh-generation-006",
       "name": "Return Refresh Generation"
@@ -108,11 +108,104 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        1536,
+        2304,
         0
       ],
       "id": "refresh-generation-007",
       "name": "Respond"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nfunction parse(value, fallback) {\n  if (value == null) return fallback;\n  if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }\n  return value;\n}\nconst job = parse(row.job, null);\nconst generation = parse(row.generation, null);\nconst provider = parse(row.provider, null);\nconst outputs = Array.isArray(provider?.providerOutputs) ? provider.providerOutputs : [];\nconst output = outputs.find(item => item?.outputUrl) || null;\nconst shouldAutoIngest = Boolean(row.ok !== false && row.ok !== 'f' && generation?.providerStatus === 'completed' && output?.outputUrl && job?.publication_job_id);\nreturn [{ json: { ok: row.ok !== false && row.ok !== 'f', error: row.error || null, shouldAutoIngest, job, generation, provider, ingestRequest: shouldAutoIngest ? { publicationJobId: job.publication_job_id, generationJobId: generation.generationJobId, outputUrl: output.outputUrl, source: 'refresh-generation-auto-ingest' } : null } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "refresh-generation-auto-001",
+      "name": "Build Auto Ingest Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "completed-output",
+              "leftValue": "={{ $json.shouldAutoIngest }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1536,
+        0
+      ],
+      "id": "refresh-generation-auto-002",
+      "name": "Should Auto Ingest"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "AvAIPubIngest01",
+          "mode": "list",
+          "cachedResultName": "Avatares AI - Publications - Ingest Comfy Output"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "publicationJobId": "={{ $json.ingestRequest.publicationJobId }}",
+            "generationJobId": "={{ $json.ingestRequest.generationJobId }}",
+            "outputUrl": "={{ $json.ingestRequest.outputUrl }}",
+            "source": "refresh-generation-auto-ingest"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1792,
+        -120
+      ],
+      "id": "refresh-generation-auto-003",
+      "name": "Execute Auto Ingest Comfy Output"
+    },
+    {
+      "parameters": {
+        "jsCode": "const refresh = $('Build Auto Ingest Request').first().json;\nconst ingest = $input.first()?.json || {};\nreturn [{ json: { ok: Boolean(ingest.ok), autoIngested: Boolean(ingest.ok), error: ingest.ok ? null : (ingest.error || 'Auto-ingest failed'), job: refresh.job, generation: refresh.generation, provider: refresh.provider, ingest } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        -120
+      ],
+      "id": "refresh-generation-auto-004",
+      "name": "Return Auto Ingest Result"
     }
   ],
   "connections": {
@@ -164,7 +257,58 @@
       "main": [
         [
           {
+            "node": "Build Auto Ingest Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Auto Ingest Request": {
+      "main": [
+        [
+          {
+            "node": "Should Auto Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Auto Ingest": {
+      "main": [
+        [
+          {
+            "node": "Execute Auto Ingest Comfy Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Return Refresh Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Auto Ingest Comfy Output": {
+      "main": [
+        [
+          {
+            "node": "Return Auto Ingest Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Auto Ingest Result": {
+      "main": [
+        [
+          {
+            "node": "Respond",
             "type": "main",
             "index": 0
           }

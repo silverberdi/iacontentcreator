@@ -30,12 +30,12 @@ Completed:
 - Create the Wave 1 operator runbook.
 - Submit image generation to Comfy Cloud through `ai-gateway`.
 - Poll Comfy Cloud generation status after submission.
+- Auto-ingest completed Comfy outputs into MinIO/Postgres.
 
 Remaining for Wave 1:
 
 - Prepare or sync required reference assets for Comfy Cloud without manual operator upload.
 - Add preflight validation and clear operator errors for missing Comfy references.
-- Auto-ingest completed Comfy outputs without manual copy/paste of the output URL.
 - Auto-refresh the console while a publication job is generating.
 - Use the runbook in at least one live production cycle and capture gaps.
 
