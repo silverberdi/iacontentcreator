@@ -131,8 +131,73 @@ function dimensionsForFormat(format) {
   return { width: 896, height: 1152 };
 }
 
+function normalizeReferenceImageContract(referenceImage) {
+  if (!referenceImage) {
+    return {
+      mode: "template-default",
+      comfyInputName: null,
+      source: null,
+      ignoredReason: null,
+    };
+  }
+
+  if (typeof referenceImage === "string") {
+    const legacyValue = referenceImage.trim();
+    if (legacyValue.includes("/") || legacyValue.includes("\\")) {
+      return {
+        mode: "template-default",
+        comfyInputName: null,
+        source: { legacyValue },
+        ignoredReason:
+          "Legacy reference image string looks like a path; only Comfy input filenames are valid for LoadImage",
+      };
+    }
+    return {
+      mode: "legacy-string",
+      comfyInputName: legacyValue,
+      source: { legacyValue },
+      ignoredReason: null,
+    };
+  }
+
+  if (typeof referenceImage !== "object") {
+    return {
+      mode: "template-default",
+      comfyInputName: null,
+      source: { invalidType: typeof referenceImage },
+      ignoredReason: "referenceImage must be an object or a Comfy input filename string",
+    };
+  }
+
+  const comfyInputName = String(
+    referenceImage.comfyInputName ||
+      referenceImage.comfyImage ||
+      referenceImage.fileName ||
+      "",
+  ).trim();
+
+  if (comfyInputName) {
+    return {
+      mode: "comfy-input",
+      comfyInputName,
+      source: referenceImage,
+      ignoredReason: null,
+    };
+  }
+
+  return {
+    mode: "template-default",
+    comfyInputName: null,
+    source: referenceImage,
+    ignoredReason:
+      "Reference image has no comfyInputName; MinIO object paths cannot be used as Comfy LoadImage filenames",
+  };
+}
+
 function patchEstefaniaWorkflow({ job = {}, promptPack = {}, generationJobId, referenceImage }) {
   const workflow = cloneJson(loadEstefaniaWorkflowTemplate());
+  const originalReferenceImage = workflow["47"]?.inputs?.image || null;
+  const normalizedReferenceImage = normalizeReferenceImageContract(referenceImage);
   const format = job.format || promptPack.format || "feed-post";
   const { width, height } = dimensionsForFormat(format);
   const positivePrompt = String(promptPack.positivePrompt || promptPack.positive_prompt || "").trim();
@@ -155,8 +220,8 @@ function patchEstefaniaWorkflow({ job = {}, promptPack = {}, generationJobId, re
     .map((part) => String(part).replace(/[^a-zA-Z0-9_-]/g, "-"))
     .join("/");
 
-  if (referenceImage) {
-    workflow["47"].inputs.image = referenceImage;
+  if (normalizedReferenceImage.comfyInputName) {
+    workflow["47"].inputs.image = normalizedReferenceImage.comfyInputName;
   }
 
   if (COMFYUI_ENABLE_FACE_DETAILER) {
@@ -183,6 +248,14 @@ function patchEstefaniaWorkflow({ job = {}, promptPack = {}, generationJobId, re
       faceDetailSeed: workflow["112:122"]?.inputs?.seed || null,
       filenamePrefix: workflow["9"].inputs.filename_prefix,
       referenceImage: workflow["47"].inputs.image,
+      referenceImageContract: {
+        mode: normalizedReferenceImage.mode,
+        source: normalizedReferenceImage.source,
+        originalTemplateImage: originalReferenceImage,
+        appliedComfyInputName: normalizedReferenceImage.comfyInputName,
+        effectiveComfyInputName: workflow["47"].inputs.image,
+        ignoredReason: normalizedReferenceImage.ignoredReason,
+      },
     },
   };
 }

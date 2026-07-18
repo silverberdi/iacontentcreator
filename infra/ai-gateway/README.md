@@ -80,6 +80,22 @@ Do not publish this service to the LAN or internet. It should only be reachable 
 
 Set `dryRun: true` in the request body to return the patched workflow without calling Comfy Cloud.
 
+Reference images use an explicit handoff contract:
+
+```json
+{
+  "contractVersion": "comfy-reference-image-v1",
+  "assetId": "...",
+  "minioBucket": "iacontentcreator-assets",
+  "minioObjectPath": "avatars/...",
+  "publicUrl": "/minio/iacontentcreator-assets/avatars/...",
+  "comfyInputName": null,
+  "comfyLoadable": false
+}
+```
+
+Only `comfyInputName` is valid for Comfy `LoadImage`. MinIO object paths and public URLs are kept as source metadata and identity guidance, but they are not written into `LoadImage`. If no `comfyInputName` is present, the gateway leaves the workflow template's default `LoadImage` input unchanged. Preparing MinIO assets as Comfy inputs belongs to the asset sync step.
+
 `POST /comfy/download-output` downloads an output image from a validated `https://cloud.comfy.org/api/view` URL and returns base64 image data plus metadata for n8n ingest. It keeps the Comfy Cloud API key inside the gateway.
 
 The older `SILVERMAN_COMFYUI_*` variable names are still accepted as compatibility aliases, but new deployments should use `COMFY_CLOUD_*`.

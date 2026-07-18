@@ -35,7 +35,6 @@ Partially implemented but blocked in live testing:
 
 Remaining for Wave 1:
 
-- Resolve Comfy reference-image contract so MinIO object paths are not treated as Comfy local `LoadImage` filenames.
 - Prepare or sync required reference assets for Comfy Cloud without manual operator upload.
 - Add preflight validation and clear operator errors for missing Comfy references.
 - Use the runbook in at least one live production cycle and capture gaps.
@@ -61,7 +60,7 @@ dc539e40-c15f-47bb-9d7f-68ca901334e2
 Validated state:
 
 ```text
-blocked-at-comfy-reference-input
+comfy-reference-contract-resolved
 ```
 
 Selected asset:

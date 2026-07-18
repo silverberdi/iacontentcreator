@@ -846,7 +846,7 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 
 ## US-017 — Resolve Comfy Reference Image Contract
 
-Status: Ready  
+Status: Done  
 Priority: P0  
 Epic: EPIC-01 Publications  
 Wave: Wave 1  
@@ -857,20 +857,20 @@ As an operator, I want image generation to use reference images that Comfy Cloud
 
 ### Acceptance Criteria
 
-- [ ] Prompt pack no longer passes MinIO `objectPath` as if it were a Comfy local input filename.
-- [ ] The Comfy handoff contract clearly distinguishes `minioObjectPath`, public/proxy URL, and Comfy input filename.
-- [ ] `Generate images` submits only reference inputs that are valid for the target Comfy Cloud workflow.
-- [ ] Existing canonical/reference images can still be used for identity guidance without manual upload by the operator.
-- [ ] Failure message explains the exact missing reference asset and the expected remediation.
+- [x] Prompt pack no longer passes MinIO `objectPath` as if it were a Comfy local input filename.
+- [x] The Comfy handoff contract clearly distinguishes `minioObjectPath`, public/proxy URL, and Comfy input filename.
+- [x] `Generate images` submits only reference inputs that are valid for the target Comfy Cloud workflow.
+- [x] Existing canonical/reference images can still be used for identity guidance without manual upload by the operator.
+- [x] Failure message explains the exact missing reference asset and the expected remediation.
 
 ### Technical Tasks
 
-- [ ] Inspect the ai-gateway Comfy workflow patcher and identify how node `47: LoadImage` is populated.
-- [ ] Define a `referenceImage` object contract instead of a plain string.
-- [ ] Update prompt-pack generation to emit structured reference image metadata.
-- [ ] Update generation submission to send the new contract to ai-gateway.
-- [ ] Update ai-gateway patching logic to avoid writing raw MinIO paths into `LoadImage`.
-- [ ] Validate with an Estefania job using the same scene that failed.
+- [x] Inspect the ai-gateway Comfy workflow patcher and identify how node `47: LoadImage` is populated.
+- [x] Define a `referenceImage` object contract instead of a plain string.
+- [x] Update prompt-pack generation to emit structured reference image metadata.
+- [x] Update generation submission to send the new contract to ai-gateway.
+- [x] Update ai-gateway patching logic to avoid writing raw MinIO paths into `LoadImage`.
+- [x] Validate with an Estefania job using the same scene that failed.
 
 ### Dependencies
 
@@ -881,6 +881,8 @@ As an operator, I want image generation to use reference images that Comfy Cloud
 
 - Root cause found during live Wave 1 testing: Comfy Cloud failed with `The system couldn't load this image` because `LoadImage` received `avatars/estefania-montealegre/raw-image/estefania-raw-image-night-city-20260604T055247-2Z.png`, which exists as a MinIO object path but not as a Comfy Cloud input file.
 - We should not require the operator to upload images manually to Comfy Cloud.
+- Implemented `comfy-reference-image-v1`. `ai-gateway` now only writes `comfyInputName` into `LoadImage`. MinIO paths remain metadata and never overwrite the template input.
+- Server dry-run on July 18, 2026 confirmed the failed `night-city` MinIO path is ignored for `LoadImage`, and the workflow keeps the template's valid input image.
 
 ---
 
@@ -975,7 +977,7 @@ As an operator, I want the console to detect invalid Comfy references before sub
 - [x] US-009 — Mark Publication As Published
 - [x] US-011 — Estefanía Business Profile Configuration
 - [x] US-014 — Validate Existing Asset Review Against Publication Flow
-- [ ] US-017 — Resolve Comfy Reference Image Contract
+- [x] US-017 — Resolve Comfy Reference Image Contract
 - [ ] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
 
 ### P1
