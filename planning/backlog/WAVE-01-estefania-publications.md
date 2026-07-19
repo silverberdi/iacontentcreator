@@ -1408,6 +1408,7 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-030 — Comfy Cloud Reference Upload Adapter
 - [x] US-032 — Auto-Prepare References Before Image Generation
 - [x] US-033 — Operator-First Publications Flow Cleanup
+- [ ] US-035 — Compact Publication Workspace UX
 - [ ] US-034A — Automatic Defective Image Classification
 - [ ] US-034B — Automatic QA Remediation Loop
 
@@ -1461,6 +1462,54 @@ As an operator, I want the console to present one clear Estefania publication pa
 
 ---
 
+## US-035 — Compact Publication Workspace UX
+
+Status: Backlog  
+Priority: P0  
+Epic: EPIC-04 Admin Operations  
+Wave: Wave 1 Stabilization  
+
+### User Story
+
+As an operator, I want the publication workspace to be organized by focused stages instead of one long vertical page, so that I can complete a publication without excessive scrolling or hunting for the next button.
+
+### Acceptance Criteria
+
+- [ ] `Publications` has internal stage navigation for the active job.
+- [ ] Stages include at minimum: `Job`, `Brief`, `Prompt`, `Images`, `Review`, `Copy`, `Publish`.
+- [ ] Only the selected stage is expanded by default.
+- [ ] The recommended next action remains visible without scrolling.
+- [ ] The primary action for the current stage is visible near the top of the workspace.
+- [ ] Brief, prompt pack, and copy pack show operator-readable summaries by default.
+- [ ] Raw JSON editing is available only in technical mode or behind an explicit raw editor control.
+- [ ] Image generation status and image review are visually separated.
+- [ ] Publishing shows the final image, caption, hashtags, copy buttons, published URL field, and `Mark published` action without excessive scrolling.
+- [ ] Existing job loading, timeline, retry, QA badges, and technical diagnostics remain available.
+
+### Technical Tasks
+
+- [ ] Add publication stage state and stage navigation to `PublicationsPanel`.
+- [ ] Move long sections behind stage-specific rendering.
+- [ ] Add a sticky recommended-action bar for the active job.
+- [ ] Create compact summary renderers for brief, prompt pack, copy pack, and generation state.
+- [ ] Move raw JSON textareas behind technical/raw edit controls.
+- [ ] Split image generation state from publication asset review controls.
+- [ ] Make the publish stage focused on manual Instagram publishing.
+- [ ] Validate responsive behavior on desktop and mobile widths.
+
+### Dependencies
+
+- US-010.
+- US-012.
+- US-033.
+
+### Notes
+
+- This story should be completed before expanding automatic QA remediation. Otherwise the remediation loop will add more state to an already long screen.
+- This is a UX restructuring story, not a change to publication semantics or automated publishing.
+
+---
+
 ## US-034A — Automatic Defective Image Classification
 
 Status: Backlog  
@@ -1496,6 +1545,7 @@ As the system, I want visual QA to automatically classify clearly defective Comf
 - US-021.
 - US-026.
 - US-031.
+- US-035.
 
 ### Notes
 
@@ -1546,6 +1596,7 @@ As the system, I want blocked/defective Comfy outputs to trigger controlled rege
 - US-021.
 - US-026.
 - US-031.
+- US-035.
 
 ### Notes
 
