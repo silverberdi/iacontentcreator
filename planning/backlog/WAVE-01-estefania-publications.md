@@ -1408,6 +1408,8 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-030 — Comfy Cloud Reference Upload Adapter
 - [x] US-032 — Auto-Prepare References Before Image Generation
 - [x] US-033 — Operator-First Publications Flow Cleanup
+- [ ] US-034A — Automatic Defective Image Classification
+- [ ] US-034B — Automatic QA Remediation Loop
 
 ### P1
 
@@ -1456,3 +1458,97 @@ As an operator, I want the console to present one clear Estefania publication pa
 - US-010.
 - US-012.
 - US-032.
+
+---
+
+## US-034A — Automatic Defective Image Classification
+
+Status: Backlog  
+Priority: P0  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1 Stabilization  
+
+### User Story
+
+As the system, I want visual QA to automatically classify clearly defective Comfy outputs, so that unusable images are marked without requiring the operator to manually inspect every obvious failure.
+
+### Acceptance Criteria
+
+- [ ] Every ingested Comfy output receives a structured QA decision: `pass`, `review_required`, or `blocked`.
+- [ ] `blocked` outputs are automatically marked as defective for the publication job.
+- [ ] Defective outputs remain stored and traceable, but are not offered as the recommended publication candidate.
+- [ ] The defect reason is stored with the asset metadata and generation attempt.
+- [ ] The console shows the defective status, QA flags, scores, and notes.
+- [ ] The operator can still inspect defective outputs in technical/admin review.
+- [ ] The system does not publish, select, or canonize any image automatically.
+
+### Technical Tasks
+
+- [ ] Define `defective` handling in publication asset metadata.
+- [ ] Extend `publication-image-qa` response normalization with defect severity.
+- [ ] Update `Avatares AI - Publications - Ingest Comfy Output` to persist defect decisions.
+- [ ] Update job metadata with latest usable candidate vs latest defective candidate.
+- [ ] Update Publications UI to separate usable candidates from defective attempts.
+- [ ] Add timeline event `image-defective` when QA blocks an output.
+
+### Dependencies
+
+- US-021.
+- US-026.
+- US-031.
+
+### Notes
+
+- This story does not regenerate images. It only makes the system confident and explicit about bad outputs.
+- Defective means unsuitable for the current publication flow, not necessarily deleted from storage.
+
+---
+
+## US-034B — Automatic QA Remediation Loop
+
+Status: Backlog  
+Priority: P0  
+Epic: EPIC-06 AI Provider Router  
+Wave: Wave 1 Stabilization  
+
+### User Story
+
+As the system, I want blocked/defective Comfy outputs to trigger controlled regeneration attempts, so that the pipeline can keep working until it finds a valid candidate or reaches a safe attempt limit.
+
+### Acceptance Criteria
+
+- [ ] When QA marks an output as `blocked`, the system can create a corrective regeneration attempt automatically.
+- [ ] The remediation loop stops when a generated output receives `pass`.
+- [ ] The remediation loop stops and asks for human review when all attempts are exhausted.
+- [ ] The maximum number of automatic attempts is configurable and defaults to `3`.
+- [ ] The system stores parent/child attempt relationships.
+- [ ] Corrective prompt changes are derived from QA flags and stored with the new attempt.
+- [ ] Identity-critical failures can stop the loop immediately when configured.
+- [ ] The console shows all attempts, their QA result, defect reason, and whether another attempt is pending.
+- [ ] The system never publishes automatically.
+- [ ] The system never promotes an image to canonical automatically.
+
+### Technical Tasks
+
+- [ ] Add remediation policy configuration to the publication generation workflow.
+- [ ] Add attempt counting and loop guard in n8n/Postgres.
+- [ ] Generate corrective prompt deltas from QA flags.
+- [ ] Re-submit Comfy generation with the corrected prompt pack.
+- [ ] Link new generation attempts to the source defective attempt.
+- [ ] Auto-refresh/poll each remediation attempt until completed or failed.
+- [ ] Add timeline events: `remediation-started`, `remediation-submitted`, `remediation-exhausted`, `remediation-passed`.
+- [ ] Update Publications UI to show remediation progress and final candidate state.
+
+### Dependencies
+
+- US-034A.
+- US-020.
+- US-021.
+- US-026.
+- US-031.
+
+### Notes
+
+- This is an automation loop, not an autonomous publishing loop.
+- Cost control is mandatory: no infinite retries, no hidden repeated Comfy submissions.
+- The first implementation should prefer full regeneration with safer prompt deltas. Inpaint/correction can be a later story.
