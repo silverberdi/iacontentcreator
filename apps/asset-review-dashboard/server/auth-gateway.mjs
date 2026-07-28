@@ -29,6 +29,7 @@ const port = Number(process.env.PORT || 8088);
 const publicBaseUrl = (process.env.PUBLIC_BASE_URL || `http://localhost:${port}`).replace(/\/$/, "");
 const webhookBaseUrl = (process.env.N8N_WEBHOOK_BASE_URL || "http://n8n:5678/webhook").replace(/\/$/, "");
 const minioBaseUrl = (process.env.MINIO_BASE_URL || "http://minio:9000").replace(/\/$/, "");
+const aiGatewayBaseUrl = (process.env.AI_GATEWAY_BASE_URL || "http://ai-gateway:8095").replace(/\/$/, "");
 const storePath = process.env.AUTH_STORE_PATH || "/data/auth-users.json";
 const sessionSecret = requiredEnv("SESSION_SECRET");
 const googleClientId = requiredEnv("GOOGLE_CLIENT_ID");
@@ -387,6 +388,40 @@ async function proxyMinio(req, res, pathname) {
   res.end();
 }
 
+async function handleOpsApi(req, res, pathname) {
+  const user = requireApproved(req, res);
+  if (!user) return;
+
+  if (pathname === "/api/ops/ai-gateway-health" && req.method === "GET") {
+    try {
+      const response = await fetch(`${aiGatewayBaseUrl}/health`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      const text = await response.text();
+      let body;
+      try {
+        body = text ? JSON.parse(text) : {};
+      } catch {
+        body = { raw: text };
+      }
+      return sendJson(res, response.ok ? 200 : 502, {
+        ok: response.ok && body?.ok !== false,
+        upstreamStatus: response.status,
+        ...body,
+      });
+    } catch (error) {
+      return sendJson(res, 502, {
+        ok: false,
+        service: "ai-gateway",
+        error: error instanceof Error ? error.message : "ai-gateway health check failed",
+      });
+    }
+  }
+
+  return sendJson(res, 404, { error: "Not found" });
+}
+
 function serveStatic(req, res, pathname) {
   let candidate = pathname === "/" ? "/index.html" : pathname;
   const filePath = normalize(resolve(join(distDir, candidate)));
@@ -405,7 +440,12 @@ function serveStatic(req, res, pathname) {
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
   }[extname(finalPath)] || "application/octet-stream";
-  res.writeHead(200, { "Content-Type": contentType });
+  const cacheControl = extname(finalPath) === ".html"
+    ? "no-store"
+    : extname(finalPath) === ".js" || extname(finalPath) === ".css"
+      ? "no-cache"
+      : "private, max-age=300";
+  res.writeHead(200, { "Content-Type": contentType, "Cache-Control": cacheControl });
   createReadStream(finalPath).pipe(res);
 }
 
@@ -415,6 +455,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/auth/login") return handleLogin(req, res);
     if (pathname === "/auth/callback") return handleCallback(req, res);
     if (pathname.startsWith("/api/auth/")) return handleAuthApi(req, res, pathname);
+    if (pathname.startsWith("/api/ops/")) return handleOpsApi(req, res, pathname);
     if (pathname.startsWith("/webhook/")) return proxyWebhook(req, res, pathname);
     if (pathname.startsWith("/minio/")) return proxyMinio(req, res, pathname);
     return serveStatic(req, res, pathname);

@@ -4,3 +4,5 @@ infra/snapshots/
 infra/snapshoots/
 ESTRUCTURA.md
 apps/asset-review-dashboard/.env.example
+__pycache__/
+*.pyc

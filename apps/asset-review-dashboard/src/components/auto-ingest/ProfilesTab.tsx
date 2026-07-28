@@ -25,6 +25,7 @@ type ProfilesTabProps = {
   catalogOptionsLoading?: boolean;
   selectedProfileId: string;
   isCreatingNew: boolean;
+  isEditorOpen: boolean;
   loading: boolean;
   profilesLoading?: boolean;
   profilesLoadSucceeded?: boolean;
@@ -61,6 +62,7 @@ export default function ProfilesTab({
   catalogOptionsLoading = false,
   selectedProfileId,
   isCreatingNew,
+  isEditorOpen,
   loading,
   profilesLoading = false,
   profilesLoadSucceeded = false,
@@ -121,12 +123,12 @@ export default function ProfilesTab({
   const safePage = Math.min(page, pageCount);
   const pagedProfiles = paginateArray(filteredProfiles, safePage, pageSize);
 
-  const showEditor = isCreatingNew || Boolean(selectedProfileId) || profiles.length === 0;
+  const showEditor = isEditorOpen;
   const editorModeLabel = isCreatingNew
-    ? "Creating new profile"
+    ? "Creating new ingest setup"
     : selectedProfileId
-      ? "Editing existing profile"
-      : "New profile";
+      ? "Editing existing ingest setup"
+      : "New ingest setup";
 
   const showEmptyProfiles =
     profilesLoadSucceeded && !profilesLoading && profiles.length === 0;
@@ -151,35 +153,18 @@ export default function ProfilesTab({
     </>
   );
 
-  const editorPanel = showEditor ? (
-    <SectionPanel
-      title="Profile editor"
-      description={editorModeLabel}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onNewProfile} disabled={busy} className={actionButtonClass}>
-            New profile
-          </button>
-          <button type="button" onClick={onClearForm} disabled={busy} className={actionButtonClass}>
-            {isCreatingNew ? "Cancel" : "Clear form"}
-          </button>
-          <button
-            type="button"
-            onClick={onUpsert}
-            disabled={busy || !draft.avatar || !draft.scene || !draft.assetType}
-            className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save profile"}
-          </button>
-        </div>
-      }
-    >
+  const editorForm = (
+    <>
+      <div className="mb-4 rounded-md border border-blue-800/50 bg-blue-950/25 px-3 py-2 text-sm text-blue-100">
+        This controls how generated files are imported and classified. It does not decide
+        which references are used to create new images.
+      </div>
       {catalogOptionsLoading && (
         <p className="mb-3 text-xs text-gray-500">Loading catalog options…</p>
       )}
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm lg:col-span-2 xl:col-span-3">
-          <span className="text-gray-400">profileName (auto-generated)</span>
+          <span className="text-gray-400">ingest setup name (auto-generated)</span>
           <input
             value={draft.profileName}
             readOnly
@@ -268,7 +253,7 @@ export default function ProfilesTab({
             disabled={busy}
             className="size-4 rounded border-border text-accent"
           />
-          <span className="text-gray-300">isEnabled</span>
+          <span className="text-gray-300">Available for ingest</span>
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -278,11 +263,11 @@ export default function ProfilesTab({
             disabled={busy}
             className="size-4 rounded border-border text-accent"
           />
-          <span className="text-gray-300">setActive on save</span>
+          <span className="text-gray-300">Use for next watcher ingest after save</span>
         </label>
       </div>
-    </SectionPanel>
-  ) : null;
+    </>
+  );
 
   return (
     <div className="space-y-4">
@@ -290,7 +275,7 @@ export default function ProfilesTab({
 
       <div className="rounded-lg border border-emerald-800/30 bg-emerald-950/20 px-4 py-3">
         <p className="text-xs font-medium uppercase tracking-wide text-emerald-300">
-          Active profile
+          Used by watcher
         </p>
         {activeProfileError && !profilesError && (
           <p className="mt-1 text-sm text-amber-200/90">{activeProfileError}</p>
@@ -307,19 +292,17 @@ export default function ProfilesTab({
             )}
           </p>
         ) : (
-          <p className="mt-1 text-sm text-gray-400">No active ingest profile selected.</p>
+          <p className="mt-1 text-sm text-gray-400">No ingest setup is selected for the watcher.</p>
         )}
       </div>
 
-      {editorPanel}
-
       <SectionPanel
-        title="Profiles"
-        description="Click Select / Edit on a row to load it in the editor above."
+        title="Ingest Profiles"
+        description="These setups classify files found by ingest. They are not character identity profiles and do not create images."
         actions={
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={onNewProfile} disabled={busy} className={actionButtonClass}>
-              New profile
+              New ingest setup
             </button>
             <button type="button" onClick={onRefresh} disabled={busy} className={actionButtonClass}>
               {loading ? "Refreshing…" : "Refresh"}
@@ -336,7 +319,7 @@ export default function ProfilesTab({
 
         {showEmptyProfiles && !isCreatingNew && (
           <p className="mb-4 text-sm text-gray-400">
-            No ingest profiles found. Use <strong className="text-gray-200">New profile</strong>{" "}
+            No ingest profiles found. Use <strong className="text-gray-200">New ingest setup</strong>{" "}
             above to create one.
           </p>
         )}
@@ -352,9 +335,9 @@ export default function ProfilesTab({
                 }}
                 className="rounded-md border border-border bg-surface-overlay px-2 py-1 text-xs text-gray-200"
               >
-                <option value="all">Active: all</option>
-                <option value="yes">Active: yes</option>
-                <option value="no">Active: no</option>
+                <option value="all">Watcher use: all</option>
+                <option value="yes">Used by watcher: yes</option>
+                <option value="no">Used by watcher: no</option>
               </select>
               <select
                 value={enabledFilter}
@@ -364,9 +347,9 @@ export default function ProfilesTab({
                 }}
                 className="rounded-md border border-border bg-surface-overlay px-2 py-1 text-xs text-gray-200"
               >
-                <option value="all">Enabled: all</option>
-                <option value="yes">Enabled: yes</option>
-                <option value="no">Enabled: no</option>
+                <option value="all">Available: all</option>
+                <option value="yes">Available: yes</option>
+                <option value="no">Available: no</option>
               </select>
             </div>
             <TableFilterBar
@@ -375,7 +358,7 @@ export default function ProfilesTab({
                 setSearch(v);
                 setPage(1);
               }}
-              searchPlaceholder="Search profile, avatar, scene, workflow, model…"
+              searchPlaceholder="Search ingest setup, avatar, scene, workflow, model…"
               page={safePage}
               pageSize={pageSize}
               totalItems={filteredProfiles.length}
@@ -391,13 +374,13 @@ export default function ProfilesTab({
               <table className="min-w-full divide-y divide-border text-left text-sm">
                 <thead className="bg-surface-overlay/60 text-xs uppercase tracking-wide text-gray-400">
                   <tr>
-                    <th className="px-3 py-2 font-medium">Profile</th>
+                    <th className="px-3 py-2 font-medium">Ingest setup</th>
                     <th className="px-3 py-2 font-medium">Avatar</th>
                     <th className="px-3 py-2 font-medium">Scene</th>
                     <th className="px-3 py-2 font-medium">Workflow</th>
                     <th className="px-3 py-2 font-medium">Model</th>
-                    <th className="px-3 py-2 font-medium">Active</th>
-                    <th className="px-3 py-2 font-medium">Enabled</th>
+                    <th className="px-3 py-2 font-medium">Used by watcher</th>
+                    <th className="px-3 py-2 font-medium">Available</th>
                     <th className="px-3 py-2 font-medium">Updated</th>
                     <th className="px-3 py-2 font-medium">Actions</th>
                   </tr>
@@ -432,7 +415,7 @@ export default function ProfilesTab({
                           {profile.profileName}
                           {rowActive && (
                             <span className="ml-2 rounded bg-emerald-800/50 px-1.5 py-0.5 text-[10px] uppercase text-emerald-200">
-                              active
+                              watcher
                             </span>
                           )}
                         </td>
@@ -455,7 +438,7 @@ export default function ProfilesTab({
                               disabled={busy}
                               className={actionButtonClass}
                             >
-                              {isSelected ? "Editing" : "Select / Edit"}
+                              {isSelected ? "Editing" : "Edit setup"}
                             </button>
                             <button
                               type="button"
@@ -463,7 +446,7 @@ export default function ProfilesTab({
                               disabled={busy || !canSetActive}
                               className="rounded-md bg-emerald-700 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
                             >
-                              {settingThisActive ? "Setting…" : "Set active"}
+                              {settingThisActive ? "Setting…" : "Use for next ingest"}
                             </button>
                             <button
                               type="button"
@@ -483,11 +466,43 @@ export default function ProfilesTab({
               </table>
             </div>
             {filteredProfiles.length === 0 && (
-              <p className="mt-3 text-sm text-gray-500">No profiles match the current filters.</p>
+          <p className="mt-3 text-sm text-gray-500">No ingest setups match the current filters.</p>
             )}
           </>
         )}
       </SectionPanel>
+
+      {showEditor && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-5xl rounded-xl border border-border bg-surface-raised shadow-2xl">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-100">Ingest setup editor</h3>
+                <p className="mt-1 text-sm text-gray-500">{editorModeLabel}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={onClearForm}
+                  disabled={busy}
+                  className={actionButtonClass}
+                >
+                  {isCreatingNew ? "Cancel" : "Close"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onUpsert}
+                  disabled={busy || !draft.avatar || !draft.scene || !draft.assetType}
+                  className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save ingest setup"}
+                </button>
+              </div>
+            </div>
+            <div className="p-5">{editorForm}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

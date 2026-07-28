@@ -19,7 +19,7 @@ export default function ManualPipelineSection({
   return (
     <SectionPanel
       title="C. Manual Pipeline Actions"
-      description="Run the full pipeline once using the active DB profile (empty request body)."
+      description="Run the full ingest pipeline once using the ingest profile currently used by the watcher."
     >
       {error && (
         <p className="mb-3 text-sm text-red-300" role="alert">

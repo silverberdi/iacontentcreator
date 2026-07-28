@@ -99,6 +99,10 @@ Define and later implement the GFE/direct monetization pipeline for Didi Duarte 
 
 Maintain secure access, role separation, approval workflows, and safe exposure of internal services.
 
+### EPIC-10 — Operator Experience And Scale
+
+Make the console usable as a multi-character operating studio by separating creative/operator workflows from technical operations and by presenting human next actions instead of internal system concepts.
+
 ## Waves
 
 | Wave | Focus | Goal |
@@ -108,6 +112,7 @@ Maintain secure access, role separation, approval workflows, and safe exposure o
 | Wave 3 | Admin Operations | Make day-to-day operations visible and recoverable from the console. |
 | Wave 4 | Voice Lab | Add reviewed local/cloud voice generation experiments. |
 | Wave 5 | Didi GFE Readiness | Define and implement safe premium-content workflows. |
+| Wave 6 | Operator Studio UX | Reorganize the console for multi-character Studio and Ops/Admin operation. |
 
 ## Wave 1 Definition
 
@@ -118,4 +123,3 @@ See:
 ```text
 planning/backlog/WAVE-01-estefania-publications.md
 ```
-

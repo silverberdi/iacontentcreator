@@ -90,6 +90,11 @@ export type PublicationBrief = {
 export type GeneratePublicationBriefPayload = {
   publicationJobId: string;
   brief?: PublicationBrief;
+  briefFeedback?: {
+    notes: string;
+    currentBrief?: PublicationBrief;
+    createdAt?: string;
+  };
 };
 
 export type GeneratePublicationBriefResponse = {
@@ -131,9 +136,33 @@ export type PublicationQaResult = {
   scores?: Record<string, number>;
   flags?: string[];
   notes?: string[];
+  defectSeverity?: "none" | "review" | "blocked" | string;
+  defectReasons?: string[];
   correctionRecommended?: boolean;
   correctionMode?: string | null;
   reviewedAt?: string;
+  [key: string]: unknown;
+};
+
+export type PublicationQaRemediation = {
+  policyVersion?: string;
+  status?: string;
+  reason?: string;
+  sourceGenerationJobId?: string | null;
+  sourceOutputUrl?: string | null;
+  maxAttempts?: number;
+  attemptsUsed?: number;
+  nextAction?: string;
+  promptDelta?: {
+    avoid?: string[];
+    instruction?: string;
+    [key: string]: unknown;
+  };
+  attempts?: Array<Record<string, unknown>>;
+  createdAt?: string;
+  updatedAt?: string;
+  exhaustedAt?: string;
+  passedAt?: string;
   [key: string]: unknown;
 };
 
@@ -251,7 +280,20 @@ export type PublicationJobSummary = {
   nextAction: PublicationNextAction;
   errorMessage?: string | null;
   generationJobId?: string | null;
+  latestAssetId?: string | null;
+  latestAssetBucket?: string | null;
+  latestAssetObjectPath?: string | null;
+  latestAssetStatus?: string | null;
+  latestAssetUrl?: string | null;
+  latestAssetQa?: PublicationQaResult | null;
+  latestAssetDefective?: boolean | null;
+  latestAssetDefectReasons?: string[] | null;
   selectedAssetId?: string | null;
+  selectedAssetBucket?: string | null;
+  selectedAssetObjectPath?: string | null;
+  selectedAssetStatus?: string | null;
+  selectedAssetUrl?: string | null;
+  thumbnailUrl?: string | null;
   publishedUrl?: string | null;
 };
 
@@ -393,6 +435,7 @@ export type MarkPublicationPublishedResponse = {
 export type GeneratePublicationImagesPayload = {
   publicationJobId: string;
   mode?: string;
+  remediation?: PublicationQaRemediation;
 };
 
 export type GeneratePublicationImagesResponse = {
@@ -452,6 +495,8 @@ export type PublicationAssetSummary = {
   status?: string | null;
   createdAt?: string | null;
   reviewNotes?: string | null;
+  qa?: PublicationQaResult | null;
+  defective?: boolean | null;
   metadata?: Record<string, unknown> | null;
   [key: string]: unknown;
 };

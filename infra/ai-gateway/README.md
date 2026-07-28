@@ -77,6 +77,8 @@ COMFY_CLOUD_ENABLE_FACE_DETAILER=false
 VISUAL_QA_API_KEY=...
 VISUAL_QA_BASE_URL=https://api.openai-compatible-provider.example/v1
 VISUAL_QA_MODEL=...
+VISUAL_QA_PROVIDER=local
+LOCAL_VISUAL_QA_URL=http://local-visual-qa:8096
 ```
 
 Do not publish this service to the LAN or internet. It should only be reachable on the internal Docker network.
@@ -109,7 +111,9 @@ Only `comfyInputName` is valid for Comfy `LoadImage`. MinIO object paths and pub
 
 `POST /comfy/prepare-reference` receives a base64 image from n8n, uploads it to Comfy Cloud input storage through `COMFY_CLOUD_UPLOAD_PATH`, and returns the `comfyInputName` that can be used in the workflow `LoadImage` node.
 
-`POST /publication-image-qa` scores a generated image for identity, face, hands, feet, composition, and publishability. If `VISUAL_QA_*` is not configured, it returns an explicit `heuristic-pre-visual` QA result so the console can still flag risk without pretending pixel-level review happened.
+`POST /publication-image-qa` scores a generated image for identity, face, hands, feet, composition, and publishability. If `VISUAL_QA_PROVIDER=local`, the gateway calls `LOCAL_VISUAL_QA_URL` and expects the local anatomy service contract. If `VISUAL_QA_*` is not configured, it returns an explicit `heuristic-pre-visual` QA result so the console can still flag risk without pretending pixel-level review happened.
+
+Local visual QA is meant to catch obvious anatomy defects, not subtle identity drift. Keep a human review step before publication.
 
 The older `SILVERMAN_COMFYUI_*` variable names are still accepted as compatibility aliases, but new deployments should use `COMFY_CLOUD_*`.
 

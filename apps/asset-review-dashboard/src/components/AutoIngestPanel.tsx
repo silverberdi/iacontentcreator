@@ -68,6 +68,7 @@ export default function AutoIngestPanel({
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [selectedProfileName, setSelectedProfileName] = useState("");
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
 
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [profilesLoadSucceeded, setProfilesLoadSucceeded] = useState(false);
@@ -330,39 +331,6 @@ export default function AutoIngestPanel({
     void refreshAll();
   }, [refreshAll]);
 
-  const restoreSelectedOrActive = useCallback(() => {
-    const selectedById = profiles.find((p) => p.profileId === selectedProfileId);
-    if (selectedById) {
-      applyProfileSelection(selectedById);
-      return;
-    }
-    const selectedByName = profiles.find((p) => p.profileName === selectedProfileName);
-    if (selectedByName) {
-      applyProfileSelection(selectedByName);
-      return;
-    }
-    if (activeProfile?.profileId) {
-      applyActiveProfileToUi(activeProfile);
-      return;
-    }
-    if (profiles.length > 0) {
-      applyProfileSelection(profiles[0]);
-      return;
-    }
-    setSelectedProfileId("");
-    setSelectedProfileName("");
-    setDraft(newProfileDraft(catalogOptions));
-    setIsCreatingNew(false);
-  }, [
-    activeProfile,
-    applyActiveProfileToUi,
-    applyProfileSelection,
-    catalogOptions,
-    profiles,
-    selectedProfileId,
-    selectedProfileName,
-  ]);
-
   const handleAvatarChange = (avatar: string) => {
     const avatarShort = findAvatarShort(catalogOptions, avatar);
     const avatarScenes = scenesForAvatar(catalogOptions.scenes, avatar);
@@ -387,6 +355,7 @@ export default function AutoIngestPanel({
     setProfilesError(null);
     setValidationErrors(null);
     applyProfileSelection(profile);
+    setIsProfileEditorOpen(true);
   };
 
   const handleDraftChange = (field: keyof IngestProfileDraft, value: string | boolean) => {
@@ -484,6 +453,10 @@ export default function AutoIngestPanel({
             : `Profile "${savedName}" saved.`,
         );
       }
+      setSelectedProfileId("");
+      setSelectedProfileName("");
+      setIsCreatingNew(false);
+      setIsProfileEditorOpen(false);
     } catch (err) {
       setProfilesError(err instanceof Error ? err.message : "Failed to save profile");
     } finally {
@@ -518,9 +491,8 @@ export default function AutoIngestPanel({
       }
 
       const displayName = activeProfileDisplayName(parsed.profile ?? rowProfile, rowProfile);
-      applyProfileSelection(rowProfile);
       await reconcileAfterMutation(`Profile "${displayName}" is now active.`, {
-        syncFormToActive: true,
+        syncFormToActive: false,
       });
     } catch (err) {
       setProfilesError(err instanceof Error ? err.message : "Failed to set active profile");
@@ -535,6 +507,7 @@ export default function AutoIngestPanel({
     setProfilesError(null);
     setValidationErrors(null);
     setIsCreatingNew(true);
+    setIsProfileEditorOpen(true);
     setSelectedProfileId("");
     setSelectedProfileName("");
     setDraft(newProfileDraft(catalogOptions));
@@ -544,14 +517,11 @@ export default function AutoIngestPanel({
     setProfilesSuccess(null);
     setProfilesError(null);
     setValidationErrors(null);
-    if (isCreatingNew) {
-      restoreSelectedOrActive();
-      return;
-    }
     setSelectedProfileId("");
     setSelectedProfileName("");
     setDraft(newProfileDraft(catalogOptions));
-    setIsCreatingNew(true);
+    setIsCreatingNew(false);
+    setIsProfileEditorOpen(false);
   };
 
   const handleRequestDelete = (profile: IngestProfile) => {
@@ -707,6 +677,7 @@ export default function AutoIngestPanel({
           catalogOptionsLoading={catalogOptionsLoading}
           selectedProfileId={selectedProfileId}
           isCreatingNew={isCreatingNew}
+          isEditorOpen={isProfileEditorOpen}
           loading={profilesBusy}
           profilesLoading={profilesLoading}
           profilesLoadSucceeded={profilesLoadSucceeded}

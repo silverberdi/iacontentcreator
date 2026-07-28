@@ -49,10 +49,10 @@ Wave 1 is done when:
 
 ## US-001 — Create Publication Job
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -91,10 +91,10 @@ As an operator, I want to create a publication job for Estefanía from the conso
 
 ## US-002A — Create Internal AI Gateway Service
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1
 
 ### User Story
 
@@ -137,10 +137,10 @@ As the system owner, I want AI provider calls to go through an internal gateway 
 
 ## US-002B — Connect Publication Brief Workflow To AI Gateway
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -182,10 +182,10 @@ As an operator, I want the publication brief workflow to use the internal AI gat
 
 ## US-002C — Add AI Gateway Provider Observability
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1
 
 ### User Story
 
@@ -219,10 +219,10 @@ As the system owner, I want basic visibility into AI provider calls, so that I c
 
 ## US-005A — Reopen Existing Publication Jobs
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -262,10 +262,10 @@ As an operator, I want to reopen an existing Estefanía publication job from the
 
 ## US-006 — Select Publication Asset
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -305,10 +305,10 @@ As an operator, I want to select the final asset for an Estefanía publication j
 
 ## US-007 — Generate Caption / Copy Pack
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -347,10 +347,10 @@ As an operator, I want to generate a caption and copy package for the selected E
 
 ## US-002 — Generate Publication Brief With DeepSeek
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -388,10 +388,10 @@ As an operator, I want the system to generate a structured publication brief, so
 
 ## US-003 — Generate Prompt Pack For Comfy Cloud
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -425,10 +425,10 @@ As an operator, I want the system to create a Comfy-ready prompt pack from the p
 
 ## US-004 — Submit Generation Job To Comfy Cloud
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -464,10 +464,10 @@ As an operator, I want to launch image generation from the console, so that I do
 
 ## US-005 — Ingest Generated Outputs Into MinIO/Postgres
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-03 Asset Review  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-03 Asset Review
+Wave: Wave 1
 
 ### User Story
 
@@ -506,10 +506,10 @@ As an operator, I want generated images to appear automatically in Asset Review,
 
 ## US-008 — Export Publishing Pack
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -546,10 +546,10 @@ As an operator, I want to export a publishing pack, so that I can manually publi
 
 ## US-009 — Mark Publication As Published
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -583,10 +583,10 @@ As an operator, I want to mark a publication as published, so that the system re
 
 ## US-010 — Publication Job Timeline
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1
 
 ### User Story
 
@@ -619,10 +619,10 @@ As an operator, I want to see the timeline of a publication job, so that I under
 
 ## US-011 — Estefanía Business Profile Configuration
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-02 Character Profiles  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-02 Character Profiles
+Wave: Wave 1
 
 ### User Story
 
@@ -659,10 +659,10 @@ As the system, I need a structured Estefanía business profile, so that prompts 
 
 ## US-012 — Operator Home / Next Action View
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1
 
 ### User Story
 
@@ -697,10 +697,10 @@ As an operator, I want a simple home screen that tells me what to do next, so th
 
 ## US-013 — Publication Job Error Handling And Retry
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1
 
 ### User Story
 
@@ -733,10 +733,10 @@ As an operator, I want clear errors and retry actions, so that failures do not r
 
 ## US-014 — Validate Existing Asset Review Against Publication Flow
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-03 Asset Review  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-03 Asset Review
+Wave: Wave 1
 
 ### User Story
 
@@ -773,10 +773,10 @@ As the product owner, I want to validate the existing Asset Review behavior agai
 
 ## US-015 — Wave 1 Runbook
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1
 
 ### User Story
 
@@ -810,10 +810,10 @@ As an operator, I want a short runbook for Estefanía production, so that I can 
 
 ## US-016 — Harden Legacy Asset Review Workflow SQL Handling
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-03 Asset Review  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-03 Asset Review
+Wave: Wave 1
 
 ### User Story
 
@@ -846,10 +846,10 @@ As a technical operator, I want legacy Asset Review workflows to handle free-tex
 
 ## US-017 — Resolve Comfy Reference Image Contract
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -888,10 +888,10 @@ As an operator, I want image generation to use reference images that Comfy Cloud
 
 ## US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1
 
 ### User Story
 
@@ -926,10 +926,10 @@ As the system, I want to make required reference images available to Comfy Cloud
 
 ## US-019 — Comfy Generation Preflight And Operator Error
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1
 
 ### User Story
 
@@ -963,10 +963,10 @@ As an operator, I want the console to detect invalid Comfy references before sub
 
 ## US-020 — Poll Comfy Cloud Generation Status
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1
 
 ### User Story
 
@@ -1002,10 +1002,10 @@ As an operator, I want the system to check whether a submitted Comfy Cloud gener
 
 ## US-021 — Auto-Ingest Completed Comfy Output
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -1042,10 +1042,10 @@ As an operator, I want completed Comfy outputs to be ingested automatically, so 
 
 ## US-022 — Console Auto-Refresh For Generating Jobs
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1
 
 ### User Story
 
@@ -1079,10 +1079,10 @@ As an operator, I want the console to refresh generating jobs automatically, so 
 
 ## US-024 — Anatomy-Aware Composition Policy
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -1114,10 +1114,10 @@ As an operator, I want the system to improve visible hands and feet instead of h
 
 ## US-026 — Generation Attempt History
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1
 
 ### User Story
 
@@ -1149,10 +1149,10 @@ As an operator, I want to see every generation attempt for a publication job, so
 
 ## US-027 — Publication Candidate Quality Review Criteria
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-03 Asset Review  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-03 Asset Review
+Wave: Wave 1
 
 ### User Story
 
@@ -1179,10 +1179,10 @@ As an operator, I want a clear quality checklist for generated publication candi
 
 ## US-028 — Dedicated Identity Reference Sync
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1
 
 ### User Story
 
@@ -1210,10 +1210,10 @@ As the system, I want approved identity references from MinIO to be prepared as 
 
 ## US-029 — Automated Image QA And Correction Pass
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1  
+Status: Done
+Priority: P1
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1
 
 ### User Story
 
@@ -1242,10 +1242,10 @@ As the system, I want to detect obvious anatomy and identity problems after gene
 
 ## US-030 — Comfy Cloud Reference Upload Adapter
 
-Status: Backlog  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1 Stabilization  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
 
 ### User Story
 
@@ -1274,10 +1274,10 @@ As the system, I want to upload or register approved MinIO identity references i
 
 ## US-031 — Pixel-Level Visual QA Provider
 
-Status: Done  
-Priority: P1  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1 Stabilization  
+Status: Done
+Priority: P1
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
 
 ### User Story
 
@@ -1310,10 +1310,10 @@ As the system, I want a visual QA provider to inspect generated images, so that 
 
 ## US-032 — Auto-Prepare References Before Image Generation
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1 Stabilization  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
 
 ### User Story
 
@@ -1342,10 +1342,10 @@ As an operator, I want `Generate images` to prepare required Comfy references au
 
 ## US-023 — Stabilize Estefania Identity And Safe Composition
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-01 Publications  
-Wave: Wave 1  
+Status: Done
+Priority: P0
+Epic: EPIC-01 Publications
+Wave: Wave 1
 
 ### User Story
 
@@ -1398,7 +1398,7 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-011 — Estefanía Business Profile Configuration
 - [x] US-014 — Validate Existing Asset Review Against Publication Flow
 - [x] US-017 — Resolve Comfy Reference Image Contract
-- [ ] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
+- [x] US-018 — Sync MinIO Reference Assets To Comfy Cloud Inputs
 - [x] US-020 — Poll Comfy Cloud Generation Status
 - [x] US-021 — Auto-Ingest Completed Comfy Output
 - [x] US-023 — Stabilize Estefania Identity And Safe Composition
@@ -1408,9 +1408,12 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-030 — Comfy Cloud Reference Upload Adapter
 - [x] US-032 — Auto-Prepare References Before Image Generation
 - [x] US-033 — Operator-First Publications Flow Cleanup
-- [ ] US-035 — Compact Publication Workspace UX
-- [ ] US-034A — Automatic Defective Image Classification
-- [ ] US-034B — Automatic QA Remediation Loop
+- [x] US-036 — Local Anatomy QA Provider For Generated Avatars
+- [x] US-038 — AI-Owned Prompt Pack Generation
+- [x] US-035 — Compact Publication Workspace UX
+- [x] US-034A — Automatic Defective Image Classification
+- [x] US-034B — Automatic QA Remediation Loop
+- [x] US-039 — Human Review Feedback Into Future Prompts
 
 ### P1
 
@@ -1419,7 +1422,7 @@ As an operator, I want Estefania image generations to use safer composition and 
 - [x] US-013 — Publication Job Error Handling And Retry
 - [x] US-016 — Harden Legacy Asset Review Workflow SQL Handling
 - [x] US-015 — Wave 1 Runbook
-- [ ] US-019 — Comfy Generation Preflight And Operator Error
+- [x] US-019 — Comfy Generation Preflight And Operator Error
 - [x] US-022 — Console Auto-Refresh For Generating Jobs
 - [x] US-027 — Publication Candidate Quality Review Criteria
 - [x] US-029 — Automated Image QA And Correction Pass
@@ -1429,10 +1432,10 @@ As an operator, I want Estefania image generations to use safer composition and 
 
 ## US-033 — Operator-First Publications Flow Cleanup
 
-Status: Done  
-Priority: P0  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1 Stabilization  
+Status: Done
+Priority: P0
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1 Stabilization
 
 ### User Story
 
@@ -1464,10 +1467,10 @@ As an operator, I want the console to present one clear Estefania publication pa
 
 ## US-035 — Compact Publication Workspace UX
 
-Status: Backlog  
-Priority: P0  
-Epic: EPIC-04 Admin Operations  
-Wave: Wave 1 Stabilization  
+Status: Done
+Priority: P0
+Epic: EPIC-04 Admin Operations
+Wave: Wave 1 Stabilization
 
 ### User Story
 
@@ -1475,27 +1478,27 @@ As an operator, I want the publication workspace to be organized by focused stag
 
 ### Acceptance Criteria
 
-- [ ] `Publications` has internal stage navigation for the active job.
-- [ ] Stages include at minimum: `Job`, `Brief`, `Prompt`, `Images`, `Review`, `Copy`, `Publish`.
-- [ ] Only the selected stage is expanded by default.
-- [ ] The recommended next action remains visible without scrolling.
-- [ ] The primary action for the current stage is visible near the top of the workspace.
-- [ ] Brief, prompt pack, and copy pack show operator-readable summaries by default.
-- [ ] Raw JSON editing is available only in technical mode or behind an explicit raw editor control.
-- [ ] Image generation status and image review are visually separated.
-- [ ] Publishing shows the final image, caption, hashtags, copy buttons, published URL field, and `Mark published` action without excessive scrolling.
-- [ ] Existing job loading, timeline, retry, QA badges, and technical diagnostics remain available.
+- [x] `Publications` has internal stage navigation for the active job.
+- [x] Stages include at minimum: `Job`, `Brief`, `Prompt`, `Images`, `Review`, `Copy`, `Publish`.
+- [x] Only the selected stage is expanded by default.
+- [x] The recommended next action remains visible without scrolling.
+- [x] The primary action for the current stage is visible near the top of the workspace.
+- [x] Brief, prompt pack, and copy pack show operator-readable summaries by default.
+- [x] Raw JSON editing is available only in technical mode or behind an explicit raw editor control.
+- [x] Image generation status and image review are visually separated.
+- [x] Publishing shows the final image, caption, hashtags, copy buttons, published URL field, and `Mark published` action without excessive scrolling.
+- [x] Existing job loading, timeline, retry, QA badges, and technical diagnostics remain available.
 
 ### Technical Tasks
 
-- [ ] Add publication stage state and stage navigation to `PublicationsPanel`.
-- [ ] Move long sections behind stage-specific rendering.
-- [ ] Add a sticky recommended-action bar for the active job.
-- [ ] Create compact summary renderers for brief, prompt pack, copy pack, and generation state.
-- [ ] Move raw JSON textareas behind technical/raw edit controls.
-- [ ] Split image generation state from publication asset review controls.
-- [ ] Make the publish stage focused on manual Instagram publishing.
-- [ ] Validate responsive behavior on desktop and mobile widths.
+- [x] Add publication stage state and stage navigation to `PublicationsPanel`.
+- [x] Move long sections behind stage-specific rendering.
+- [x] Add a sticky recommended-action bar for the active job.
+- [x] Create compact summary renderers for brief, prompt pack, copy pack, and generation state.
+- [x] Move raw JSON textareas behind technical/raw edit controls.
+- [x] Split image generation state from publication asset review controls.
+- [x] Make the publish stage focused on manual Instagram publishing.
+- [x] Validate responsive behavior on desktop and mobile widths.
 
 ### Dependencies
 
@@ -1507,15 +1510,16 @@ As an operator, I want the publication workspace to be organized by focused stag
 
 - This story should be completed before expanding automatic QA remediation. Otherwise the remediation loop will add more state to an already long screen.
 - This is a UX restructuring story, not a change to publication semantics or automated publishing.
+- Implemented as stage navigation in the Publications console. Standard mode renders the selected stage only; technical mode can still expose diagnostics.
 
 ---
 
 ## US-034A — Automatic Defective Image Classification
 
-Status: Backlog  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1 Stabilization  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
 
 ### User Story
 
@@ -1523,22 +1527,22 @@ As the system, I want visual QA to automatically classify clearly defective Comf
 
 ### Acceptance Criteria
 
-- [ ] Every ingested Comfy output receives a structured QA decision: `pass`, `review_required`, or `blocked`.
-- [ ] `blocked` outputs are automatically marked as defective for the publication job.
-- [ ] Defective outputs remain stored and traceable, but are not offered as the recommended publication candidate.
-- [ ] The defect reason is stored with the asset metadata and generation attempt.
-- [ ] The console shows the defective status, QA flags, scores, and notes.
-- [ ] The operator can still inspect defective outputs in technical/admin review.
-- [ ] The system does not publish, select, or canonize any image automatically.
+- [x] Every ingested Comfy output receives a structured QA decision: `pass`, `review_required`, or `blocked`.
+- [x] `blocked` outputs are automatically marked as defective for the publication job.
+- [x] Defective outputs remain stored and traceable, but are not offered as the recommended publication candidate.
+- [x] The defect reason is stored with the asset metadata and generation attempt.
+- [x] The console shows the defective status, QA flags, scores, and notes.
+- [x] The operator can still inspect defective outputs in technical/admin review.
+- [x] The system does not publish, select, or canonize any image automatically.
 
 ### Technical Tasks
 
-- [ ] Define `defective` handling in publication asset metadata.
-- [ ] Extend `publication-image-qa` response normalization with defect severity.
-- [ ] Update `Avatares AI - Publications - Ingest Comfy Output` to persist defect decisions.
-- [ ] Update job metadata with latest usable candidate vs latest defective candidate.
-- [ ] Update Publications UI to separate usable candidates from defective attempts.
-- [ ] Add timeline event `image-defective` when QA blocks an output.
+- [x] Define `defective` handling in publication asset metadata.
+- [x] Extend `publication-image-qa` response normalization with defect severity.
+- [x] Update `Avatares AI - Publications - Ingest Comfy Output` to persist defect decisions.
+- [x] Update job metadata with latest usable candidate vs latest defective candidate.
+- [x] Update Publications UI to separate usable candidates from defective attempts.
+- [x] Add timeline event `image-defective` when QA blocks an output.
 
 ### Dependencies
 
@@ -1551,15 +1555,126 @@ As the system, I want visual QA to automatically classify clearly defective Comf
 
 - This story does not regenerate images. It only makes the system confident and explicit about bad outputs.
 - Defective means unsuitable for the current publication flow, not necessarily deleted from storage.
+- Current console behavior keeps generated outputs visible with image preview, QA status, flags, defect status, and scores. Blocked assets are marked as QA-blocked and are not automatically selectable/canonical.
+
+---
+
+## US-036 — Local Anatomy QA Provider For Generated Avatars
+
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
+
+### User Story
+
+As the system, I want a local visual QA service to detect obvious anatomy defects in generated avatar images, so that broken outputs can be blocked without depending on paid external vision providers.
+
+### Acceptance Criteria
+
+- [x] A local `local-visual-qa` service exists for the Ubuntu server stack.
+- [x] The service is designed to run inside the internal Docker network.
+- [x] The service accepts generated image bytes or base64 input.
+- [x] The service returns structured QA output compatible with `publication-image-qa-v1`.
+- [x] The service can detect obvious person/body defects such as no detectable person and low-confidence pose.
+- [x] The service returns `pass`, `review_required`, or `blocked`.
+- [x] `ai-gateway` can use the local service when `VISUAL_QA_PROVIDER=local`.
+- [x] If the local service is unavailable, `ai-gateway` falls back safely to explicit heuristic QA.
+- [x] The implementation is documented with server requirements and operating notes.
+- [x] The service is validated against known good, review-required, and defective Estefanía images generated during Wave 1.
+- [x] The service is deployed to `~/local-ai-stack`.
+
+### Technical Tasks
+
+- [x] Add `infra/local-visual-qa` service.
+- [x] Implement CPU-friendly pose/anatomy checks with MediaPipe/OpenCV.
+- [x] Add Dockerfile and compose service snippet.
+- [x] Add `/health` and `/qa/anatomy` endpoints.
+- [x] Extend `ai-gateway` visual QA routing for `VISUAL_QA_PROVIDER=local`.
+- [x] Normalize local QA output into existing `metadata.qa` schema.
+- [x] Deploy service to `~/local-ai-stack`.
+- [x] Configure server env for local QA.
+- [x] Validate after Docker restart.
+
+### Dependencies
+
+- US-031.
+- US-034A.
+
+### Notes
+
+- This service is a first-pass anatomy filter, not a final identity or aesthetic judge.
+- GTX 1050 is available after driver reboot, but MVP remains CPU-compatible because VRAM is only 2 GB.
+- Validation found that `very_strict` created false positives on usable waist-up night-city images. Production strictness was moved back to `strict`.
+
+### Validation Evidence
+
+| Image | Visual read | QA result | Notes |
+| --- | --- | --- | --- |
+| `estefania-raw-image-nature-cabin-20260725T221529-1Z.png` | Usable candidate | `review_required` | Local QA did not block; human review still useful. |
+| `estefania-raw-image-airport-20260725T223647-1Z.png` | Defective hand/object interaction | `blocked` / `ambiguous-hand-object-interaction` | User observed coffee cup plus phone with apparent extra hands. |
+| `estefania-raw-image-airport-20260725T225825-1Z.png` | Better candidate | `review_required` / `weak-right_arm-keypoints` | QA preserved candidate for review instead of blocking. |
+| `estefania-raw-image-airport-20260725T233309-1Z.png` | Defective hand/object interaction | `blocked` / `ambiguous-hand-object-interaction` | Confirmed blocked output remains inspectable. |
+| `estefania-raw-image-night-city-20260726T013426-1Z.png` | Much better candidate | `review_required` / `weak-right_leg-keypoints` | `defective=false`; scores around `0.72`; exposed in console after dashboard update. |
+
+---
+
+## US-038 — AI-Owned Prompt Pack Generation
+
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
+
+### User Story
+
+As an operator, I want the system to generate the final image prompt intelligently without requiring me to inspect or repair JSON, so that publication image generation feels magical instead of engineering-heavy.
+
+### Acceptance Criteria
+
+- [x] DeepSeek generates the final `promptPack` consumed by the Comfy generation workflow.
+- [x] The generated prompt pack uses one coherent pose/composition instead of combining contradictory template fragments.
+- [x] The generated prompt pack includes operator-readable summary fields.
+- [x] The standard console hides raw prompt JSON from non-technical operation.
+- [x] Raw prompt JSON remains available only in technical mode.
+- [x] n8n stores prompt provider metadata for auditability.
+- [x] Prompt guardrails preserve Estefania's identity and brand fit while allowing natural variation in confidence, posture, and expressiveness.
+- [x] Validate at least 3 new image generations against the AI-owned prompt-pack flow.
+
+### Technical Tasks
+
+- [x] Add `POST /publication-prompt-pack` to `ai-gateway`.
+- [x] Route `Avatares AI - Publications - Generate Prompt Pack` through `ai-gateway`.
+- [x] Store `promptPackProvider` and `promptPackProviderMeta`.
+- [x] Keep references and technical prompt fields server-side.
+- [x] Add standard-mode prompt summary in the Publications console.
+- [x] Deploy `ai-gateway`, n8n workflow, and dashboard changes.
+- [x] Keep Estefania character-tone guidance broad enough to avoid over-constraining natural variation.
+- [x] Update the operator runbook with the new prompt behavior.
+
+### Dependencies
+
+- US-023.
+- US-024.
+- US-030.
+- US-032.
+- US-033.
+
+### Notes
+
+- Root-cause analysis showed DeepSeek's brief was reasonable, but the old n8n prompt template produced "prompt soup" by combining contradictory pose and framing fragments.
+- The operator should not validate JSON. DeepSeek owns the final prompt pack, and the console presents a human summary by default.
+- Early post-change generations improved substantially. Estefania can appear a little more relaxed/assertive in some scenes; this is acceptable variation for now and should be monitored rather than blocked.
+- Validation covered multiple post-change airport and night-city generations reviewed in the console, including both `review_required` and blocked QA outcomes.
 
 ---
 
 ## US-034B — Automatic QA Remediation Loop
 
-Status: Backlog  
-Priority: P0  
-Epic: EPIC-06 AI Provider Router  
-Wave: Wave 1 Stabilization  
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
 
 ### User Story
 
@@ -1567,27 +1682,27 @@ As the system, I want blocked/defective Comfy outputs to trigger controlled rege
 
 ### Acceptance Criteria
 
-- [ ] When QA marks an output as `blocked`, the system can create a corrective regeneration attempt automatically.
-- [ ] The remediation loop stops when a generated output receives `pass`.
-- [ ] The remediation loop stops and asks for human review when all attempts are exhausted.
-- [ ] The maximum number of automatic attempts is configurable and defaults to `3`.
-- [ ] The system stores parent/child attempt relationships.
-- [ ] Corrective prompt changes are derived from QA flags and stored with the new attempt.
-- [ ] Identity-critical failures can stop the loop immediately when configured.
-- [ ] The console shows all attempts, their QA result, defect reason, and whether another attempt is pending.
-- [ ] The system never publishes automatically.
-- [ ] The system never promotes an image to canonical automatically.
+- [x] When QA marks an output as `blocked`, the system can create a corrective regeneration attempt automatically.
+- [x] The remediation loop stops when a generated output receives `pass`.
+- [x] The remediation loop stops and asks for human review when all attempts are exhausted.
+- [x] The maximum number of automatic attempts is configurable and defaults to `3`.
+- [x] The system stores parent/child attempt relationships.
+- [x] Corrective prompt changes are derived from QA flags and stored with the new attempt.
+- [x] Identity-critical failures can stop the loop immediately when configured.
+- [x] The console shows all attempts, their QA result, defect reason, and whether another attempt is pending.
+- [x] The system never publishes automatically.
+- [x] The system never promotes an image to canonical automatically.
 
 ### Technical Tasks
 
-- [ ] Add remediation policy configuration to the publication generation workflow.
-- [ ] Add attempt counting and loop guard in n8n/Postgres.
-- [ ] Generate corrective prompt deltas from QA flags.
-- [ ] Re-submit Comfy generation with the corrected prompt pack.
-- [ ] Link new generation attempts to the source defective attempt.
-- [ ] Auto-refresh/poll each remediation attempt until completed or failed.
-- [ ] Add timeline events: `remediation-started`, `remediation-submitted`, `remediation-exhausted`, `remediation-passed`.
-- [ ] Update Publications UI to show remediation progress and final candidate state.
+- [x] Add remediation policy configuration to the publication generation workflow.
+- [x] Add attempt counting and loop guard in n8n/Postgres.
+- [x] Generate corrective prompt deltas from QA flags.
+- [x] Re-submit Comfy generation with the corrected prompt pack.
+- [x] Link new generation attempts to the source defective attempt.
+- [x] Auto-refresh/poll each remediation attempt until completed or failed.
+- [x] Add timeline events: `remediation-started`, `remediation-submitted`, `remediation-exhausted`, `remediation-passed`.
+- [x] Update Publications UI to show remediation progress and final candidate state.
 
 ### Dependencies
 
@@ -1603,3 +1718,528 @@ As the system, I want blocked/defective Comfy outputs to trigger controlled rege
 - This is an automation loop, not an autonomous publishing loop.
 - Cost control is mandatory: no infinite retries, no hidden repeated Comfy submissions.
 - The first implementation should prefer full regeneration with safer prompt deltas. Inpaint/correction can be a later story.
+- Implemented with `qa-remediation-v1`, default `maxAttempts=3`, prompt delta appended to the remediation generation prompt, and auto-submit during console polling when an ingested image is blocked.
+
+---
+
+## US-039 — Human Review Feedback Into Future Prompts
+
+Status: Done
+Priority: P0
+Epic: EPIC-06 AI Provider Router
+Wave: Wave 1 Stabilization
+
+### User Story
+
+As the system, I want human review checklist decisions, rejection reasons, and review notes to inform future prompt packs and remediation attempts, so that operator feedback improves later images instead of remaining only as audit metadata.
+
+### Acceptance Criteria
+
+- [x] Quality checklist values are persisted as structured review feedback for selected and rejected assets.
+- [x] Rejection reasons are mapped to prompt guidance categories such as identity, hands, feet, composition, brand fit, and publishability.
+- [x] Review notes are summarized into concise, non-technical prompt guidance before being sent to DeepSeek.
+- [x] Future prompt-pack generation can include recent relevant human feedback for the same avatar/scene.
+- [x] QA remediation attempts can merge automatic QA flags with human rejection reasons when available.
+- [x] The console shows when human feedback influenced a prompt or remediation attempt.
+- [x] The system does not train a model or alter canonical identity automatically from review notes.
+- [x] Feedback influence is capped to avoid overfitting to one operator comment or one bad generation.
+
+### Technical Tasks
+
+- [x] Define `publication-human-feedback-v1` metadata schema.
+- [x] Extend select/reject workflows to persist normalized feedback.
+- [x] Add a feedback lookup step for recent same-avatar/same-scene reviews.
+- [x] Add feedback summarization in `ai-gateway` or n8n before prompt-pack generation.
+- [x] Inject summarized feedback into `/publication-prompt-pack` context.
+- [x] Inject rejection-reason prompt deltas into QA remediation when applicable.
+- [x] Add UI indicator showing feedback was used.
+- [ ] Validate with at least 3 feedback-driven regenerations.
+
+### Dependencies
+
+- US-027.
+- US-034A.
+- US-034B.
+- US-038.
+
+### Notes
+
+- This story turns review controls from passive curation metadata into active prompt memory.
+- Feedback must stay advisory. A single note should not permanently redefine Estefania or the scene.
+- Implemented on July 26, 2026. Remaining validation is live operator sampling across multiple feedback-driven regenerations.
+
+---
+
+## US-040 — Operator Studio Information Architecture
+
+Status: Done
+Priority: P0
+Epic: EPIC-10 Operator Experience And Scale
+Wave: Wave 2 Studio UX
+
+### User Story
+
+As an operator, I want the console to be organized around characters, work queues, and clear next actions instead of internal systems, so that I can manage multiple AI characters without needing to understand jobs, workflows, prompt packs, ingest details, or technical IDs.
+
+### Problem Statement
+
+The current console has gained significant operational value, but it still reflects how the system was built rather than how a non-technical operator thinks. The same operator action can appear across `Home`, `Asset Review`, and `Publications`; technical concepts such as job IDs, prompt packs, Comfy status, ingest, QA remediation, and timeline events leak into the standard experience; and the home view works more like a job queue than a business/character dashboard.
+
+This becomes a scaling risk as soon as the system manages more than one character.
+
+### Acceptance Criteria
+
+- [x] Define a new top-level navigation model that separates `Studio` work from `Ops/Admin` work.
+- [x] Define the non-technical Studio pages required to manage multiple characters.
+- [x] Define the Ops/Admin pages required to monitor and operate the underlying system.
+- [x] Map current pages/components to the proposed new information architecture.
+- [x] Identify duplicated or overlapping experiences, especially `Asset Review` vs publication image review.
+- [x] Define which concepts are hidden from standard mode and remain available only in technical/debug mode.
+- [x] Define human-readable labels for job, generation, QA, publication, and error states.
+- [x] Define the dashboard metrics needed to understand character activity at a glance.
+- [x] Define the primary operator workflows and the single recommended next action for each workflow state.
+- [x] Define a migration path that preserves the current working console while new pages are introduced.
+- [x] Produce implementation stories for the first Studio dashboard, unified review inbox, simplified publication workspace, and Ops/Admin dashboard.
+- [x] Validate the proposed IA against the Estefania flow before implementing UI changes.
+
+### Proposed Studio IA
+
+- `Dashboard`: cross-character activity, active jobs, review queue, publish-ready content, QA blocks, recent successes/failures, and primary next actions.
+- `Characters`: per-character overview with identity/canonical state, active scenes, recent assets, quality trends, publication activity, and character-level actions.
+- `Production`: publication/content jobs grouped by operator state such as preparing, generating, needs review, copy ready, publish ready, published, and needs attention.
+- `Review`: unified image review inbox for publication candidates and asset/canonical decisions.
+- `Publish`: final publishing queue with approved image, caption, hashtags, copy actions, and published URL recording.
+
+### Proposed Ops/Admin IA
+
+- `Ops Dashboard`: system health, active workers, recent failures, stuck jobs, ingest status, gateway/Comfy/n8n status, and backup freshness.
+- `Ingest`: ingest profiles, watcher controls, manual pipeline runs, and last-run preview.
+- `Catalogs`: avatars, scenes, asset types, workflows, and models.
+- `Backups`: backup creation, listing, and restore/recovery guidance.
+- `Access`: user access and approval controls.
+- `Technical Debug`: raw IDs, JSON payloads, timelines, provider metadata, workflow diagnostics, and low-level retry/debug tools.
+
+### Technical Tasks
+
+- [x] Audit current routes, tabs, panels, and operator actions.
+- [x] Inventory all standard-mode technical leaks.
+- [x] Draft the new navigation hierarchy and page responsibilities.
+- [x] Draft state-label taxonomy for publications, assets, QA, generation, and publishing.
+- [x] Draft dashboard KPI definitions and required API/data gaps.
+- [x] Draft unified review inbox behavior and decision model.
+- [x] Draft simplified publication workspace behavior.
+- [x] Draft Ops/Admin dashboard behavior.
+- [x] Split the implementation into follow-up US-041+ stories.
+- [x] Review the proposal with product/operator perspective before coding.
+
+### Out Of Scope
+
+- Building the new dashboard UI.
+- Rewriting `PublicationsPanel`.
+- Changing backend workflow behavior.
+- Removing existing technical/admin screens.
+- Adding support for a new character.
+
+### Dependencies
+
+- US-033.
+- US-035.
+- US-036.
+- US-038.
+- US-039.
+
+### Notes
+
+- This is a product architecture story, not a visual polish task.
+- Current pages should keep working while the new IA is introduced.
+- The goal is not to hide capability; the goal is to put capability behind the right mental model.
+- A non-technical operator should not need to know what n8n, Comfy, prompt packs, ingest, or metadata are in order to create and publish content.
+- Delivered in `docs/product/operator-studio-information-architecture.md`.
+
+---
+
+## US-041 — Character Activity Dashboard
+
+Status: Done
+Priority: P0
+Epic: EPIC-10 Operator Experience And Scale
+Wave: Wave 2 Studio UX
+
+### User Story
+
+As an operator, I want a Studio dashboard that summarizes character activity, pending work, QA issues, and publish-ready content, so that I can understand what needs attention without opening technical pages.
+
+### Acceptance Criteria
+
+- [x] Dashboard is the default standard-mode landing page.
+- [x] Dashboard shows active characters with current production/review/publish counts.
+- [x] Dashboard shows active publication jobs grouped by human next action.
+- [x] Dashboard shows images awaiting review.
+- [x] Dashboard shows QA-blocked or failed items as attention cards.
+- [x] Dashboard shows publish-ready items.
+- [x] Dashboard shows recent successes/failures.
+- [x] Dashboard provides a primary `Create publication` action.
+- [x] Dashboard can open the relevant production/review/publish task directly.
+- [x] Dashboard hides raw IDs and technical provider details in standard mode.
+
+### Technical Tasks
+
+- [x] Reuse or extend publication summary APIs for cross-character metrics.
+- [x] Add dashboard data adapter in the console.
+- [x] Build dashboard cards for characters, queues, attention items, and publish-ready items.
+- [x] Add human state labels from US-040.
+- [x] Preserve current `OperatorHomePanel` until replacement is validated.
+
+### Dependencies
+
+- US-040.
+
+### Notes
+
+- Implemented as the new standard `Studio Dashboard` inside `OperatorHomePanel`.
+- MVP uses the existing publication jobs summary endpoint with `includePublished=true` and no avatar filter.
+- Deeper analytics such as acceptance rate, regeneration rate, QA score trends, and per-character quality history require follow-up data work.
+- Post-review refinement compacted the global header, moved user controls into a profile chip/menu, removed the body-level user card, and upgraded the recommended next-action hero into a contextual task card.
+
+---
+
+## US-042 — Unified Review Inbox
+
+Status: Done
+Priority: P0
+Epic: EPIC-10 Operator Experience And Scale
+Wave: Wave 2 Studio UX
+
+### User Story
+
+As an operator, I want one review inbox for generated images, publication candidates, and canonical/reference decisions, so that I do not need to know whether an image belongs to Asset Review or Publications before deciding what to do with it.
+
+### Acceptance Criteria
+
+- [x] Review inbox combines publication candidates and asset/canonical review candidates in one standard-mode queue.
+- [x] Each review item shows image preview, character, scene, source context, QA status, and recommended action.
+- [x] Operator can approve for publication when the image belongs to a publication job.
+- [x] Operator can reject and request another attempt when supported.
+- [x] Operator can reject as not suitable for canonical/reference use.
+- [x] Canonical promotion is permission-gated or technical/admin only.
+- [x] Human feedback checklist and notes are available from the review item.
+- [x] QA flags are shown in human language.
+- [x] Raw asset IDs, metadata, and provider details are hidden unless technical mode is enabled.
+- [x] Existing Asset Review and Publications flows continue working during migration.
+
+### Technical Tasks
+
+- [x] Define unified review item view model.
+- [x] Reuse existing asset review and publication APIs where possible.
+- [x] Add source-aware actions for publication select/reject and canonical review.
+- [x] Preserve `publication-human-feedback-v1` persistence.
+- [x] Add filters for character, scene, queue, QA status, and source.
+
+### Dependencies
+
+- US-027.
+- US-034A.
+- US-039.
+- US-040.
+
+### Notes
+
+- Review Inbox now shows a humanized quality check with QA status, visible flags/reasons, and confidence scores when available.
+- Items blocked by QA cannot be selected from the standard inbox, but the operator can still request another generation.
+- Standard-mode filters now include character, scene, queue, QA status, and source. Source is currently publication-only until canonical/reference candidates are merged into the inbox.
+- Review Inbox now merges publication candidates with raw asset/reference candidates. Publication items can be selected or regenerated, while asset/reference candidates can be rejected as unsuitable from the same queue.
+- Canonical promotion remains intentionally technical/admin-only in the legacy grid to avoid accidental identity changes from the standard inbox.
+
+- MVP adds a standard-mode `Review Inbox` focused on publication candidates from the summary endpoint.
+- Publication candidates can now be selected or rejected inline with a quick review note.
+- `Needs another try` now rejects the current image and submits another Comfy Cloud generation for the same publication job.
+- Technical mode still exposes the legacy Asset Review grid for canonical/reference actions.
+- Full completion requires bringing raw/canonical asset candidates into the same inbox and adding inline feedback/actions instead of opening the publication workspace.
+
+---
+
+## US-042A — Review Inbox Regenerate After Rejection
+
+Status: Done
+Priority: P0
+Epic: EPIC-10 Operator Experience And Scale
+Wave: Wave 2 Studio UX
+
+### User Story
+
+As an operator, I want `Needs another try` in the Review Inbox to reject the current image and immediately request a replacement, so that review work feels operational instead of requiring me to open the publication workspace for the common rejection path.
+
+### Acceptance Criteria
+
+- [x] `Needs another try` persists the rejection and human feedback for the current image.
+- [x] After rejection succeeds, the inbox submits a new image generation for the same publication job.
+- [x] The new generation uses the existing publication prompt pack and Comfy Cloud generation endpoint.
+- [x] The inbox shows a success message when the replacement generation is submitted.
+- [x] If regeneration fails after rejection, the operator sees a safe error and can open the publication workspace.
+- [x] The system does not publish, select, or canonize any image automatically.
+- [x] Existing backend generation preflight and safety checks still apply.
+
+### Technical Tasks
+
+- [x] Call `rejectAsset` with `publication-quality-review-v1` notes from Review Inbox.
+- [x] Call `generatePublicationImages` after successful rejection.
+- [x] Refresh Review Inbox after the replacement request.
+- [x] Keep the full publication workspace available for advanced retry/remediation.
+
+### Dependencies
+
+- US-042.
+- US-034B.
+
+### Notes
+
+- This is not a new remediation loop. It is an operator-triggered replacement request from the inbox.
+- Attempt limits and deeper remediation policy remain owned by the generation workflows.
+
+---
+
+## US-043 — Simplified Publication Workspace
+
+Status: Done
+Priority: P0
+Epic: EPIC-10 Operator Experience And Scale
+Wave: Wave 2 Studio UX
+
+### User Story
+
+As an operator, I want a simplified publication workspace that shows one safe next action at a time, so that I can create, review, package, and publish content without understanding brief JSON, prompt packs, Comfy, ingest, timelines, or internal IDs.
+
+### Acceptance Criteria
+
+- [x] Standard workspace shows a single recommended next action prominently.
+- [x] Workspace summarizes creative direction without raw brief JSON.
+- [ ] Workspace summarizes visual direction without raw prompt pack JSON.
+- [ ] Image generation state is shown as human status, not provider status.
+- [x] Latest generated image and QA guidance are visible in the same workspace.
+- [ ] Review decision controls are visible only when image review is the next action.
+- [ ] Copy and publishing controls are visible only when relevant.
+- [x] Timeline, IDs, prompt JSON, provider metadata, and raw events move to technical/debug mode.
+- [x] Existing `PublicationsPanel` remains available or recoverable during migration.
+- [ ] Workspace can load an existing publication job from Dashboard/Production.
+
+### Technical Tasks
+
+- [ ] Extract reusable human state and next-action helpers.
+- [ ] Create standard-mode publication workspace component.
+- [ ] Move technical sections behind a debug/details boundary.
+- [x] Reuse existing publication APIs.
+- [ ] Add transition links from Dashboard, Production, Review, and Publish.
+
+### Dependencies
+
+- US-038.
+- US-039.
+- US-040.
+- US-041.
+
+### Notes
+
+- First US-043 increment added a real primary CTA to `Recommended Action`, driven by the current publication job state.
+- The publication workspace now prioritizes creating/configuring a publication job before secondary recovery tools such as loading by `publicationJobId`.
+- `Create job` and `Load recent` now live together as start-work actions. Recent jobs open in a modal selector instead of consuming the main workspace.
+- Publication image review now uses the same human QA language as Review Inbox: readable status, humanized flags, and score labels with percentages.
+- Standard-mode brief review now renders creative direction, caption angle, emotional tone, scene notes, caption ideas, and avoid rules without exposing raw JSON.
+
+---
+
+## US-044 — Ops/Admin Dashboard
+
+Status: Done
+Priority: P1
+Epic: EPIC-10 Operator Experience And Scale
+Wave: Wave 2 Studio UX
+
+### User Story
+
+As an admin/operator, I want an Ops dashboard that summarizes system health, stuck jobs, ingest status, recent failures, and backup freshness, so that I can detect operational problems without SSH, Docker, n8n, MinIO, or Postgres access.
+
+### Acceptance Criteria
+
+- [x] Ops dashboard shows ai-gateway, n8n, Comfy, DeepSeek, ingest watcher, and backup health where available.
+- [x] Dashboard shows recent failed publication/generation jobs.
+- [x] Dashboard shows stuck or long-running generation jobs.
+- [x] Dashboard shows active ingest profile and watcher state.
+- [x] Dashboard shows latest backup freshness.
+- [x] Dashboard links to Ingest, Catalogs, Backups, Access, and Technical Debug.
+- [x] Standard admin view uses human labels; raw diagnostics require technical mode.
+- [x] Ingest profiles are clearly labeled as ingest/import setups, not character identity profiles.
+- [x] Ingest setup creation/editing opens in a modal so the main view stays focused on the operational list.
+- [x] Existing Ops/Admin sections continue working.
+
+### Technical Tasks
+
+- [x] Inventory existing health/status APIs.
+- [x] Define missing health data gaps.
+- [x] Build Ops dashboard view model.
+- [x] Add dashboard cards for services, failures, stuck jobs, ingest, and backups.
+- [x] Link each card to its operational destination.
+- [x] Rename confusing ingest profile labels and explain watcher classification behavior.
+- [x] Move ingest setup editor out of the default page flow into an explicit modal.
+- [x] Add authenticated ai-gateway health bridge for DeepSeek, Comfy Cloud, and Visual QA provider status.
+
+### Dependencies
+
+- US-013.
+- US-015.
+- US-040.
+
+### Notes
+
+- First increment adds a read-only Ops dashboard above the existing Ops/Admin tools.
+- n8n health is inferred from successful dashboard webhook responses.
+- Ops dashboard now reads ai-gateway `/health` through the authenticated console gateway and shows DeepSeek, Comfy Cloud, and Visual QA configuration status.
+- Raw aggregated diagnostics are available only in technical mode.
+- Ingest Profiles copy now clarifies that these setups classify generated files during ingest and do not control creative reference selection for image generation.
+- Ingest setup editor now opens only from `New ingest setup` or `Edit setup`, keeping the list as the default operator view.
+- Validation confirmed ai-gateway online, n8n responding, AI providers configured, and latest backup fresh after re-enabling `Avatares AI - Admin - Daily Backup`.
+
+---
+
+## US-045 — Operator Creative Direction And Feedback
+
+Status: Done
+Priority: P0
+Epic: EPIC-10 Operator Experience And Scale
+Wave: Wave 2 Studio UX
+
+### User Story
+
+As an operator, I want to guide a publication with human creative direction and revise the brief with comments, so that I can request posts about events, moods, must-have details, or changes without editing prompts or JSON.
+
+### Acceptance Criteria
+
+- [x] Operator can add optional topic/event context before creating a publication job.
+- [x] Operator can add desired mood before creating a publication job.
+- [x] Operator can add must-include details before creating a publication job.
+- [x] Operator can add avoid constraints before creating a publication job.
+- [x] Creative direction is folded into the publication objective consumed by brief generation.
+- [x] Operator can add plain-language feedback after seeing the brief.
+- [x] Feedback can be applied without exposing or editing raw brief JSON.
+- [x] AI gateway regenerates a genuinely revised brief from current brief plus operator feedback.
+- [x] Feedback history is stored as job metadata for audit and future prompt guidance.
+- [x] Prompt pack generation clearly reflects applied brief feedback.
+
+### Technical Tasks
+
+- [x] Add creative direction fields to standard Publications create flow.
+- [x] Add standard-mode brief feedback textbox.
+- [x] Save applied feedback using existing manual brief update path.
+- [x] Extend `Avatares AI - Publications - Generate Brief` to pass `briefFeedback` to `ai-gateway`.
+- [x] Extend `ai-gateway` `/publication-brief` to revise from current brief and feedback.
+- [x] Store `operator-brief-feedback-v1` entries in publication job metadata.
+- [x] Show last applied feedback in the brief summary.
+
+### Dependencies
+
+- US-038.
+- US-043.
+
+### Notes
+
+- Deep feedback revision now routes through `ai-gateway` and DeepSeek when `briefFeedback` is provided. n8n stores `lastBriefFeedback` and appends to `briefFeedbackHistory`.
+- Prompt pack generation receives `operatorBriefFeedback`, stores `promptPackOperatorBriefFeedback`, and shows the last applied feedback in the standard brief summary.
+
+---
+
+## US-046 — Character Onboarding Foundation
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to create and prepare a new character through a guided onboarding flow, so that new characters can be configured safely without editing JSON, database rows, prompts, or workflow internals.
+
+### Acceptance Criteria
+
+- [ ] Operator can create a draft character profile from the web console.
+- [ ] Onboarding captures display name, short handle, business profile, content pillars, caption tone, brand fit, and publishing limits.
+- [ ] Operator can define initial scenes or select starter scene templates.
+- [ ] Operator can upload or select candidate identity reference images.
+- [ ] Operator can classify references as global identity canon or scene-specific canon.
+- [ ] Operator can see that ingest profiles are operational import recipes, not character identity profiles.
+- [ ] Character has visible onboarding status: `draft`, `references-needed`, `identity-review`, `ready-for-tests`, `ready`.
+- [ ] Character cannot be used for normal publication jobs until minimum onboarding requirements are complete.
+- [ ] Standard UI uses human labels and guided steps; technical JSON/debug data remains behind technical mode.
+- [ ] Existing Estefania configuration can be represented by the same onboarding model without breaking current publication flows.
+
+### Technical Tasks
+
+- [ ] Inventory current character, avatar catalog, scene catalog, prompt profile, and canonical registry data dependencies.
+- [ ] Define character onboarding view model and minimum-ready rules.
+- [ ] Add create/edit character API endpoints or n8n workflows.
+- [ ] Add onboarding UI entry point from Ops/Admin or Characters.
+- [ ] Add reference image selection/upload step.
+- [ ] Add canon classification fields: `identity-canon`, `scene-canon`, `supporting-reference`, `rejected-reference`.
+- [ ] Add operator-facing copy that distinguishes character profiles, reference canon, and ingest profiles.
+- [ ] Persist onboarding status and validation checklist.
+- [ ] Add compatibility mapping for existing Estefania data.
+
+### Dependencies
+
+- US-044.
+- US-045.
+
+### Notes
+
+- This US is the umbrella for scaling beyond Estefania.
+- It should not attempt to solve image consistency quality by itself; it creates the structured path where identity hardening can run.
+- Ingest profiles should remain operational import configurations. They must not be presented as character identity profiles or used as creative reference source of truth.
+
+---
+
+## US-047 — Character Identity Hardening
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want each character to pass an identity consistency hardening step before publication, so that generated images keep the same recognizable person across scenes, moods, and prompts.
+
+### Acceptance Criteria
+
+- [ ] Operator can mark one or more canonical identity anchor images for a character.
+- [ ] Operator can mark scene-specific canonical references for each scene.
+- [ ] System shows which identity references are used by prompt pack and Comfy generation.
+- [ ] System shows which scene references are used by prompt pack and Comfy generation.
+- [ ] Character has an identity prompt/profile summary used consistently by brief and prompt-pack generation.
+- [ ] Prompt pack generation resolves references from `avatar + scene + assetType`, using scene canon when available and falling back to global identity canon when needed.
+- [ ] Prompt pack generation never depends on the active ingest profile to choose creative or identity references.
+- [ ] Operator can run controlled identity test generations across at least three scenes.
+- [ ] Identity test results separate identity drift, anatomy defects, composition defects, and scene/style mismatch.
+- [ ] Character is blocked from normal publishing until identity hardening passes or is explicitly overridden by an admin.
+- [ ] Estefania can be audited through the same hardening flow without replacing her current assets.
+- [ ] Standard UI explains identity risk in human language; raw QA/provider metadata remains available in technical mode.
+
+### Technical Tasks
+
+- [ ] Define canonical identity reference rules and primary anchor selection.
+- [ ] Define scene-canon selection and fallback rules.
+- [ ] Add reference resolver for generation: `avatar + scene + assetType -> identity references + scene references`.
+- [ ] Extend prompt pack metadata with identity references actually used.
+- [ ] Extend prompt pack metadata with scene references actually used.
+- [ ] Add identity profile fields to ai-gateway avatar profiles or equivalent character config.
+- [ ] Add controlled identity test job type or workflow.
+- [ ] Add identity QA summary and operator decision fields.
+- [ ] Add readiness gate tying identity hardening to character onboarding status.
+- [ ] Backfill Estefania identity audit view from existing canonical registry data.
+
+### Dependencies
+
+- US-046.
+
+### Notes
+
+- This US turns what we learned from Estefania into a repeatable quality gate for every future character.
+- The goal is not stricter anatomy validation; it is stable character identity across otherwise valid images.
+- Generation should treat active ingest profile as irrelevant for creative reference selection. Active ingest profile only classifies files entering through generic ingest.

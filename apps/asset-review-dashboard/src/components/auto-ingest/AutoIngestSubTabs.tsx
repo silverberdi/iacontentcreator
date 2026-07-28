@@ -1,7 +1,7 @@
 export type AutoIngestSubTab = "profiles" | "runner" | "preview";
 
 const TABS: { id: AutoIngestSubTab; label: string }[] = [
-  { id: "profiles", label: "Profiles" },
+  { id: "profiles", label: "Ingest Profiles" },
   { id: "runner", label: "Runner / Watcher" },
   { id: "preview", label: "Preview / Last Run" },
 ];

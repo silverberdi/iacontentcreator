@@ -19,8 +19,9 @@ import DashboardTabs, { type DashboardTab } from "./components/DashboardTabs";
 import PageContainer from "./components/PageContainer";
 import PublicationsPanel from "./components/PublicationsPanel";
 import OperatorHomePanel from "./components/OperatorHomePanel";
+import OpsDashboardPanel from "./components/OpsDashboardPanel";
 import UserAccessPanel from "./components/UserAccessPanel";
-import { logout } from "./api/authApi";
+import UnifiedReviewInboxPanel from "./components/UnifiedReviewInboxPanel";
 import { defaultFilters } from "./data/catalogs";
 import { useCatalogOptions } from "./hooks/useCatalogOptions";
 import type { AuthUser } from "./types/auth";
@@ -182,7 +183,9 @@ export default function App({ currentUser }: AppProps) {
       case "home":
         return "What needs attention next";
       case "review":
-        return "Review, promote, and reject generated avatar assets";
+        return technicalMode
+          ? "Review, promote, and reject generated avatar assets"
+          : "Images that need a human decision";
       case "publications":
         return "Create and track Estefania influencer publication jobs";
       case "content-cycle":
@@ -191,6 +194,22 @@ export default function App({ currentUser }: AppProps) {
         return "Operational controls, catalogs, ingest runner, and backups";
       default:
         return undefined;
+    }
+  }, [activeTab]);
+  const headerTitle = useMemo(() => {
+    switch (activeTab) {
+      case "home":
+        return "Home";
+      case "review":
+        return "Asset Review";
+      case "publications":
+        return "Publications";
+      case "content-cycle":
+        return "Content Cycle";
+      case "ops":
+        return "Ops / Admin";
+      default:
+        return "Home";
     }
   }, [activeTab]);
 
@@ -413,7 +432,12 @@ export default function App({ currentUser }: AppProps) {
 
   return (
     <div className="min-h-screen bg-surface">
-      <Header subtitle={headerSubtitle} filterPills={reviewFilterPills} />
+      <Header
+        title={headerTitle}
+        subtitle={headerSubtitle}
+        currentUser={currentUser}
+        filterPills={reviewFilterPills}
+      />
 
       <DashboardTabs
         activeTab={activeTab}
@@ -423,20 +447,6 @@ export default function App({ currentUser }: AppProps) {
 
       <main>
         <PageContainer className="space-y-6 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-raised px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-200">{currentUser.name}</p>
-              <p className="truncate font-mono text-xs text-gray-500">{currentUser.email}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void logout().then(() => window.location.assign("/"))}
-              className="rounded-md border border-border bg-surface-overlay px-3 py-1.5 text-xs text-gray-200 hover:border-gray-500"
-            >
-              Sign out
-            </button>
-          </div>
-
           <ApiKeyWarning />
 
           {catalogOptionsError && activeTab !== "ops" && (
@@ -450,6 +460,7 @@ export default function App({ currentUser }: AppProps) {
               <OperatorHomePanel
                 catalogOptions={catalogOptions}
                 technicalMode={technicalMode}
+                onCreatePublication={() => setActiveTab("publications")}
                 onOpenPublicationJob={handleOpenPublicationJob}
               />
             </div>
@@ -457,56 +468,66 @@ export default function App({ currentUser }: AppProps) {
 
           {activeTab === "review" && (
             <div role="tabpanel" className="space-y-6">
-              <FiltersPanel
-                filters={filters}
-                catalogOptions={catalogOptions}
-                catalogOptionsLoading={catalogOptionsLoading}
-                loading={loading}
-                onChange={handleFiltersChange}
-                onRefresh={handleRefresh}
-              />
+              {!technicalMode ? (
+                <UnifiedReviewInboxPanel
+                  catalogOptions={catalogOptions}
+                  technicalMode={technicalMode}
+                  onOpenPublicationJob={handleOpenPublicationJob}
+                />
+              ) : (
+                <>
+                  <FiltersPanel
+                    filters={filters}
+                    catalogOptions={catalogOptions}
+                    catalogOptionsLoading={catalogOptionsLoading}
+                    loading={loading}
+                    onChange={handleFiltersChange}
+                    onRefresh={handleRefresh}
+                  />
 
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-lg border border-red-800/60 bg-red-950/40 px-4 py-3 text-sm text-red-200"
-                >
-                  <p className="font-medium">Error loading data</p>
-                  <p className="mt-1 text-red-300/90">{error}</p>
-                </div>
+                  {error && (
+                    <div
+                      role="alert"
+                      className="rounded-lg border border-red-800/60 bg-red-950/40 px-4 py-3 text-sm text-red-200"
+                    >
+                      <p className="font-medium">Error loading data</p>
+                      <p className="mt-1 text-red-300/90">{error}</p>
+                    </div>
+                  )}
+
+                  {operationMessage && (
+                    <div
+                      role="status"
+                      className={`rounded-lg border px-4 py-3 text-sm ${
+                        operationMessage.type === "success"
+                          ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-200"
+                          : "border-red-800/60 bg-red-950/40 text-red-200"
+                      }`}
+                    >
+                      {operationMessage.text}
+                    </div>
+                  )}
+
+                  <CanonicalPanel
+                    canonical={canonical}
+                    reason={canonicalReason}
+                    loading={loading && !error}
+                  />
+
+                  <CandidateGrid
+                    candidates={filteredCandidates}
+                    totalCount={candidateCount}
+                    loading={loading && !error}
+                    statusFilter={filters.statusFilter}
+                    showCanonicalInCandidates={filters.showCanonicalInCandidates}
+                    onImageClick={openImageModal}
+                    onPromote={openPromoteDialog}
+                    onSelect={openSelectDialog}
+                    onReject={openRejectDialog}
+                    operationPending={operationPending}
+                  />
+                </>
               )}
-
-              {operationMessage && (
-                <div
-                  role="status"
-                  className={`rounded-lg border px-4 py-3 text-sm ${
-                    operationMessage.type === "success"
-                      ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-200"
-                      : "border-red-800/60 bg-red-950/40 text-red-200"
-                  }`}
-                >
-                  {operationMessage.text}
-                </div>
-              )}
-
-              <CanonicalPanel
-                canonical={canonical}
-                reason={canonicalReason}
-                loading={loading && !error}
-              />
-
-              <CandidateGrid
-                candidates={filteredCandidates}
-                totalCount={candidateCount}
-                loading={loading && !error}
-                statusFilter={filters.statusFilter}
-                showCanonicalInCandidates={filters.showCanonicalInCandidates}
-                onImageClick={openImageModal}
-                onPromote={openPromoteDialog}
-                onSelect={openSelectDialog}
-                onReject={openRejectDialog}
-                operationPending={operationPending}
-              />
             </div>
           )}
 
@@ -573,6 +594,11 @@ export default function App({ currentUser }: AppProps) {
                   mode is enabled.
                 </p>
               )}
+
+              <OpsDashboardPanel
+                technicalMode={technicalMode}
+                onOpenSection={(section) => setActiveOpsSection(section)}
+              />
 
               {activeOpsSection === "auto-ingest" && (
                 <AutoIngestPanel

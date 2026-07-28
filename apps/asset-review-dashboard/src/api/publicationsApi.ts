@@ -200,6 +200,9 @@ export async function loadPublicationJobsSummary(
     "/publications/jobs/summary",
     payload,
   );
+  if (!data) {
+    throw new Error("Publication job summary could not be loaded.");
+  }
   if (!data.ok || !data.summary) {
     throw new Error(data.error || data.reason || data.message || "Publication job summary could not be loaded.");
   }

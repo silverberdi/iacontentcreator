@@ -15,18 +15,24 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "id": "summary-001",
       "name": "POST /publications/jobs/summary",
       "webhookId": "publication-jobs-summary-webhook"
     },
     {
       "parameters": {
-        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst avatar = String(body.avatar || '').trim();\nconst scene = String(body.scene || '').trim();\nconst includePublished = body.includePublished === true || body.include_published === true;\nconst requestedLimit = Number(body.limit || 30);\nconst limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 100) : 30;\nconst where = [];\nif (avatar) where.push('avatar = ' + sql(avatar));\nif (scene) where.push('scene = ' + sql(scene));\nif (!includePublished) where.push(\"status <> 'published'\");\nconst whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';\nconst query = `\nWITH selected_jobs AS (\n  SELECT *\n  FROM publication_jobs\n  ${whereSql}\n  ORDER BY\n    CASE status\n      WHEN 'failed' THEN 0\n      WHEN 'ready-to-publish' THEN 1\n      WHEN 'copy-ready' THEN 2\n      WHEN 'assets-ready' THEN 3\n      WHEN 'review-ready' THEN 4\n      WHEN 'generating' THEN 5\n      WHEN 'prompt-ready' THEN 6\n      WHEN 'brief-ready' THEN 7\n      WHEN 'draft' THEN 8\n      ELSE 9\n    END,\n    updated_at DESC NULLS LAST,\n    created_at DESC\n  LIMIT ${limit}\n), job_actions AS (\n  SELECT\n    publication_job_id,\n    avatar,\n    scene,\n    format,\n    objective,\n    business_profile,\n    status,\n    error_message,\n    created_at,\n    updated_at,\n    metadata,\n    CASE status\n      WHEN 'draft' THEN jsonb_build_object('action', 'generate-brief', 'label', 'Generate brief', 'description', 'Generate or paste the creative brief for this publication.')\n      WHEN 'brief-ready' THEN jsonb_build_object('action', 'generate-prompt-pack', 'label', 'Generate prompt pack', 'description', 'Create the Comfy-ready prompt pack from the approved brief.')\n      WHEN 'prompt-ready' THEN jsonb_build_object('action', 'generate-images', 'label', 'Generate images', 'description', 'Submit the prompt pack to Comfy Cloud.')\n      WHEN 'generating' THEN jsonb_build_object('action', 'ingest-output', 'label', 'Ingest Comfy output', 'description', 'Wait for the generated image, then paste the Comfy output URL.')\n      WHEN 'review-ready' THEN jsonb_build_object('action', 'select-asset', 'label', 'Select publication asset', 'description', 'Review the generated image and select it for this publication job.')\n      WHEN 'assets-ready' THEN jsonb_build_object('action', 'generate-copy-pack', 'label', 'Generate copy', 'description', 'Generate or edit the caption and publishing copy.')\n      WHEN 'copy-ready' THEN jsonb_build_object('action', 'export-pack', 'label', 'Export publishing pack', 'description', 'Prepare the image URL, caption, hashtags, and manual publishing instructions.')\n      WHEN 'ready-to-publish' THEN jsonb_build_object('action', 'publish-manually', 'label', 'Publish manually and record URL', 'description', 'Post from Instagram, then mark the job as published.')\n      WHEN 'published' THEN jsonb_build_object('action', 'complete', 'label', 'Complete', 'description', 'This publication has been recorded as published.')\n      WHEN 'failed' THEN jsonb_build_object('action', 'review-error', 'label', 'Review error', 'description', 'Read the error, fix the cause, and retry the failed step.')\n      ELSE jsonb_build_object('action', 'inspect-status', 'label', 'Inspect status', 'description', 'Review the job status and continue from the matching section.')\n    END AS next_action\n  FROM selected_jobs\n), job_rows AS (\n  SELECT jsonb_build_object(\n    'publicationJobId', publication_job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'format', format,\n    'objective', objective,\n    'businessProfile', business_profile,\n    'status', status,\n    'createdAt', created_at,\n    'updatedAt', updated_at,\n    'errorMessage', error_message,\n    'generationJobId', metadata->>'generationJobId',\n    'selectedAssetId', metadata->>'selectedAssetId',\n    'publishedUrl', metadata->>'publishedUrl',\n    'nextAction', next_action\n  ) AS job,\n  status,\n  updated_at,\n  created_at\n  FROM job_actions\n), grouped AS (\n  SELECT\n    status,\n    COUNT(*)::int AS count,\n    jsonb_agg(job ORDER BY updated_at DESC NULLS LAST, created_at DESC) AS jobs\n  FROM job_rows\n  GROUP BY status\n), counts AS (\n  SELECT COALESCE(jsonb_object_agg(status, count), '{}'::jsonb) AS value\n  FROM grouped\n)\nSELECT\n  true AS ok,\n  jsonb_build_object(\n    'jobs', COALESCE((SELECT jsonb_agg(job ORDER BY\n      CASE status\n        WHEN 'failed' THEN 0\n        WHEN 'ready-to-publish' THEN 1\n        WHEN 'copy-ready' THEN 2\n        WHEN 'assets-ready' THEN 3\n        WHEN 'review-ready' THEN 4\n        WHEN 'generating' THEN 5\n        WHEN 'prompt-ready' THEN 6\n        WHEN 'brief-ready' THEN 7\n        WHEN 'draft' THEN 8\n        ELSE 9\n      END,\n      updated_at DESC NULLS LAST,\n      created_at DESC\n    ) FROM job_rows), '[]'::jsonb),\n    'groups', COALESCE((SELECT jsonb_agg(jsonb_build_object('status', status, 'count', count, 'jobs', jobs) ORDER BY\n      CASE status\n        WHEN 'failed' THEN 0\n        WHEN 'ready-to-publish' THEN 1\n        WHEN 'copy-ready' THEN 2\n        WHEN 'assets-ready' THEN 3\n        WHEN 'review-ready' THEN 4\n        WHEN 'generating' THEN 5\n        WHEN 'prompt-ready' THEN 6\n        WHEN 'brief-ready' THEN 7\n        WHEN 'draft' THEN 8\n        ELSE 9\n      END\n    ) FROM grouped), '[]'::jsonb),\n    'counts', (SELECT value FROM counts)\n  ) AS summary;\n`;\nreturn [{ json: { query } }];"
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst avatar = String(body.avatar || '').trim();\nconst scene = String(body.scene || '').trim();\nconst includePublished = body.includePublished === true || body.include_published === true;\nconst requestedLimit = Number(body.limit || 30);\nconst limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 100) : 30;\nconst where = [];\nif (avatar) where.push('avatar = ' + sql(avatar));\nif (scene) where.push('scene = ' + sql(scene));\nif (!includePublished) where.push(\"status <> 'published'\");\nconst whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';\nconst query = `\nWITH selected_jobs AS (\n  SELECT *\n  FROM publication_jobs\n  ${whereSql}\n  ORDER BY\n    CASE status\n      WHEN 'failed' THEN 0\n      WHEN 'ready-to-publish' THEN 1\n      WHEN 'copy-ready' THEN 2\n      WHEN 'assets-ready' THEN 3\n      WHEN 'review-ready' THEN 4\n      WHEN 'generating' THEN 5\n      WHEN 'prompt-ready' THEN 6\n      WHEN 'brief-ready' THEN 7\n      WHEN 'draft' THEN 8\n      ELSE 9\n    END,\n    updated_at DESC NULLS LAST,\n    created_at DESC\n  LIMIT ${limit}\n), job_actions AS (\n  SELECT\n    sj.publication_job_id,\n    sj.avatar,\n    sj.scene,\n    sj.format,\n    sj.objective,\n    sj.business_profile,\n    sj.asset_type,\n    sj.status,\n    sj.error_message,\n    sj.created_at,\n    sj.updated_at,\n    sj.metadata,\n    latest_asset.asset_id AS latest_asset_id,\n    latest_asset.bucket AS latest_asset_bucket,\n    latest_asset.object_path AS latest_asset_object_path,\n    latest_asset.status AS latest_asset_status,\n    latest_asset.metadata AS latest_asset_metadata,\n    selected_asset.asset_id AS selected_asset_id,\n    selected_asset.bucket AS selected_asset_bucket,\n    selected_asset.object_path AS selected_asset_object_path,\n    selected_asset.status AS selected_asset_status,\n    CASE sj.status\n      WHEN 'draft' THEN jsonb_build_object('action', 'generate-brief', 'label', 'Generate brief', 'description', 'Generate or paste the creative brief for this publication.')\n      WHEN 'brief-ready' THEN jsonb_build_object('action', 'generate-prompt-pack', 'label', 'Generate prompt pack', 'description', 'Create the Comfy-ready prompt pack from the approved brief.')\n      WHEN 'prompt-ready' THEN jsonb_build_object('action', 'generate-images', 'label', 'Generate images', 'description', 'Submit the prompt pack to Comfy Cloud.')\n      WHEN 'generating' THEN jsonb_build_object('action', 'ingest-output', 'label', 'Ingest Comfy output', 'description', 'Wait for the generated image, then paste the Comfy output URL.')\n      WHEN 'review-ready' THEN jsonb_build_object('action', 'select-asset', 'label', 'Select publication asset', 'description', 'Review the generated image and select it for this publication job.')\n      WHEN 'assets-ready' THEN jsonb_build_object('action', 'generate-copy-pack', 'label', 'Generate copy', 'description', 'Generate or edit the caption and publishing copy.')\n      WHEN 'copy-ready' THEN jsonb_build_object('action', 'export-pack', 'label', 'Export publishing pack', 'description', 'Prepare the image URL, caption, hashtags, and manual publishing instructions.')\n      WHEN 'ready-to-publish' THEN jsonb_build_object('action', 'publish-manually', 'label', 'Publish manually and record URL', 'description', 'Post from Instagram, then mark the job as published.')\n      WHEN 'published' THEN jsonb_build_object('action', 'complete', 'label', 'Complete', 'description', 'This publication has been recorded as published.')\n      WHEN 'failed' THEN jsonb_build_object('action', 'review-error', 'label', 'Review error', 'description', 'Read the error, fix the cause, and retry the failed step.')\n      ELSE jsonb_build_object('action', 'inspect-status', 'label', 'Inspect status', 'description', 'Review the job status and continue from the matching section.')\n    END AS next_action\n  FROM selected_jobs sj\n  LEFT JOIN LATERAL (\n    SELECT car.*\n    FROM canonical_asset_registry car\n    WHERE car.asset_id::text = sj.metadata->>'latestGeneratedAssetId'\n       OR (car.metadata->>'publicationJobId' = sj.publication_job_id::text AND car.asset_type = sj.asset_type)\n    ORDER BY\n      CASE WHEN car.asset_id::text = sj.metadata->>'latestGeneratedAssetId' THEN 0 ELSE 1 END,\n      car.created_at DESC NULLS LAST\n    LIMIT 1\n  ) latest_asset ON true\n  LEFT JOIN LATERAL (\n    SELECT car.*\n    FROM canonical_asset_registry car\n    WHERE car.asset_id::text = sj.metadata->>'selectedAssetId'\n    LIMIT 1\n  ) selected_asset ON true\n), job_rows AS (\n  SELECT jsonb_build_object(\n    'publicationJobId', publication_job_id,\n    'avatar', avatar,\n    'scene', scene,\n    'format', format,\n    'objective', objective,\n    'businessProfile', business_profile,\n    'status', status,\n    'createdAt', created_at,\n    'updatedAt', updated_at,\n    'errorMessage', error_message,\n    'generationJobId', metadata->>'generationJobId',\n    'latestAssetId', COALESCE(latest_asset_id::text, metadata->>'latestGeneratedAssetId'),\n    'latestAssetBucket', latest_asset_bucket,\n    'latestAssetObjectPath', COALESCE(latest_asset_object_path, metadata->>'latestGeneratedAssetObjectPath'),\n    'latestAssetStatus', latest_asset_status,\n    'latestAssetQa', COALESCE(latest_asset_metadata->'qa', metadata->'latestGeneratedAssetQa'),\n    'latestAssetDefective', CASE\n      WHEN lower(COALESCE(latest_asset_metadata->>'defective', metadata->>'latestGeneratedAssetDefective', 'false')) IN ('true', 't', '1', 'yes') THEN true\n      ELSE false\n    END,\n    'latestAssetDefectReasons', COALESCE(latest_asset_metadata->'defectReasons', metadata->'latestGeneratedAssetDefectReasons', '[]'::jsonb),\n    'latestAssetUrl', CASE\n      WHEN latest_asset_bucket IS NOT NULL AND latest_asset_object_path IS NOT NULL THEN '/minio/' || latest_asset_bucket || '/' || latest_asset_object_path\n      ELSE NULL\n    END,\n    'selectedAssetId', COALESCE(selected_asset_id::text, metadata->>'selectedAssetId'),\n    'selectedAssetBucket', COALESCE(selected_asset_bucket, metadata->>'selectedAssetBucket'),\n    'selectedAssetObjectPath', COALESCE(selected_asset_object_path, metadata->>'selectedAssetObjectPath'),\n    'selectedAssetStatus', selected_asset_status,\n    'selectedAssetUrl', CASE\n      WHEN COALESCE(selected_asset_bucket, metadata->>'selectedAssetBucket') IS NOT NULL\n        AND COALESCE(selected_asset_object_path, metadata->>'selectedAssetObjectPath') IS NOT NULL\n      THEN '/minio/' || COALESCE(selected_asset_bucket, metadata->>'selectedAssetBucket') || '/' || COALESCE(selected_asset_object_path, metadata->>'selectedAssetObjectPath')\n      ELSE NULL\n    END,\n    'thumbnailUrl', COALESCE(\n      CASE\n        WHEN COALESCE(selected_asset_bucket, metadata->>'selectedAssetBucket') IS NOT NULL\n          AND COALESCE(selected_asset_object_path, metadata->>'selectedAssetObjectPath') IS NOT NULL\n        THEN '/minio/' || COALESCE(selected_asset_bucket, metadata->>'selectedAssetBucket') || '/' || COALESCE(selected_asset_object_path, metadata->>'selectedAssetObjectPath')\n        ELSE NULL\n      END,\n      CASE\n        WHEN latest_asset_bucket IS NOT NULL AND latest_asset_object_path IS NOT NULL THEN '/minio/' || latest_asset_bucket || '/' || latest_asset_object_path\n        ELSE NULL\n      END\n    ),\n    'publishedUrl', COALESCE(metadata->>'publishedUrl', metadata->'publishedRecord'->>'publishedUrl'),\n    'nextAction', next_action\n  ) AS job,\n  status,\n  updated_at,\n  created_at\n  FROM job_actions\n), grouped AS (\n  SELECT\n    status,\n    COUNT(*)::int AS count,\n    jsonb_agg(job ORDER BY updated_at DESC NULLS LAST, created_at DESC) AS jobs\n  FROM job_rows\n  GROUP BY status\n), counts AS (\n  SELECT COALESCE(jsonb_object_agg(status, count), '{}'::jsonb) AS value\n  FROM grouped\n)\nSELECT\n  true AS ok,\n  jsonb_build_object(\n    'jobs', COALESCE((SELECT jsonb_agg(job ORDER BY\n      CASE status\n        WHEN 'failed' THEN 0\n        WHEN 'ready-to-publish' THEN 1\n        WHEN 'copy-ready' THEN 2\n        WHEN 'assets-ready' THEN 3\n        WHEN 'review-ready' THEN 4\n        WHEN 'generating' THEN 5\n        WHEN 'prompt-ready' THEN 6\n        WHEN 'brief-ready' THEN 7\n        WHEN 'draft' THEN 8\n        ELSE 9\n      END,\n      updated_at DESC NULLS LAST,\n      created_at DESC\n    ) FROM job_rows), '[]'::jsonb),\n    'groups', COALESCE((SELECT jsonb_agg(jsonb_build_object('status', status, 'count', count, 'jobs', jobs) ORDER BY\n      CASE status\n        WHEN 'failed' THEN 0\n        WHEN 'ready-to-publish' THEN 1\n        WHEN 'copy-ready' THEN 2\n        WHEN 'assets-ready' THEN 3\n        WHEN 'review-ready' THEN 4\n        WHEN 'generating' THEN 5\n        WHEN 'prompt-ready' THEN 6\n        WHEN 'brief-ready' THEN 7\n        WHEN 'draft' THEN 8\n        ELSE 9\n      END\n    ) FROM grouped), '[]'::jsonb),\n    'counts', (SELECT value FROM counts)\n  ) AS summary;\n`;\nreturn [{ json: { query } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [256, 0],
+      "position": [
+        256,
+        0
+      ],
       "id": "summary-002",
       "name": "Build Jobs Summary Query"
     },
@@ -38,7 +44,10 @@
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [512, 0],
+      "position": [
+        512,
+        0
+      ],
       "id": "summary-003",
       "name": "Load Jobs Summary",
       "alwaysOutputData": true,
@@ -55,7 +64,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [768, 0],
+      "position": [
+        768,
+        0
+      ],
       "id": "summary-004",
       "name": "Return Jobs Summary"
     },
@@ -67,23 +79,58 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1024, 0],
+      "position": [
+        1024,
+        0
+      ],
       "id": "summary-005",
       "name": "Respond"
     }
   ],
   "connections": {
     "POST /publications/jobs/summary": {
-      "main": [[{ "node": "Build Jobs Summary Query", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Jobs Summary Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Jobs Summary Query": {
-      "main": [[{ "node": "Load Jobs Summary", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Load Jobs Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Load Jobs Summary": {
-      "main": [[{ "node": "Return Jobs Summary", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Return Jobs Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Return Jobs Summary": {
-      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

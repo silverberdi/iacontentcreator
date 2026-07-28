@@ -10,6 +10,8 @@ const DEEPSEEK_BASE_URL = (process.env.DEEPSEEK_BASE_URL || "https://api.deepsee
 const VISUAL_QA_API_KEY = process.env.VISUAL_QA_API_KEY || "";
 const VISUAL_QA_BASE_URL = (process.env.VISUAL_QA_BASE_URL || "").replace(/\/$/, "");
 const VISUAL_QA_MODEL = process.env.VISUAL_QA_MODEL || "";
+const VISUAL_QA_PROVIDER = String(process.env.VISUAL_QA_PROVIDER || "").trim().toLowerCase();
+const LOCAL_VISUAL_QA_URL = (process.env.LOCAL_VISUAL_QA_URL || "http://local-visual-qa:8096").replace(/\/$/, "");
 const COMFYUI_API_KEY = process.env.COMFY_CLOUD_API_KEY || process.env.SILVERMAN_COMFYUI_API_KEY || "";
 const COMFYUI_BASE_URL = (process.env.COMFY_CLOUD_BASE_URL || process.env.SILVERMAN_COMFYUI_BASE_URL || "https://cloud.comfy.org").replace(/\/$/, "");
 const COMFYUI_API_PREFIX = `/${String(process.env.COMFY_CLOUD_API_PREFIX || process.env.SILVERMAN_COMFYUI_API_PREFIX || "/api").replace(/^\/+|\/+$/g, "")}`;
@@ -42,6 +44,15 @@ const REQUIRED_COPY_PACK_FIELDS = [
   "captionAlternatives",
   "hashtags",
   "publishingNotes",
+];
+
+const REQUIRED_PROMPT_PACK_FIELDS = [
+  "positivePrompt",
+  "negativePrompt",
+  "identityReminders",
+  "sceneDetails",
+  "visualAvoidRules",
+  "compositionPolicy",
 ];
 
 const QA_FIELDS = ["identity", "face", "hands", "feet", "composition", "publishability"];
@@ -641,9 +652,16 @@ function normalizeQa(raw, fallbackFlags = []) {
     scores[field] = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
   }
   const flags = normalizeArray(source.flags, fallbackFlags);
-  const blocked = scores.identity < 0.35 || scores.face < 0.35 || scores.publishability < 0.35;
+  const sourceStatus = String(source.status || "").trim().toLowerCase();
+  const defectReasons = normalizeArray(source.defectReasons || source.defect_reasons, []);
+  const blocked =
+    sourceStatus === "blocked" ||
+    scores.identity < 0.35 ||
+    scores.face < 0.35 ||
+    scores.publishability < 0.35;
   const reviewRequired =
     blocked ||
+    sourceStatus === "review_required" ||
     flags.length > 0 ||
     scores.hands < 0.55 ||
     scores.feet < 0.55 ||
@@ -655,9 +673,63 @@ function normalizeQa(raw, fallbackFlags = []) {
     scores,
     flags,
     notes: normalizeArray(source.notes, ["Human review is required before publication."]),
+    defectSeverity: source.defectSeverity || source.defect_severity || (blocked ? "blocked" : reviewRequired ? "review" : "none"),
+    defectReasons,
     correctionRecommended: Boolean(source.correctionRecommended ?? (scores.hands < 0.55 || scores.feet < 0.55)),
     correctionMode: source.correctionMode || (scores.hands < 0.55 || scores.feet < 0.55 ? "future-inpaint-pass" : null),
     reviewedAt: new Date().toISOString(),
+  };
+}
+
+async function evaluateLocalVisualQa(input = {}, fallbackFlags = []) {
+  if (!input.fileBase64) {
+    return null;
+  }
+
+  const started = Date.now();
+  const response = await fetch(`${LOCAL_VISUAL_QA_URL}/qa/anatomy`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      avatar: input.avatar || "estefania-montealegre",
+      scene: input.scene || null,
+      mimeType: input.mimeType || "image/png",
+      fileBase64: input.fileBase64,
+      promptPack: input.promptPack || {},
+    }),
+  });
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || data?.ok === false) {
+    return {
+      ok: false,
+      provider: "local-visual-qa",
+      error: data?.error || text.slice(0, 300) || response.statusText,
+      category: "provider_error",
+      status: response.status,
+      latencyMs: Date.now() - started,
+      qa: {
+        ...normalizeQa(data?.qa || { flags: fallbackFlags }),
+        provider: "local-visual-qa",
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    provider: "local-visual-qa",
+    model: "local-anatomy",
+    latencyMs: Date.now() - started,
+    qa: {
+      ...normalizeQa(data?.qa, fallbackFlags),
+      provider: "local-visual-qa",
+    },
   };
 }
 
@@ -677,6 +749,26 @@ async function evaluatePublicationImageQa(input = {}) {
   }
   if (rejectIf.some((item) => item.toLowerCase().includes("identity") || item.toLowerCase().includes("face"))) {
     fallbackFlags.push("identity-review");
+  }
+
+  if (VISUAL_QA_PROVIDER === "local") {
+    try {
+      const localResult = await evaluateLocalVisualQa(input, fallbackFlags);
+      if (localResult) return localResult;
+    } catch (error) {
+      return {
+        ok: true,
+        qa: {
+          ...normalizeQa({ flags: [...fallbackFlags, "local-visual-qa-unavailable"] }),
+          provider: "heuristic-pre-visual",
+          notes: [
+            `Local visual QA is unavailable: ${error.message}`,
+            "The system fell back to conservative heuristic review.",
+          ],
+        },
+        provider: "heuristic-pre-visual",
+      };
+    }
   }
 
   if (!VISUAL_QA_API_KEY || !VISUAL_QA_BASE_URL || !VISUAL_QA_MODEL || !input.fileBase64) {
@@ -825,6 +917,13 @@ function normalizeBrief(raw, context) {
 
 function buildDeepSeekMessages(context) {
   const profile = context.avatarProfileSummary || {};
+  const operatorFeedback = context.operatorFeedback && typeof context.operatorFeedback === "object"
+    ? context.operatorFeedback
+    : null;
+  const currentBrief = context.currentBrief && typeof context.currentBrief === "object"
+    ? context.currentBrief
+    : null;
+  const revisionMode = Boolean(operatorFeedback?.notes && currentBrief);
   const systemPrompt = [
     `You are the creative strategist for ${profile.displayName || "Estefanía Montealegre"}, a fictional AI influencer.`,
     "Return only strict JSON.",
@@ -832,10 +931,15 @@ function buildDeepSeekMessages(context) {
     "Do not override profile rules with generic influencer advice.",
     "Captions should feel like natural thoughts, not produced ad copy.",
     "Avoid motivational speeches, generic self-help, overproduced influencer copy, forced spanglish, artificial sadness, identity inconsistency, and unsupported commercial claims.",
+    revisionMode
+      ? "You are revising an existing brief. Preserve what still works, apply the operator feedback semantically, and do not merely append feedback text."
+      : "",
   ].join(" ");
 
   const userPrompt = {
-    task: "Generate a structured publication brief for an AI influencer content job.",
+    task: revisionMode
+      ? "Revise the current structured publication brief using the operator feedback."
+      : "Generate a structured publication brief for an AI influencer content job.",
     requiredJsonShape: {
       visualIntent: "string",
       captionAngle: "string",
@@ -848,6 +952,8 @@ function buildDeepSeekMessages(context) {
       generationNotes: "string",
     },
     ...context,
+    currentBrief,
+    operatorFeedback,
     businessGoal:
       "Generate content that makes brands interested in Estefanía and creates a believable lifestyle media asset that can later become a publishing pack.",
   };
@@ -937,6 +1043,252 @@ async function callDeepSeek(context) {
     latencyMs: Date.now() - started,
     brief,
   };
+}
+
+function normalizePromptPack(raw, context) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const job = context.job || {};
+  const brief = context.brief || job.brief || {};
+  const referenceImages = Array.isArray(context.referenceImages) ? context.referenceImages : [];
+  const humanFeedback = Array.isArray(context.humanFeedback) ? context.humanFeedback.slice(0, 8) : [];
+  const operatorBriefFeedback =
+    context.operatorBriefFeedback && typeof context.operatorBriefFeedback === "object"
+      ? context.operatorBriefFeedback
+      : {};
+  const humanFeedbackCategories = [
+    ...new Set(
+      humanFeedback.flatMap((item) => {
+        const feedback = item?.feedback && typeof item.feedback === "object" ? item.feedback : item;
+        return Array.isArray(feedback?.categories) ? feedback.categories.map(String) : [];
+      }),
+    ),
+  ].slice(0, 12);
+  const sortedReferenceImages = [...referenceImages].sort((a, b) => {
+    const aPrepared = a?.comfyInputName ? 0 : 1;
+    const bPrepared = b?.comfyInputName ? 0 : 1;
+    if (aPrepared !== bPrepared) return aPrepared - bPrepared;
+    const aCanonical = a?.isCanonical || a?.status === "canonical" ? 0 : 1;
+    const bCanonical = b?.isCanonical || b?.status === "canonical" ? 0 : 1;
+    return aCanonical - bCanonical;
+  });
+  const identityReferences = sortedReferenceImages
+    .filter((ref) => ref?.status === "canonical" || ref?.isCanonical || ref?.status === "selected")
+    .slice(0, 4);
+  const preparedIdentityReferences = identityReferences.filter((ref) => ref?.comfyInputName);
+  const compositionPolicy =
+    source.compositionPolicy && typeof source.compositionPolicy === "object"
+      ? source.compositionPolicy
+      : {};
+  const promptPack = {
+    positivePrompt: String(source.positivePrompt || "").trim(),
+    negativePrompt: String(source.negativePrompt || "").trim(),
+    identityReminders: normalizeArray(source.identityReminders, [
+      `${context.avatarDisplayName || job.avatar || "Estefanía Montealegre"} must remain visually consistent with approved reference images`,
+      "photorealistic lifestyle portrait, natural expression, believable candid presence",
+    ]),
+    sceneDetails: String(source.sceneDetails || brief.visualIntent || "").trim(),
+    visualAvoidRules: normalizeArray(source.visualAvoidRules, []),
+    referenceImages: sortedReferenceImages,
+    identityReferences,
+    preparedIdentityReferences,
+    sceneReferences: sortedReferenceImages.slice(0, 6),
+    compositionPolicy: {
+      framing: String(compositionPolicy.framing || "medium close-up or waist-up portrait").trim(),
+      pose: String(compositionPolicy.pose || "one coherent natural pose only").trim(),
+      hands: String(compositionPolicy.hands || "hands should be simple, relaxed, clearly readable, or mostly out of frame").trim(),
+      feet: String(compositionPolicy.feet || "do not mention or emphasize feet unless the scene explicitly requires them").trim(),
+      camera: String(compositionPolicy.camera || "natural 50mm lifestyle photography, no extreme angle").trim(),
+      rejectIf: normalizeArray(compositionPolicy.rejectIf, [
+        "contradictory pose",
+        "extra fingers or extra hands",
+        "merged hands with objects",
+        "distorted hands",
+        "identity drift",
+      ]),
+    },
+    suggestedFormat: String(source.suggestedFormat || brief.suggestedFormat || job.format || "feed-post").trim(),
+    comfyHints: {
+      aspectRatio: source.comfyHints?.aspectRatio || (job.format === "story" ? "9:16" : "4:5"),
+      outputIntent: source.comfyHints?.outputIntent || "publication-candidate",
+      assetType: "raw-image",
+    },
+    comfyReferencePolicy: {
+      contractVersion: "comfy-reference-image-v1",
+      loadImageRequiresComfyInputName: true,
+      minioObjectPathIsNotComfyInput: true,
+      primaryReferencePolicy: "Use the first prepared approved identity reference as the Comfy LoadImage anchor.",
+      preparedIdentityReferenceCount: preparedIdentityReferences.length,
+    },
+    operatorSummary: {
+      visualDirection: String(source.operatorSummary?.visualDirection || source.sceneDetails || brief.visualIntent || "").trim(),
+      pose: String(source.operatorSummary?.pose || compositionPolicy.pose || "").trim(),
+      riskControls: normalizeArray(source.operatorSummary?.riskControls, []),
+    },
+    humanFeedbackInfluence: {
+      contractVersion: "publication-human-feedback-influence-v1",
+      used: humanFeedback.length > 0,
+      feedbackCount: humanFeedback.length,
+      categories: humanFeedbackCategories,
+    },
+    operatorBriefFeedbackInfluence: {
+      contractVersion: "operator-brief-feedback-prompt-influence-v1",
+      used: operatorBriefFeedback.used === true,
+      lastFeedback: operatorBriefFeedback.lastFeedback || null,
+      recentFeedback: normalizeArray(operatorBriefFeedback.recentFeedback, []).slice(0, 5),
+    },
+    source: {
+      publicationJobId: job.publicationJobId || context.publicationJobId || null,
+      generatedFrom: "publication-brief",
+      generator: "deepseek-publication-prompt-pack-v1",
+    },
+  };
+
+  const missing = REQUIRED_PROMPT_PACK_FIELDS.filter((field) => {
+    const value = promptPack[field];
+    if (field === "compositionPolicy") return !value || typeof value !== "object";
+    return Array.isArray(value) ? value.length === 0 : !String(value || "").trim();
+  });
+  if (!promptPack.positivePrompt || promptPack.positivePrompt.length < 80) missing.push("positivePrompt:min-length");
+  if (!promptPack.negativePrompt || promptPack.negativePrompt.length < 40) missing.push("negativePrompt:min-length");
+  return { promptPack, missing: [...new Set(missing)] };
+}
+
+function buildPromptPackMessages(context) {
+  const profile = context.avatarProfileSummary || {};
+  const humanFeedback = Array.isArray(context.humanFeedback) ? context.humanFeedback.slice(0, 8) : [];
+  const operatorBriefFeedback =
+    context.operatorBriefFeedback && typeof context.operatorBriefFeedback === "object"
+      ? context.operatorBriefFeedback
+      : {};
+  const compactHumanFeedback = humanFeedback
+    .map((item) => {
+      const feedback = item?.feedback && typeof item.feedback === "object" ? item.feedback : {};
+      return {
+        assetId: item?.assetId || null,
+        decision: feedback.decision || null,
+        categories: normalizeArray(feedback.categories, []).slice(0, 8),
+        reasons: normalizeArray(feedback.reasons, []).slice(0, 8),
+        failedCriteria: normalizeArray(feedback.failedCriteria, []).slice(0, 8),
+        notes: String(feedback.notes || feedback.promptGuidance?.note || "").slice(0, 500),
+      };
+    })
+    .filter((item) => item.decision || item.categories.length || item.reasons.length || item.notes);
+  const humanFeedbackCategories = [
+    ...new Set(compactHumanFeedback.flatMap((item) => item.categories)),
+  ].slice(0, 12);
+  const operatorFeedbackNotes = String(operatorBriefFeedback.lastFeedback?.notes || "").trim();
+  const systemPrompt = [
+    `You are the image prompt director for ${profile.displayName || "Estefanía Montealegre"}, a fictional AI influencer.`,
+    "Return only strict JSON.",
+    "You own the final Comfy image prompt. Do not delegate composition to templates.",
+    "Use human review feedback as advisory memory, not as a permanent identity rewrite.",
+    "Do not overfit to one review note; preserve brand identity and the current scene brief.",
+    "Create one coherent visual instruction, not a list of conflicting pose ideas.",
+    "Never combine seated, leaning, walking, and hand-in-pocket unless they form one physically plausible pose.",
+    "Do not mention feet for waist-up or medium close-up framing.",
+    "Hands must be either clearly simple and relaxed, or mostly out of frame. Avoid phones, cups, bags, passports, or objects in hands unless explicitly required.",
+    "Do not overload the negative prompt. Keep it focused on defects that matter for image generation.",
+    "The operator will not edit JSON; produce a usable prompt pack now.",
+    operatorFeedbackNotes
+      ? "Operator brief feedback has already been applied to the brief; reflect it concretely in the image prompt without merely quoting it."
+      : "",
+  ].join(" ");
+
+  const userPrompt = {
+    task: "Generate the final Comfy-ready prompt pack for this publication image.",
+    requiredJsonShape: {
+      positivePrompt: "string",
+      negativePrompt: "string",
+      identityReminders: ["string"],
+      sceneDetails: "string",
+      visualAvoidRules: ["string"],
+      compositionPolicy: {
+        framing: "string",
+        pose: "string",
+        hands: "string",
+        feet: "string",
+        camera: "string",
+        rejectIf: ["string"],
+      },
+      suggestedFormat: "string",
+      operatorSummary: {
+        visualDirection: "string",
+        pose: "string",
+        riskControls: ["string"],
+      },
+    },
+    ...context,
+    humanFeedbackSummary: {
+      feedbackCount: compactHumanFeedback.length,
+      categories: humanFeedbackCategories,
+      recentFeedback: compactHumanFeedback,
+      instruction: "Address repeated rejection categories in the new prompt while keeping the avatar natural and expressive.",
+    },
+    operatorBriefFeedbackSummary: {
+      used: operatorBriefFeedback.used === true,
+      lastFeedback: operatorBriefFeedback.lastFeedback || null,
+      recentFeedback: normalizeArray(operatorBriefFeedback.recentFeedback, []).slice(0, 5),
+      instruction: operatorFeedbackNotes
+        ? "Translate this operator feedback into concrete visual choices, mood, constraints, and risk controls."
+        : "No operator brief feedback has been applied.",
+    },
+    hardRules: [
+      "Use exactly one physically plausible pose.",
+      "Prefer waist-up or medium close-up framing.",
+      "If human feedback is present, address repeated rejection categories without making the image stiff or over-constrained.",
+      "If the scene includes a railing, use either relaxed hands on/near railing OR one hand in pocket, not both.",
+      "If hands are not essential, keep them mostly out of frame or relaxed and unobtrusive.",
+      "Do not include 'feet' in the positive prompt unless full body is explicitly requested.",
+      "Avoid repeating the same scene description twice.",
+    ],
+  };
+
+  return [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: JSON.stringify(userPrompt) },
+  ];
+}
+
+async function callDeepSeekPromptPack(context) {
+  if (!DEEPSEEK_API_KEY) {
+    return { ok: false, error: "DEEPSEEK_API_KEY is not configured", category: "missing_credentials" };
+  }
+  const started = Date.now();
+  const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      messages: buildPromptPackMessages(withAvatarProfile(context)),
+      temperature: 0.55,
+      response_format: { type: "json_object" },
+    }),
+  });
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: data?.error?.message || data?.message || text.slice(0, 300) || response.statusText,
+      category: "provider_error",
+      provider: "deepseek",
+      model: DEEPSEEK_MODEL,
+      status: response.status,
+      latencyMs: Date.now() - started,
+    };
+  }
+  const content = data?.choices?.[0]?.message?.content;
+  let parsed;
+  try { parsed = typeof content === "string" ? JSON.parse(content) : content; } catch {
+    return { ok: false, error: "DeepSeek returned non-JSON content", category: "invalid_provider_json", provider: "deepseek", model: DEEPSEEK_MODEL, latencyMs: Date.now() - started };
+  }
+  const enrichedContext = withAvatarProfile(context);
+  const { promptPack, missing } = normalizePromptPack(parsed, enrichedContext);
+  if (missing.length > 0) {
+    return { ok: false, error: `Generated prompt pack is missing required fields: ${missing.join(", ")}`, category: "invalid_prompt_pack_shape", provider: "deepseek", model: DEEPSEEK_MODEL, latencyMs: Date.now() - started };
+  }
+  return { ok: true, provider: "deepseek", model: DEEPSEEK_MODEL, latencyMs: Date.now() - started, promptPack };
 }
 
 function normalizeCopyPack(raw, context) {
@@ -1165,6 +1517,31 @@ async function handlePublicationCopyPack(req, res, requestId) {
   jsonResponse(res, status, { requestId, ...result });
 }
 
+async function handlePublicationPromptPack(req, res, requestId) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    jsonResponse(res, 400, { ok: false, requestId, error: "Invalid JSON body", category: "invalid_request" });
+    return;
+  }
+
+  const result = await callDeepSeekPromptPack(body);
+  const status = result.ok ? 200 : result.category === "missing_credentials" ? 503 : 502;
+  console.log(
+    JSON.stringify({
+      requestId,
+      route: "publication-prompt-pack",
+      ok: result.ok,
+      provider: result.provider || "deepseek",
+      model: result.model || DEEPSEEK_MODEL,
+      category: result.category || "ok",
+      latencyMs: result.latencyMs || 0,
+    }),
+  );
+  jsonResponse(res, status, { requestId, ...result });
+}
+
 async function handleAvatarProfile(req, res, requestId) {
   let body;
   try {
@@ -1379,8 +1756,12 @@ const server = http.createServer(async (req, res) => {
             downloadOutput: true,
           },
           visualQa: {
-            configured: Boolean(VISUAL_QA_API_KEY && VISUAL_QA_BASE_URL && VISUAL_QA_MODEL),
+            provider: VISUAL_QA_PROVIDER || (VISUAL_QA_API_KEY && VISUAL_QA_BASE_URL && VISUAL_QA_MODEL ? "openai-compatible" : "heuristic-pre-visual"),
+            configured:
+              VISUAL_QA_PROVIDER === "local" ||
+              Boolean(VISUAL_QA_API_KEY && VISUAL_QA_BASE_URL && VISUAL_QA_MODEL),
             baseUrl: VISUAL_QA_BASE_URL || null,
+            localUrl: VISUAL_QA_PROVIDER === "local" ? LOCAL_VISUAL_QA_URL : null,
             model: VISUAL_QA_MODEL || null,
           },
         },
@@ -1395,6 +1776,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/publication-copy-pack") {
       await handlePublicationCopyPack(req, res, requestId);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/publication-prompt-pack") {
+      await handlePublicationPromptPack(req, res, requestId);
       return;
     }
 

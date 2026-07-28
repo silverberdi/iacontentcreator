@@ -116,10 +116,10 @@ export default function WatcherControlsSection({
           {status.activeProfile && (
             <div>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
-                activeProfile
+                Ingest setup used by watcher
               </p>
               <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-                <ResultRow label="profileName" value={status.activeProfile.profileName} />
+                <ResultRow label="ingest setup" value={status.activeProfile.profileName} />
                 <ResultRow label="avatar" value={status.activeProfile.avatar} />
                 <ResultRow label="scene" value={status.activeProfile.scene} />
                 <ResultRow label="workflow" value={status.activeProfile.workflow} />
