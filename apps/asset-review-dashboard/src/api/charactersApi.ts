@@ -1,5 +1,7 @@
 import { postN8nJson } from "./n8nClient";
 import type {
+  CharacterCanonPortraitIngestPayload,
+  CharacterCanonPortraitIngestResponse,
   CharacterCanonPortraitQueuePayload,
   CharacterCanonPortraitQueueResponse,
   CharacterCanonPortraitRunResponse,
@@ -105,4 +107,13 @@ export async function runCanonPortraitGeneration(
     jobId,
     mode: "character-canon-portrait",
   });
+}
+
+export async function ingestCanonPortraitOutput(
+  payload: CharacterCanonPortraitIngestPayload,
+): Promise<CharacterCanonPortraitIngestResponse> {
+  return postN8nJson<CharacterCanonPortraitIngestResponse>(
+    "/admin/characters/canon/ingest-output",
+    payload,
+  );
 }

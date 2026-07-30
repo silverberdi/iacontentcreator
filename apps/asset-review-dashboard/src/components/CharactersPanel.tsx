@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ingestCanonPortraitOutput,
   listCharacterOnboarding,
   listCharacterReferences,
   queueCanonPortraitGeneration,
@@ -222,10 +223,12 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const [referenceForm, setReferenceForm] = useState(EMPTY_REFERENCE_FORM);
   const [canonSaving, setCanonSaving] = useState(false);
   const [canonRunning, setCanonRunning] = useState(false);
+  const [canonIngesting, setCanonIngesting] = useState(false);
   const [canonJob, setCanonJob] = useState<CharacterCanonPortraitJob | null>(null);
   const [canonPromptPack, setCanonPromptPack] =
     useState<CharacterCanonPortraitPromptPack | null>(null);
   const [canonInstructions, setCanonInstructions] = useState<string[]>([]);
+  const [canonOutputUrl, setCanonOutputUrl] = useState("");
   const [activeStep, setActiveStep] = useState<WizardStepId>("type");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
@@ -355,6 +358,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     setCanonJob(null);
     setCanonPromptPack(null);
     setCanonInstructions([]);
+    setCanonOutputUrl("");
     setActiveStep("type");
     setMessage(null);
     setReferenceMessage(null);
@@ -548,6 +552,64 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       setCanonMessage({ type: "error", text });
     } finally {
       setCanonRunning(false);
+    }
+  };
+
+  const ingestCanonPortrait = async () => {
+    if (!canonJob?.jobId) {
+      setCanonMessage({ type: "error", text: "Queue a canon portrait job before ingesting output." });
+      return;
+    }
+    if (!canonOutputUrl.trim()) {
+      setCanonMessage({ type: "error", text: "Paste the Comfy output URL before ingesting." });
+      return;
+    }
+    setCanonIngesting(true);
+    setCanonMessage(null);
+    try {
+      const result = await ingestCanonPortraitOutput({
+        jobId: canonJob.jobId,
+        outputUrl: canonOutputUrl,
+      });
+      if (result.ok === false || !result.reference) {
+        throw new Error(result.message || result.reason || result.error || "Canon portrait output could not be ingested.");
+      }
+      setCanonJob(result.generationJob ?? canonJob);
+      setCanonOutputUrl("");
+      await loadReferences(result.reference.avatar);
+      setCanonMessage({
+        type: "success",
+        text: "Canon portrait output ingested as identity-candidate. Review it below and promote it if it defines the character.",
+      });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Canon portrait output could not be ingested.";
+      setCanonMessage({ type: "error", text });
+    } finally {
+      setCanonIngesting(false);
+    }
+  };
+
+  const promoteReferenceToIdentityCanon = async (reference: CharacterReferenceRecord) => {
+    setReferenceSaving(true);
+    setReferenceMessage(null);
+    try {
+      const result = await registerCharacterReference({
+        avatar: reference.avatar,
+        scene: "portrait-canon",
+        classification: "identity-canon",
+        objectPathOrUrl: reference.url,
+        reviewNotes: "Promoted to identity canon from Characters visual reference intake.",
+      });
+      if (result.ok === false || !result.reference) {
+        throw new Error(result.message || result.reason || "Reference could not be promoted.");
+      }
+      await loadReferences(reference.avatar);
+      setReferenceMessage({ type: "success", text: "Identity canon promoted." });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Reference could not be promoted.";
+      setReferenceMessage({ type: "error", text });
+    } finally {
+      setReferenceSaving(false);
     }
   };
 
@@ -1038,6 +1100,26 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                     </ul>
                   </div>
                 )}
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                  <label className="text-sm text-gray-400">
+                    Comfy output URL
+                    <input
+                      value={canonOutputUrl}
+                      onChange={(event) => setCanonOutputUrl(event.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-surface-raised px-3 py-2 text-gray-100"
+                      placeholder="Paste the Comfy output image URL after generation"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void ingestCanonPortrait()}
+                    disabled={!canonJob?.jobId || canonIngesting}
+                    className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {canonIngesting ? "Ingesting..." : "Ingest as identity-candidate"}
+                  </button>
+                </div>
               </div>
 
               <div className="rounded-md border border-border bg-surface p-4">
@@ -1223,6 +1305,16 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                         </p>
                         {reference.reviewNotes && (
                           <p className="mt-2 text-sm text-gray-400">{reference.reviewNotes}</p>
+                        )}
+                        {reference.classification === "identity-candidate" && (
+                          <button
+                            type="button"
+                            onClick={() => void promoteReferenceToIdentityCanon(reference)}
+                            disabled={referenceSaving}
+                            className="mt-3 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                          >
+                            Promote to identity canon
+                          </button>
                         )}
                       </div>
                     </article>

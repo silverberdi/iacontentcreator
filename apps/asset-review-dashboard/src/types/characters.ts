@@ -175,3 +175,17 @@ export type CharacterCanonPortraitRunResponse = {
   reason?: string;
   error?: string;
 };
+
+export type CharacterCanonPortraitIngestPayload = {
+  jobId: string;
+  outputUrl: string;
+};
+
+export type CharacterCanonPortraitIngestResponse = {
+  ok?: boolean;
+  reference?: CharacterReferenceRecord;
+  generationJob?: CharacterCanonPortraitJob;
+  message?: string;
+  reason?: string;
+  error?: string;
+};

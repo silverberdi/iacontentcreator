@@ -1,0 +1,296 @@
+{
+  "id": "adminCharacterCanonIngestOutputV1",
+  "name": "Avatares AI - Admin - Character Canon Ingest Output",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/characters/canon/ingest-output",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c9f1632c-1afb-41c4-bc67-555555555555",
+      "name": "POST /admin/characters/canon/ingest-output",
+      "webhookId": "c9f1632c-1afb-41c4-bc67-555555555555"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nconst body = $json.body || $json;\nconst jobId = String(body.jobId || body.job_id || '').trim();\nconst outputUrl = String(body.outputUrl || body.output_url || '').trim();\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;\nif (!uuidRegex.test(jobId) || !outputUrl) {\n  return [{ json: { query: \"SELECT false AS ok, 'jobId and outputUrl are required' AS error;\" } }];\n}\nconst query = `\nSELECT\n  true AS ok,\n  gj.job_id AS \"jobId\",\n  gj.avatar,\n  gj.scene,\n  gj.asset_type AS \"assetType\",\n  gj.platform,\n  gj.prompt_pack AS \"promptPack\",\n  gj.request_payload AS \"requestPayload\",\n  ac.avatar_short AS \"avatarShort\",\n  ${sql(outputUrl)} AS \"outputUrl\"\nFROM generation_jobs gj\nLEFT JOIN avatar_catalog ac ON ac.avatar = gj.avatar\nWHERE gj.job_id = ${sql(jobId)}::uuid\nLIMIT 1;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-load",
+      "name": "Build Load Job Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        560,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-pgload",
+      "name": "Load Generation Job",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nfunction slug(value, fallback = '') {\n  return String(value || fallback || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');\n}\nconst row = $input.first()?.json || {};\nif (!row.ok || !row.jobId || !row.outputUrl) return [{ json: { ok: false, error: row.error || 'Generation job context not found' } }];\nconst gateway = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'http://ai-gateway:8095/comfy/download-output',\n  headers: { 'Content-Type': 'application/json', 'X-Request-Id': 'canon-ingest-' + row.jobId },\n  body: { outputUrl: row.outputUrl },\n  json: true,\n  timeout: 120000,\n});\nif (!gateway?.ok || !gateway.base64) return [{ json: { ok: false, error: gateway?.error || 'Comfy output download failed', gateway } }];\nconst avatar = slug(row.avatar);\nconst safeJob = String(row.jobId).replace(/[^a-zA-Z0-9_-]/g, '-');\nconst inputDir = '/home/node/.n8n-files/inbox/canon-' + safeJob + '-' + Date.now();\nfs.mkdirSync(inputDir, { recursive: true });\nconst ext = gateway.mimeType === 'image/jpeg' ? 'jpg' : gateway.mimeType === 'image/webp' ? 'webp' : 'png';\nconst fileName = avatar + '-canon-portrait-' + safeJob + '.' + ext;\nconst filePath = path.join(inputDir, fileName);\nfs.writeFileSync(filePath, Buffer.from(gateway.base64, 'base64'));\nreturn [{ json: {\n  ok: true,\n  jobId: row.jobId,\n  avatar: row.avatar,\n  avatarShort: row.avatarShort || avatar.split('-')[0] || avatar,\n  scene: 'portrait-canon',\n  assetType: row.assetType || 'raw-image',\n  workflow: 'character-canon-portrait',\n  model: 'flux1-dev-fp8 + uso-flux1',\n  seed: 0,\n  version: 1,\n  promptPack: row.promptPack || {},\n  requestPayload: row.requestPayload || {},\n  outputUrl: row.outputUrl,\n  inputDir,\n  downloadedFileName: fileName,\n  downloadedFile: filePath,\n  downloadedBase64: gateway.base64,\n  mimeType: gateway.mimeType || 'image/png',\n  byteLength: gateway.byteLength || 0,\n  sha256: gateway.sha256,\n  comfyFilename: gateway.filename,\n  comfySubfolder: gateway.subfolder,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-download",
+      "name": "Download Comfy Output"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "download-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-if-download-ok",
+      "name": "Download OK"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "AfxD9EeNMHktFrld",
+          "mode": "list",
+          "cachedResultName": "Avatares AI - Register Raw Asset Batch - Callable"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "inputDir": "={{ $json.inputDir }}",
+            "processedDir": "/home/node/.n8n-files/processed",
+            "duplicatesDir": "/home/node/.n8n-files/duplicates",
+            "failedDir": "/home/node/.n8n-files/failed",
+            "baseUrl": "http://192.168.0.194:9000",
+            "avatar": "={{ $json.avatar }}",
+            "avatarShort": "={{ $json.avatarShort }}",
+            "scene": "={{ $json.scene }}",
+            "assetType": "={{ $json.assetType }}",
+            "workflow": "={{ $json.workflow }}",
+            "model": "={{ $json.model }}",
+            "seed": "={{ $json.seed }}",
+            "version": "={{ $json.version }}",
+            "autoPromoteLatest": false
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-register",
+      "name": "Execute Register Raw Asset Batch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const context = $('Download Comfy Output').first().json;\nconst rows = $input.all().map((item) => item.json || {});\nfunction sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nconst metadata = {\n  referenceIntake: 'characters-console',\n  referenceClassification: 'identity-candidate',\n  referenceRole: 'identity-candidate',\n  registeredFrom: 'canon-portrait-generation',\n  generationJobId: context.jobId,\n  outputUrl: context.outputUrl,\n  comfyFilename: context.comfyFilename,\n  comfySubfolder: context.comfySubfolder,\n  promptPack: context.promptPack,\n  source: 'character-canon-ingest-output',\n  registeredAt: new Date().toISOString(),\n};\nconst returnedAssetId = rows.find((item) => item.assetId || item.asset_id)?.assetId || rows.find((item) => item.asset_id)?.asset_id || null;\nconst assetPredicate = returnedAssetId ? '(asset_id = ' + sql(returnedAssetId) + ' OR sha256 = ' + sql(context.sha256) + ')' : 'sha256 = ' + sql(context.sha256);\nconst reviewNotes = 'Canon portrait candidate generated from character onboarding.';\nconst query = `\nWITH asset_target AS (\n  SELECT * FROM canonical_asset_registry WHERE ${assetPredicate} ORDER BY created_at DESC LIMIT 1\n), asset_update AS (\n  UPDATE canonical_asset_registry car\n  SET\n    scene = 'portrait-canon',\n    status = 'raw',\n    is_canonical = false,\n    review_notes = ${sql(reviewNotes)},\n    metadata = COALESCE(car.metadata, '{}'::jsonb) || ${sqlJson(metadata)}\n  FROM asset_target t\n  WHERE car.asset_id = t.asset_id\n  RETURNING car.*\n), generated AS (\n  INSERT INTO generated_assets (generated_asset_id, job_id, asset_id, avatar, scene, asset_type, status, review_notes, metadata, created_at, updated_at)\n  SELECT gen_random_uuid(), ${sql(context.jobId)}::uuid, asset_id::uuid, avatar, scene, asset_type, 'generated', ${sql(reviewNotes)}, ${sqlJson(metadata)} || jsonb_build_object('assetId', asset_id, 'bucket', bucket, 'objectPath', object_path), now(), now()\n  FROM asset_update\n  ON CONFLICT (asset_id)\n  DO UPDATE SET\n    job_id = EXCLUDED.job_id,\n    status = 'generated',\n    review_notes = EXCLUDED.review_notes,\n    metadata = generated_assets.metadata || EXCLUDED.metadata,\n    updated_at = now()\n  RETURNING *\n), generation_update AS (\n  UPDATE generation_jobs\n  SET status = 'review_required',\n      completed_at = now(),\n      updated_at = now(),\n      result_payload = COALESCE(result_payload, '{}'::jsonb) || ${sqlJson(metadata)} || jsonb_build_object(\n        'assetId', (SELECT asset_id FROM asset_update LIMIT 1),\n        'bucket', (SELECT bucket FROM asset_update LIMIT 1),\n        'objectPath', (SELECT object_path FROM asset_update LIMIT 1),\n        'referenceClassification', 'identity-candidate'\n      )\n  WHERE job_id = ${sql(context.jobId)}::uuid\n  RETURNING *\n)\nSELECT true AS ok,\n  jsonb_build_object(\n    'assetId', asset_id,\n    'avatar', avatar,\n    'scene', scene,\n    'classification', metadata->>'referenceClassification',\n    'status', status,\n    'isCanonical', COALESCE(is_canonical, false),\n    'bucket', bucket,\n    'objectPath', object_path,\n    'url', '/minio/' || bucket || '/' || object_path,\n    'reviewNotes', review_notes,\n    'createdAt', created_at\n  ) AS reference,\n  (SELECT row_to_json(generated) FROM generated LIMIT 1) AS generated_asset,\n  (SELECT row_to_json(generation_update) FROM generation_update LIMIT 1) AS generation_job\nFROM asset_update;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-link",
+      "name": "Build Link Candidate Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1680,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-pglink",
+      "name": "Link Identity Candidate",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') return [{ json: { ok: false, message: row.error || row.message || 'Canon portrait output could not be ingested.' } }];\nconst reference = typeof row.reference === 'string' ? JSON.parse(row.reference) : row.reference;\nconst generationJob = typeof row.generation_job === 'string' ? JSON.parse(row.generation_job) : row.generation_job;\nreturn [{ json: { ok: true, reference, generationJob } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        0
+      ],
+      "id": "adminCharacterCanonIngestOutputV1-return",
+      "name": "Return Candidate"
+    }
+  ],
+  "connections": {
+    "POST /admin/characters/canon/ingest-output": {
+      "main": [
+        [
+          {
+            "node": "Build Load Job Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Load Job Query": {
+      "main": [
+        [
+          {
+            "node": "Load Generation Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Generation Job": {
+      "main": [
+        [
+          {
+            "node": "Download Comfy Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Comfy Output": {
+      "main": [
+        [
+          {
+            "node": "Download OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Register Raw Asset Batch": {
+      "main": [
+        [
+          {
+            "node": "Build Link Candidate Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Link Candidate Query": {
+      "main": [
+        [
+          {
+            "node": "Link Identity Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link Identity Candidate": {
+      "main": [
+        [
+          {
+            "node": "Return Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download OK": {
+      "main": [
+        [
+          {
+            "node": "Execute Register Raw Asset Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

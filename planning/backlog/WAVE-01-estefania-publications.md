@@ -2362,8 +2362,8 @@ As an operator, I want to generate canon portrait candidates, so that I can esta
 - [ ] Operator can generate portrait canon candidates from onboarding.
 - [x] Operator can queue a canon portrait generation job from onboarding.
 - [x] Prompt pack is generated automatically from type, narrative identity, and visual strategy.
-- [ ] Candidates are registered as `identity-candidate`.
-- [ ] Operator can select one or more candidates as `identity-canon`.
+- [x] Candidates can be ingested from a Comfy output URL and registered as `identity-candidate`.
+- [x] Operator can select one or more candidates as `identity-canon`.
 - [ ] QA result and rejection reasons are visible.
 - [ ] Character cannot advance without approved identity canon.
 
@@ -2371,7 +2371,9 @@ As an operator, I want to generate canon portrait candidates, so that I can esta
 
 - First slice adds a Canon portrait generation workbench inside Characters > Visual.
 - The workbench creates a `portrait-canon` generation job with a character-specific prompt pack and shows the generated positive/negative prompts to the operator.
-- Current generic generation runner still returns manual Comfy instructions, so automatic candidate ingest/classification remains pending.
+- Current generic generation runner still returns manual Comfy instructions.
+- Added `POST /admin/characters/canon/ingest-output` to download a Comfy output, register it through the raw asset registry, classify it as `identity-candidate`, and show it in Characters reference intake.
+- `identity-candidate` references can be promoted to `identity-canon` from the Characters visual step.
 
 ---
 
