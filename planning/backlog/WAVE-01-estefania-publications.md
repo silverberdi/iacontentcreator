@@ -2348,7 +2348,7 @@ As an operator, I want to upload or register character reference images, so that
 
 ## US-051 — Canon Portrait Generation
 
-Status: Backlog
+Status: In Progress
 Priority: P0
 Epic: EPIC-11 Character Scale And Identity
 Wave: Wave 3 Character Onboarding
@@ -2360,11 +2360,18 @@ As an operator, I want to generate canon portrait candidates, so that I can esta
 ### Acceptance Criteria
 
 - [ ] Operator can generate portrait canon candidates from onboarding.
-- [ ] Prompt pack is generated automatically from type, narrative identity, and visual strategy.
+- [x] Operator can queue a canon portrait generation job from onboarding.
+- [x] Prompt pack is generated automatically from type, narrative identity, and visual strategy.
 - [ ] Candidates are registered as `identity-candidate`.
 - [ ] Operator can select one or more candidates as `identity-canon`.
 - [ ] QA result and rejection reasons are visible.
 - [ ] Character cannot advance without approved identity canon.
+
+### Implementation Notes
+
+- First slice adds a Canon portrait generation workbench inside Characters > Visual.
+- The workbench creates a `portrait-canon` generation job with a character-specific prompt pack and shows the generated positive/negative prompts to the operator.
+- Current generic generation runner still returns manual Comfy instructions, so automatic candidate ingest/classification remains pending.
 
 ---
 

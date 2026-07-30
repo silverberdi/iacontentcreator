@@ -120,3 +120,58 @@ export type CharacterReferenceRegisterResponse = {
   message?: string;
   reason?: string;
 };
+
+export type CharacterCanonPortraitJob = {
+  jobId?: string;
+  avatar?: string;
+  scene?: string;
+  assetType?: string;
+  platform?: string;
+  status?: string;
+  runMode?: string;
+  startedAt?: string;
+  createdAt?: string;
+};
+
+export type CharacterCanonPortraitPromptPack = {
+  positivePrompt: string;
+  negativePrompt: string;
+  referenceImages?: string[];
+  [key: string]: unknown;
+};
+
+export type CharacterCanonPortraitQueuePayload = {
+  avatar: string;
+  displayName: string;
+  avatarType: CharacterAvatarType;
+  businessProfile: string;
+  primaryObjective: string;
+  contentPillars: string[];
+  captionTone: string[];
+  brandFit: string[];
+  publishingLimits: string[];
+  reviewTriggers: string[];
+  notes?: string;
+};
+
+export type CharacterCanonPortraitQueueResponse = {
+  ok?: boolean;
+  queued?: boolean;
+  job?: CharacterCanonPortraitJob;
+  promptPack?: CharacterCanonPortraitPromptPack;
+  message?: string;
+  reason?: string;
+  error?: string;
+};
+
+export type CharacterCanonPortraitRunResponse = {
+  ok?: boolean;
+  running?: boolean;
+  manual?: boolean;
+  job?: CharacterCanonPortraitJob;
+  promptPack?: CharacterCanonPortraitPromptPack;
+  instructions?: string[];
+  message?: string;
+  reason?: string;
+  error?: string;
+};

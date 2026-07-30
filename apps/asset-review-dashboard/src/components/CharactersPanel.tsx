@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   listCharacterOnboarding,
   listCharacterReferences,
+  queueCanonPortraitGeneration,
   registerCharacterReference,
+  runCanonPortraitGeneration,
   saveCharacterOnboarding,
 } from "../api/charactersApi";
 import {
@@ -14,6 +16,8 @@ import type {
   CharacterOnboardingRecord,
   CharacterOnboardingSavePayload,
   CharacterOnboardingStatus,
+  CharacterCanonPortraitJob,
+  CharacterCanonPortraitPromptPack,
   CharacterReferenceClassification,
   CharacterReferenceRecord,
   CharacterSceneDraft,
@@ -216,11 +220,21 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const [referencesLoading, setReferencesLoading] = useState(false);
   const [referenceSaving, setReferenceSaving] = useState(false);
   const [referenceForm, setReferenceForm] = useState(EMPTY_REFERENCE_FORM);
+  const [canonSaving, setCanonSaving] = useState(false);
+  const [canonRunning, setCanonRunning] = useState(false);
+  const [canonJob, setCanonJob] = useState<CharacterCanonPortraitJob | null>(null);
+  const [canonPromptPack, setCanonPromptPack] =
+    useState<CharacterCanonPortraitPromptPack | null>(null);
+  const [canonInstructions, setCanonInstructions] = useState<string[]>([]);
   const [activeStep, setActiveStep] = useState<WizardStepId>("type");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
   const [referenceMessage, setReferenceMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [canonMessage, setCanonMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
@@ -338,9 +352,13 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     setDraft(DEFAULT_CHARACTER);
     setReferences([]);
     setReferenceForm(EMPTY_REFERENCE_FORM);
+    setCanonJob(null);
+    setCanonPromptPack(null);
+    setCanonInstructions([]);
     setActiveStep("type");
     setMessage(null);
     setReferenceMessage(null);
+    setCanonMessage(null);
   };
 
   const applyBlueprint = (avatarType: CharacterAvatarType) => {
@@ -460,6 +478,76 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       setReferenceMessage({ type: "error", text });
     } finally {
       setReferenceSaving(false);
+    }
+  };
+
+  const queueCanonPortrait = async () => {
+    const payloadAvatar = draft.avatar || slugify(draft.displayName);
+    if (!payloadAvatar || !draft.displayName || !draft.primaryObjective) {
+      setCanonMessage({
+        type: "error",
+        text: "Define display name, avatar slug, and primary objective before generating canon portraits.",
+      });
+      return;
+    }
+
+    setCanonSaving(true);
+    setCanonMessage(null);
+    try {
+      const result = await queueCanonPortraitGeneration({
+        avatar: payloadAvatar,
+        displayName: draft.displayName,
+        avatarType: draft.avatarType,
+        businessProfile: draft.businessProfile,
+        primaryObjective: draft.primaryObjective,
+        contentPillars: draft.contentPillars,
+        captionTone: draft.captionTone,
+        brandFit: draft.brandFit,
+        publishingLimits: draft.publishingLimits,
+        reviewTriggers: draft.reviewTriggers,
+        notes: draft.notes,
+      });
+      if (result.ok === false || !result.job?.jobId) {
+        throw new Error(result.message || result.reason || result.error || "Canon portrait job was not queued.");
+      }
+      setCanonJob(result.job);
+      setCanonPromptPack(result.promptPack ?? null);
+      setCanonInstructions([]);
+      setCanonMessage({
+        type: "success",
+        text: "Canon portrait job queued. Run it when you are ready to generate candidates.",
+      });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Canon portrait job was not queued.";
+      setCanonMessage({ type: "error", text });
+    } finally {
+      setCanonSaving(false);
+    }
+  };
+
+  const runCanonPortrait = async () => {
+    if (!canonJob?.jobId) return;
+    setCanonRunning(true);
+    setCanonMessage(null);
+    try {
+      const result = await runCanonPortraitGeneration(canonJob.jobId);
+      if (result.ok === false) {
+        throw new Error(result.message || result.reason || result.error || "Canon portrait job could not run.");
+      }
+      setCanonJob(result.job ?? canonJob);
+      setCanonPromptPack(result.promptPack ?? canonPromptPack);
+      setCanonInstructions(result.instructions ?? []);
+      setCanonMessage({
+        type: "success",
+        text: result.manual
+          ? "Canon portrait job is marked running. Use the prompt pack in Comfy and register the resulting image as identity-candidate."
+          : "Canon portrait generation started.",
+      });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Canon portrait job could not run.";
+      setCanonMessage({ type: "error", text });
+    } finally {
+      setCanonRunning(false);
     }
   };
 
@@ -843,6 +931,113 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div className="rounded-md border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                      Canon portrait generation
+                    </h3>
+                    <p className="mt-1 max-w-3xl text-sm text-gray-500">
+                      Create the first identity portrait job from this character definition. Good
+                      outputs should be registered below as `identity-candidate`, then promoted to
+                      `identity-canon` when the operator recognizes the character.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void queueCanonPortrait()}
+                      disabled={canonSaving}
+                      className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {canonSaving ? "Queueing..." : "Generate canon portrait job"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void runCanonPortrait()}
+                      disabled={!canonJob?.jobId || canonRunning}
+                      className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 disabled:opacity-40"
+                    >
+                      {canonRunning ? "Running..." : "Run job"}
+                    </button>
+                  </div>
+                </div>
+
+                {canonMessage && (
+                  <div
+                    className={`mt-4 rounded-md border px-4 py-3 text-sm ${
+                      canonMessage.type === "success"
+                        ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-200"
+                        : "border-red-800/60 bg-red-950/40 text-red-200"
+                    }`}
+                    role="status"
+                  >
+                    {canonMessage.text}
+                  </div>
+                )}
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-md border border-border bg-surface-raised p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Scene
+                    </p>
+                    <p className="mt-1 text-sm text-gray-200">portrait-canon</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-surface-raised p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Job status
+                    </p>
+                    <p className="mt-1 text-sm text-gray-200">{canonJob?.status ?? "Not queued"}</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-surface-raised p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Expected result
+                    </p>
+                    <p className="mt-1 text-sm text-gray-200">identity-candidate</p>
+                  </div>
+                </div>
+
+                {canonJob?.jobId && (
+                  <p className="mt-3 break-all font-mono text-xs text-gray-500">
+                    generationJobId: {canonJob.jobId}
+                  </p>
+                )}
+
+                {canonPromptPack && (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <div className="rounded-md border border-border bg-surface-raised p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Positive prompt
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">
+                        {canonPromptPack.positivePrompt}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-border bg-surface-raised p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Negative prompt
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">
+                        {canonPromptPack.negativePrompt}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {canonInstructions.length > 0 && (
+                  <div className="mt-4 rounded-md border border-amber-900/60 bg-amber-950/20 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+                      Next manual step
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm text-amber-100/80">
+                      {canonInstructions.map((instruction) => (
+                        <li key={instruction}>{instruction}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-md border border-border bg-surface p-4">
