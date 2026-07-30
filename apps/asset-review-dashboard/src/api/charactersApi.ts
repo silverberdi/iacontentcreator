@@ -1,5 +1,9 @@
 import { postN8nJson } from "./n8nClient";
 import type {
+  CharacterReferenceRegisterPayload,
+  CharacterReferenceRegisterResponse,
+  CharacterReferencesListPayload,
+  CharacterReferencesListResponse,
   CharacterOnboardingListResponse,
   CharacterOnboardingSavePayload,
   CharacterOnboardingSaveResponse,
@@ -13,4 +17,22 @@ export async function saveCharacterOnboarding(
   payload: CharacterOnboardingSavePayload,
 ): Promise<CharacterOnboardingSaveResponse> {
   return postN8nJson<CharacterOnboardingSaveResponse>("/admin/characters/save", payload);
+}
+
+export async function listCharacterReferences(
+  payload: CharacterReferencesListPayload,
+): Promise<CharacterReferencesListResponse> {
+  return postN8nJson<CharacterReferencesListResponse>(
+    "/admin/characters/references/list",
+    payload,
+  );
+}
+
+export async function registerCharacterReference(
+  payload: CharacterReferenceRegisterPayload,
+): Promise<CharacterReferenceRegisterResponse> {
+  return postN8nJson<CharacterReferenceRegisterResponse>(
+    "/admin/characters/references/register",
+    payload,
+  );
 }

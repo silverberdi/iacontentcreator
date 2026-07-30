@@ -1,0 +1,110 @@
+{
+  "id": "adminCharacterReferencesRegisterV1",
+  "name": "Avatares AI - Admin - Character References Register",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/characters/references/register",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a861ef40-cd8b-493a-9539-444444444444",
+      "name": "POST /admin/characters/references/register",
+      "webhookId": "a861ef40-cd8b-493a-9539-444444444444"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? {})) + '::jsonb';\n}\nfunction slug(value) {\n  return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');\n}\nfunction parsePath(input, fallbackBucket) {\n  const raw = String(input || '').trim();\n  const decoded = decodeURI(raw);\n  const marker = '/minio/';\n  const markerIndex = decoded.indexOf(marker);\n  if (markerIndex >= 0) {\n    const rest = decoded.slice(markerIndex + marker.length).replace(/^\\/+/, '');\n    const [bucket, ...parts] = rest.split('/');\n    return { bucket: bucket || fallbackBucket, objectPath: parts.join('/') };\n  }\n  const clean = decoded.replace(/^https?:\\/\\/[^/]+\\//, '').replace(/^\\/+/, '');\n  if (clean.startsWith(fallbackBucket + '/')) {\n    return { bucket: fallbackBucket, objectPath: clean.slice(fallbackBucket.length + 1) };\n  }\n  return { bucket: fallbackBucket, objectPath: clean };\n}\n\nconst body = $json.body || $json;\nconst allowed = new Set(['identity-candidate', 'identity-canon', 'scene-candidate', 'scene-canon', 'supporting-reference', 'rejected-reference']);\nconst avatar = slug(body.avatar);\nconst classification = String(body.classification || '').trim();\nconst bucketFallback = String(body.bucket || 'iacontentcreator-assets').trim();\nconst parsed = parsePath(body.objectPathOrUrl || body.object_path || body.url || '', bucketFallback);\nconst isSceneReference = classification.startsWith('scene-');\nconst scene = slug(body.scene || (isSceneReference ? '' : 'portrait-canon'));\nconst reviewNotes = String(body.reviewNotes || body.review_notes || '').trim();\nconst ext = (parsed.objectPath.split('.').pop() || 'png').toLowerCase();\nconst mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';\nconst status = classification === 'rejected-reference' ? 'rejected' : classification.endsWith('-canon') ? 'canonical' : 'raw';\nconst isCanonical = classification.endsWith('-canon');\n\nif (!avatar || !scene || !allowed.has(classification) || !parsed.objectPath) {\n  return [{ json: { query: `SELECT false AS ok, 'avatar, scene, classification, and objectPathOrUrl are required' AS error;` } }];\n}\n\nconst metadata = {\n  referenceIntake: 'characters-console',\n  referenceClassification: classification,\n  referenceRole: classification,\n  registeredFrom: 'characters-onboarding',\n  registeredAt: new Date().toISOString(),\n  rejectedForGeneration: classification === 'rejected-reference',\n};\nconst canonicalGroup = avatar + ':' + scene + ':raw-image';\nconst originalFilename = parsed.objectPath.split('/').pop() || 'reference.' + ext;\nconst query = `\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\nWITH inserted AS (\n  INSERT INTO canonical_asset_registry (\n    asset_id,\n    sha256,\n    avatar,\n    asset_type,\n    scene,\n    version,\n    workflow,\n    model,\n    seed,\n    bucket,\n    object_path,\n    original_filename,\n    mime_type,\n    file_size,\n    extension,\n    prompt,\n    negative_prompt,\n    sampler,\n    steps,\n    cfg,\n    tags,\n    metadata,\n    status,\n    review_notes,\n    is_canonical,\n    canonical_group\n  ) VALUES (\n    gen_random_uuid(),\n    encode(digest(${sql(avatar + '|' + scene + '|' + parsed.bucket + '|' + parsed.objectPath + '|' + classification)}, 'sha256'), 'hex'),\n    ${sql(avatar)},\n    'raw-image',\n    ${sql(scene)},\n    1,\n    'character-reference-intake',\n    'operator-registered-reference',\n    0,\n    ${sql(parsed.bucket)},\n    ${sql(parsed.objectPath)},\n    ${sql(originalFilename)},\n    ${sql(mimeType)},\n    0,\n    ${sql(ext)},\n    '',\n    '',\n    '',\n    NULL,\n    NULL,\n    ${sqlJson([avatar, scene, 'raw-image', classification])},\n    ${sqlJson(metadata)},\n    ${sql(status)},\n    ${sql(reviewNotes || 'Registered from Characters visual reference intake.')},\n    ${isCanonical ? 'true' : 'false'},\n    ${sql(canonicalGroup)}\n  )\n  ON CONFLICT (object_path) DO UPDATE SET\n    status = EXCLUDED.status,\n    review_notes = EXCLUDED.review_notes,\n    is_canonical = EXCLUDED.is_canonical,\n    metadata = COALESCE(canonical_asset_registry.metadata, '{}'::jsonb) || EXCLUDED.metadata\n  RETURNING *\n)\nSELECT true AS ok,\n  jsonb_build_object(\n    'assetId', asset_id,\n    'avatar', avatar,\n    'scene', scene,\n    'classification', metadata->>'referenceClassification',\n    'status', status,\n    'isCanonical', COALESCE(is_canonical, false),\n    'bucket', bucket,\n    'objectPath', object_path,\n    'url', '/minio/' || bucket || '/' || object_path,\n    'reviewNotes', review_notes,\n    'createdAt', created_at\n  ) AS reference\nFROM inserted;\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        0
+      ],
+      "id": "adminCharacterReferencesRegisterV1-build",
+      "name": "Build Reference Register Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        0
+      ],
+      "id": "adminCharacterReferencesRegisterV1-pg",
+      "name": "Register Reference",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') return [{ json: { ok: false, message: row.error || 'Reference could not be registered.' } }];\nconst reference = typeof row.reference === 'string' ? JSON.parse(row.reference) : row.reference;\nreturn [{ json: { ok: true, reference } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        0
+      ],
+      "id": "adminCharacterReferencesRegisterV1-return",
+      "name": "Return Result"
+    }
+  ],
+  "connections": {
+    "POST /admin/characters/references/register": {
+      "main": [
+        [
+          {
+            "node": "Build Reference Register Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reference Register Query": {
+      "main": [
+        [
+          {
+            "node": "Register Reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register Reference": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

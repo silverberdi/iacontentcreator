@@ -2320,7 +2320,7 @@ As an operator, I want a guided wizard that creates a character from scratch, so
 
 ## US-050 — Identity Reference Intake
 
-Status: Backlog
+Status: In Progress
 Priority: P0
 Epic: EPIC-11 Character Scale And Identity
 Wave: Wave 3 Character Onboarding
@@ -2332,11 +2332,17 @@ As an operator, I want to upload or register character reference images, so that
 ### Acceptance Criteria
 
 - [ ] Operator can upload reference images from Characters.
-- [ ] Each reference is associated with avatar and optionally scene.
-- [ ] References can be classified as `identity-candidate`, `identity-canon`, `scene-candidate`, `scene-canon`, `supporting-reference`, or `rejected-reference`.
-- [ ] Accepted references are stored in MinIO and registered in `canonical_asset_registry`.
-- [ ] Rejected references are never used for generation.
-- [ ] UI shows what reference evidence is still missing.
+- [x] Operator can register an existing MinIO reference URL or object path from Characters.
+- [x] Each reference is associated with avatar and optionally scene.
+- [x] References can be classified as `identity-candidate`, `identity-canon`, `scene-candidate`, `scene-canon`, `supporting-reference`, or `rejected-reference`.
+- [x] Registered references are stored in `canonical_asset_registry` with `raw-image` compatibility for prompt reference resolution.
+- [x] Rejected references are registered as `status=rejected`, so they are excluded from normal generation reference resolution.
+- [x] UI shows what reference evidence is still missing.
+
+### Implementation Notes
+
+- First safe slice supports registration of already-uploaded MinIO images. Direct binary upload from Characters remains pending because the current MinIO gateway only proxies reads.
+- Reference classification metadata is stored under `metadata.referenceClassification` and `metadata.referenceIntake = characters-console`.
 
 ---
 

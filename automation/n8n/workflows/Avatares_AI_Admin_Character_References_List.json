@@ -1,0 +1,110 @@
+{
+  "id": "adminCharacterReferencesListV1",
+  "name": "Avatares AI - Admin - Character References List",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/characters/references/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2f70ff9c-d544-4115-9b40-333333333333",
+      "name": "POST /admin/characters/references/list",
+      "webhookId": "2f70ff9c-d544-4115-9b40-333333333333"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null || String(value).trim() === '') return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction slug(value) {\n  return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');\n}\nconst body = $json.body || $json;\nconst avatar = slug(body.avatar);\nif (!avatar) {\n  return [{ json: { query: \"SELECT false AS ok, 'avatar is required' AS error, '[]'::jsonb AS references;\" } }];\n}\nconst query = `\nSELECT\n  true AS ok,\n  COALESCE(jsonb_agg(jsonb_build_object(\n    'assetId', asset_id,\n    'avatar', avatar,\n    'scene', scene,\n    'classification', COALESCE(metadata->>'referenceClassification', 'supporting-reference'),\n    'status', status,\n    'isCanonical', COALESCE(is_canonical, false),\n    'bucket', bucket,\n    'objectPath', object_path,\n    'url', '/minio/' || bucket || '/' || object_path,\n    'reviewNotes', review_notes,\n    'createdAt', created_at\n  ) ORDER BY created_at DESC NULLS LAST), '[]'::jsonb) AS references,\n  jsonb_build_object(\n    'identityCanonCount', COUNT(*) FILTER (WHERE metadata->>'referenceClassification' = 'identity-canon'),\n    'sceneCanonCount', COUNT(*) FILTER (WHERE metadata->>'referenceClassification' = 'scene-canon'),\n    'candidateCount', COUNT(*) FILTER (WHERE metadata->>'referenceClassification' IN ('identity-candidate', 'scene-candidate')),\n    'rejectedCount', COUNT(*) FILTER (WHERE metadata->>'referenceClassification' = 'rejected-reference')\n  ) AS summary\nFROM canonical_asset_registry\nWHERE avatar = ${sql(avatar)}\n  AND metadata->>'referenceIntake' = 'characters-console';\n`;\nreturn [{ json: { query } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        0
+      ],
+      "id": "adminCharacterReferencesListV1-build",
+      "name": "Build Reference List Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        0
+      ],
+      "id": "adminCharacterReferencesListV1-pg",
+      "name": "List References",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') return [{ json: { ok: false, message: row.error || 'References could not load.' } }];\nconst references = typeof row.references === 'string' ? JSON.parse(row.references) : row.references;\nconst summary = typeof row.summary === 'string' ? JSON.parse(row.summary) : row.summary;\nreturn [{ json: { ok: true, references: references || [], summary: summary || {} } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        0
+      ],
+      "id": "adminCharacterReferencesListV1-return",
+      "name": "Return Result"
+    }
+  ],
+  "connections": {
+    "POST /admin/characters/references/list": {
+      "main": [
+        [
+          {
+            "node": "Build Reference List Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reference List Query": {
+      "main": [
+        [
+          {
+            "node": "List References",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List References": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

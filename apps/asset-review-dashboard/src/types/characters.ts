@@ -14,6 +14,29 @@ export type ReferencePolicy = {
   rejectedReference: boolean;
 };
 
+export type CharacterReferenceClassification =
+  | "identity-candidate"
+  | "identity-canon"
+  | "scene-candidate"
+  | "scene-canon"
+  | "supporting-reference"
+  | "rejected-reference";
+
+export type CharacterReferenceRecord = {
+  assetId: string;
+  avatar: string;
+  scene: string;
+  classification: CharacterReferenceClassification;
+  status: string;
+  isCanonical: boolean;
+  bucket: string;
+  objectPath: string;
+  url: string;
+  reviewNotes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type CharacterSceneDraft = {
   scene: string;
   displayName: string;
@@ -61,6 +84,39 @@ export type CharacterOnboardingSavePayload = Omit<
 export type CharacterOnboardingSaveResponse = {
   ok?: boolean;
   character?: CharacterOnboardingRecord;
+  message?: string;
+  reason?: string;
+};
+
+export type CharacterReferencesListPayload = {
+  avatar: string;
+};
+
+export type CharacterReferencesListResponse = {
+  ok?: boolean;
+  references?: CharacterReferenceRecord[];
+  summary?: {
+    identityCanonCount: number;
+    sceneCanonCount: number;
+    candidateCount: number;
+    rejectedCount: number;
+  };
+  message?: string;
+  reason?: string;
+};
+
+export type CharacterReferenceRegisterPayload = {
+  avatar: string;
+  scene?: string;
+  classification: CharacterReferenceClassification;
+  objectPathOrUrl: string;
+  bucket?: string;
+  reviewNotes?: string;
+};
+
+export type CharacterReferenceRegisterResponse = {
+  ok?: boolean;
+  reference?: CharacterReferenceRecord;
   message?: string;
   reason?: string;
 };
