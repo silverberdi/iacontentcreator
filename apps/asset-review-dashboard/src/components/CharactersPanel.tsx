@@ -24,6 +24,25 @@ const STATUS_LABELS: Record<CharacterOnboardingStatus, string> = {
   ready: "Ready",
 };
 
+type WizardStepId =
+  | "type"
+  | "identity"
+  | "voice"
+  | "limits"
+  | "scenes"
+  | "visual"
+  | "summary";
+
+const WIZARD_STEPS: { id: WizardStepId; label: string; helper: string }[] = [
+  { id: "type", label: "Type", helper: "Choose the blueprint." },
+  { id: "identity", label: "Identity", helper: "Name and objective." },
+  { id: "voice", label: "Voice", helper: "Pillars, tone, and fit." },
+  { id: "limits", label: "Limits", helper: "Rules and review triggers." },
+  { id: "scenes", label: "Scenes", helper: "Starter contexts." },
+  { id: "visual", label: "Visual", helper: "Canon strategy." },
+  { id: "summary", label: "Summary", helper: "Save and continue." },
+];
+
 const DEFAULT_REFERENCE_POLICY: ReferencePolicy = {
   identityCanon: true,
   sceneCanon: true,
@@ -110,6 +129,31 @@ function readinessItems(character: CharacterOnboardingRecord | CharacterOnboardi
   ];
 }
 
+function isStepComplete(step: WizardStepId, draft: CharacterOnboardingSavePayload): boolean {
+  switch (step) {
+    case "type":
+      return Boolean(draft.avatarType);
+    case "identity":
+      return Boolean(
+        draft.displayName && draft.avatar && draft.avatarShort && draft.primaryObjective,
+      );
+    case "voice":
+      return (
+        draft.contentPillars.length > 0 &&
+        draft.captionTone.length > 0 &&
+        draft.brandFit.length > 0
+      );
+    case "limits":
+      return draft.publishingLimits.length > 0 && draft.reviewTriggers.length > 0;
+    case "scenes":
+      return draft.scenes.some((scene) => scene.scene && scene.displayName);
+    case "visual":
+      return draft.referencePolicy.identityCanon && draft.referencePolicy.sceneCanon;
+    case "summary":
+      return inferStatus(draft) !== "draft";
+  }
+}
+
 type CharactersPanelProps = {
   onCatalogsChanged?: () => void;
 };
@@ -120,6 +164,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const [draft, setDraft] = useState<CharacterOnboardingSavePayload>(DEFAULT_CHARACTER);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeStep, setActiveStep] = useState<WizardStepId>("type");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
@@ -210,6 +255,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const startNewCharacter = () => {
     setSelectedAvatar(null);
     setDraft(DEFAULT_CHARACTER);
+    setActiveStep("type");
     setMessage(null);
   };
 
@@ -276,6 +322,22 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   };
 
   const currentReadiness = readinessItems(draft);
+  const currentStepIndex = WIZARD_STEPS.findIndex((step) => step.id === activeStep);
+  const completedStepCount = WIZARD_STEPS.filter((step) => isStepComplete(step.id, draft)).length;
+  const nextRecommendedStep =
+    WIZARD_STEPS.find((step) => !isStepComplete(step.id, draft)) ??
+    WIZARD_STEPS[WIZARD_STEPS.length - 1];
+  const activeBlueprint = characterTypeBlueprints[draft.avatarType];
+
+  const goToPreviousStep = () => {
+    const previous = WIZARD_STEPS[Math.max(0, currentStepIndex - 1)];
+    if (previous) setActiveStep(previous.id);
+  };
+
+  const goToNextStep = () => {
+    const next = WIZARD_STEPS[Math.min(WIZARD_STEPS.length - 1, currentStepIndex + 1)];
+    if (next) setActiveStep(next.id);
+  };
 
   return (
     <div className="space-y-5">
@@ -369,6 +431,49 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
 
         <section className="rounded-lg border border-border bg-surface-raised p-5">
           <div className="mb-5 rounded-md border border-border bg-surface p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                  Creation wizard
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {completedStepCount} of {WIZARD_STEPS.length} steps complete. Next:{" "}
+                  <span className="text-gray-300">{nextRecommendedStep.label}</span>.
+                </p>
+              </div>
+              <div className="rounded-full border border-border bg-surface-overlay px-3 py-1 text-xs text-gray-300">
+                {activeBlueprint.label}
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 lg:grid-cols-7">
+              {WIZARD_STEPS.map((step, index) => {
+                const isActive = activeStep === step.id;
+                const isComplete = isStepComplete(step.id, draft);
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => setActiveStep(step.id)}
+                    className={`rounded-md border p-3 text-left transition ${
+                      isActive
+                        ? "border-accent bg-accent/10"
+                        : isComplete
+                          ? "border-emerald-900/70 bg-emerald-950/20"
+                          : "border-border bg-surface-raised hover:border-gray-600"
+                    }`}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      {index + 1}. {step.label}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-4 text-gray-500">{step.helper}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {activeStep === "type" && (
+            <div className="mb-5 rounded-md border border-border bg-surface p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
@@ -408,7 +513,10 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               })}
             </div>
           </div>
+          )}
 
+          {activeStep === "identity" && (
+            <>
           <div className="grid gap-4 lg:grid-cols-3">
             <label className="text-sm text-gray-400">
               Display name
@@ -484,7 +592,10 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               placeholder="What this character is meant to create and why."
             />
           </label>
+            </>
+          )}
 
+          {activeStep === "voice" && (
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <label className="text-sm text-gray-400">
               Content pillars
@@ -513,6 +624,11 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                 placeholder="coffee, fashion, urban lifestyle"
               />
             </label>
+          </div>
+          )}
+
+          {activeStep === "limits" && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <label className="text-sm text-gray-400">
               Publishing limits
               <textarea
@@ -536,7 +652,9 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               />
             </label>
           </div>
+          )}
 
+          {activeStep === "visual" && (
           <div className="mt-5 rounded-md border border-blue-900/70 bg-blue-950/20 p-4">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-100">
               Visual Canon Plan
@@ -571,7 +689,9 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               ))}
             </div>
           </div>
+          )}
 
+          {activeStep === "scenes" && (
           <div className="mt-5">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
@@ -632,7 +752,10 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               )}
             </div>
           </div>
+          )}
 
+          {activeStep === "summary" && (
+            <>
           <label className="mt-4 block text-sm text-gray-400">
             Notes
             <textarea
@@ -667,6 +790,42 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
             >
               {saving ? "Saving..." : "Save character"}
             </button>
+          </div>
+            </>
+          )}
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+            <button
+              type="button"
+              onClick={goToPreviousStep}
+              disabled={currentStepIndex === 0}
+              className="rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm text-gray-200 disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <div className="text-sm text-gray-500">
+              {isStepComplete(activeStep, draft)
+                ? "This step has enough information."
+                : "This step still needs attention."}
+            </div>
+            {activeStep === "summary" ? (
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={saving}
+                className="rounded-md bg-accent px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save character"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={goToNextStep}
+                className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white"
+              >
+                Next
+              </button>
+            )}
           </div>
         </section>
       </div>

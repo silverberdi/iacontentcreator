@@ -2295,7 +2295,7 @@ As an operator, I want to choose the avatar type when creating a character, so t
 
 ## US-049 — Character Creation Wizard
 
-Status: Backlog
+Status: Done
 Priority: P0
 Epic: EPIC-11 Character Scale And Identity
 Wave: Wave 3 Character Onboarding
@@ -2306,11 +2306,15 @@ As an operator, I want a guided wizard that creates a character from scratch, so
 
 ### Acceptance Criteria
 
-- [ ] Wizard guides the operator through type, narrative identity, voice, limits, scenes, visual strategy, and summary.
-- [ ] Wizard creates or updates character onboarding, avatar catalog, scene catalog, and prompt/profile configuration.
-- [ ] Defaults are editable at every step.
-- [ ] The operator sees progress, missing items, and next recommended action.
-- [ ] Completing the wizard places the character in `references-needed` or `identity-review`, not `ready`.
+- [x] Wizard guides the operator through type, narrative identity, voice, limits, scenes, visual strategy, and summary.
+- [x] Wizard creates or updates character onboarding, avatar catalog, scene catalog, and prompt/profile configuration.
+- [x] Defaults are editable at every step.
+- [x] The operator sees progress, missing items, and next recommended action.
+- [x] Completing the wizard places the character in `references-needed` or `identity-review`, not `ready`.
+
+### Notes
+
+- Implemented on 2026-07-30 UTC as the `Characters` creation wizard: type, identity, voice, limits, scenes, visual canon strategy, and summary/save. It reuses `/admin/characters/save`, which updates onboarding plus avatar/scene catalogs.
 
 ---
 
