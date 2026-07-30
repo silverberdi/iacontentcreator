@@ -2245,3 +2245,220 @@ As an operator, I want each character to pass an identity consistency hardening 
 - The goal is not stricter anatomy validation; it is stable character identity across otherwise valid images.
 - Generation should treat active ingest profile as irrelevant for creative reference selection. Active ingest profile only classifies files entering through generic ingest.
 - Implemented first resolver slice on 2026-07-30 UTC: prompt pack load context now prefers scene references and falls back to `portrait-canon` / `public-identity` identity anchors when no scene references exist. Metadata records `referenceResolution.usesActiveIngestProfile = false`.
+
+---
+
+## US-048 — Character Type Blueprint
+
+Status: Done
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to choose the avatar type when creating a character, so that onboarding, defaults, scenes, safety limits, tone, and publishing rules are configured for the right kind of persona: influencer, GFE/BFE, or authority.
+
+### Acceptance Criteria
+
+- [x] Operator can choose one avatar type: `influencer`, `gfe-bfe`, or `authority`.
+- [x] Each type loads human-readable defaults, not technical JSON.
+- [x] Influencer blueprint includes brand fit, lifestyle pillars, campaign/platform framing, and commercial review triggers.
+- [x] GFE/BFE blueprint includes relational tone, intimacy boundaries, safety limits, public/private framing, and stricter review triggers.
+- [x] Authority blueprint includes expert domain, educational tone, claim limits, citation/review triggers, and trust-building scenes.
+- [x] Type-specific starter scenes are proposed and editable.
+- [x] Type-specific content pillars, caption tone, brand fit, publishing limits, and review triggers are persisted.
+- [x] The selected type is stored with the character and synced into catalog/profile metadata.
+- [x] Existing Estefania is represented as `influencer` without breaking her current flows.
+
+### Technical Tasks
+
+- [x] Extend character onboarding model with `avatarType` and `reviewTriggers`.
+- [x] Define blueprint constants for `influencer`, `gfe-bfe`, and `authority`.
+- [x] Add type selector to the Characters UI.
+- [x] Apply blueprint defaults when creating a new character or changing type.
+- [x] Persist `avatarType` and `reviewTriggers` in `character_onboarding`.
+- [x] Sync avatar type into `avatar_catalog.avatar_kind`.
+- [x] Backfill Estefania as `influencer`.
+
+### Dependencies
+
+- US-046.
+
+### Notes
+
+- This is the correction that makes onboarding type-aware instead of a generic character form.
+- The three avatar types should drive later wizard steps, reference requirements, QA strictness, and publishing policy.
+- Implemented on 2026-07-30 UTC: type-aware `Characters` blueprints for influencer, GFE/BFE, and authority; persisted `avatarType` and `reviewTriggers`; synced `avatar_catalog.avatar_kind`; Estefania remains influencer.
+
+---
+
+## US-049 — Character Creation Wizard
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want a guided wizard that creates a character from scratch, so that I do not need to know which tables, prompts, profiles, or workflows must be configured manually.
+
+### Acceptance Criteria
+
+- [ ] Wizard guides the operator through type, narrative identity, voice, limits, scenes, visual strategy, and summary.
+- [ ] Wizard creates or updates character onboarding, avatar catalog, scene catalog, and prompt/profile configuration.
+- [ ] Defaults are editable at every step.
+- [ ] The operator sees progress, missing items, and next recommended action.
+- [ ] Completing the wizard places the character in `references-needed` or `identity-review`, not `ready`.
+
+---
+
+## US-050 — Identity Reference Intake
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to upload or register character reference images, so that the system can build a visual identity without manual MinIO or database work.
+
+### Acceptance Criteria
+
+- [ ] Operator can upload reference images from Characters.
+- [ ] Each reference is associated with avatar and optionally scene.
+- [ ] References can be classified as `identity-candidate`, `identity-canon`, `scene-candidate`, `scene-canon`, `supporting-reference`, or `rejected-reference`.
+- [ ] Accepted references are stored in MinIO and registered in `canonical_asset_registry`.
+- [ ] Rejected references are never used for generation.
+- [ ] UI shows what reference evidence is still missing.
+
+---
+
+## US-051 — Canon Portrait Generation
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to generate canon portrait candidates, so that I can establish a character's visual identity even when I do not already have a perfect reference.
+
+### Acceptance Criteria
+
+- [ ] Operator can generate portrait canon candidates from onboarding.
+- [ ] Prompt pack is generated automatically from type, narrative identity, and visual strategy.
+- [ ] Candidates are registered as `identity-candidate`.
+- [ ] Operator can select one or more candidates as `identity-canon`.
+- [ ] QA result and rejection reasons are visible.
+- [ ] Character cannot advance without approved identity canon.
+
+---
+
+## US-052 — Scene Pack Generation
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to generate starter scene packs for a character, so that new avatars quickly reach a usable scene set similar to Estefania.
+
+### Acceptance Criteria
+
+- [ ] Operator can generate images for starter scenes proposed by the avatar type.
+- [ ] Generated images are registered with avatar, scene, and asset type.
+- [ ] Operator can select `scene-canon`.
+- [ ] Generation falls back to `identity-canon` when a scene has no canon yet.
+- [ ] UI shows scenes as ready, pending, defective, or needing review.
+- [ ] Character requires a minimum scene pack before normal publishing.
+
+---
+
+## US-053 — Identity Test Matrix
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to test a character across multiple scenes, so that I can decide whether identity is stable before using the character in production publications.
+
+### Acceptance Criteria
+
+- [ ] Operator can run identity test generation across at least three scenes.
+- [ ] Results separate identity drift, face mismatch, anatomy defects, scene mismatch, and composition issues.
+- [ ] System summarizes whether the character is stable enough for publication.
+- [ ] Operator can approve, regenerate, request better canon, or flag `needs-lora`.
+- [ ] Failed identity tests keep the character out of normal publishing.
+
+---
+
+## US-054 — Character Readiness Gate
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want normal publication jobs to unlock only when a character is ready, so that incomplete avatars are not accidentally used.
+
+### Acceptance Criteria
+
+- [ ] Normal publication creation is blocked for characters that are not `ready`.
+- [ ] `ready` requires type, profile, limits, identity canon, minimum scenes, and approved identity test matrix.
+- [ ] Admin override is possible with mandatory note.
+- [ ] UI explains exactly what is missing in plain language.
+- [ ] Existing Estefania remains usable after readiness backfill.
+
+---
+
+## US-055 — First Publication From Onboarding
+
+Status: Backlog
+Priority: P1
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to launch the first publication directly from onboarding, so that the path from new character to publishable output is continuous.
+
+### Acceptance Criteria
+
+- [ ] A `ready` character shows `Create first publication`.
+- [ ] Operator selects one ready scene and starts the publication workflow.
+- [ ] Brief, prompt pack, image generation, review, copy, and export run through the existing publication pipeline.
+- [ ] The publication is linked back to onboarding history.
+- [ ] The operator does not need to switch to technical pages.
+
+---
+
+## US-056 — LoRA Decision And Training Handoff
+
+Status: Backlog
+Priority: P1
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator or admin, I want the system to recommend LoRA training only when references and canon are not enough, so that training is a deliberate escalation rather than a mandatory first step.
+
+### Acceptance Criteria
+
+- [ ] System can flag `needs-lora` after repeated identity failures.
+- [ ] Operator sees which approved references are suitable as a training dataset.
+- [ ] Dataset can be exported or handed off to a training provider.
+- [ ] Trained LoRA metadata can be registered back to the character.
+- [ ] Comfy generation can use the registered LoRA when available.
+- [ ] Training provider remains pluggable and separate from Comfy Cloud inference.

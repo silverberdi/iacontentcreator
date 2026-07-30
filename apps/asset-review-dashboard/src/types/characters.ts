@@ -5,6 +5,8 @@ export type CharacterOnboardingStatus =
   | "ready-for-tests"
   | "ready";
 
+export type CharacterAvatarType = "influencer" | "gfe-bfe" | "authority";
+
 export type ReferencePolicy = {
   identityCanon: boolean;
   sceneCanon: boolean;
@@ -20,6 +22,7 @@ export type CharacterSceneDraft = {
 
 export type CharacterOnboardingRecord = {
   avatar: string;
+  avatarType: CharacterAvatarType;
   avatarShort: string;
   displayName: string;
   businessProfile: string;
@@ -28,6 +31,7 @@ export type CharacterOnboardingRecord = {
   captionTone: string[];
   brandFit: string[];
   publishingLimits: string[];
+  reviewTriggers: string[];
   referencePolicy: ReferencePolicy;
   scenes: CharacterSceneDraft[];
   status: CharacterOnboardingStatus;

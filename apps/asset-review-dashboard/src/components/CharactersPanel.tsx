@@ -3,7 +3,12 @@ import {
   listCharacterOnboarding,
   saveCharacterOnboarding,
 } from "../api/charactersApi";
+import {
+  characterTypeBlueprints,
+  characterTypeOptions,
+} from "../data/characterBlueprints";
 import type {
+  CharacterAvatarType,
   CharacterOnboardingRecord,
   CharacterOnboardingSavePayload,
   CharacterOnboardingStatus,
@@ -28,16 +33,18 @@ const DEFAULT_REFERENCE_POLICY: ReferencePolicy = {
 
 const DEFAULT_CHARACTER: CharacterOnboardingSavePayload = {
   avatar: "",
+  avatarType: "influencer",
   avatarShort: "",
   displayName: "",
-  businessProfile: "influencer-brand",
-  primaryObjective: "",
-  contentPillars: [],
-  captionTone: [],
-  brandFit: [],
-  publishingLimits: [],
+  businessProfile: characterTypeBlueprints.influencer.businessProfile,
+  primaryObjective: characterTypeBlueprints.influencer.primaryObjective,
+  contentPillars: characterTypeBlueprints.influencer.contentPillars,
+  captionTone: characterTypeBlueprints.influencer.captionTone,
+  brandFit: characterTypeBlueprints.influencer.brandFit,
+  publishingLimits: characterTypeBlueprints.influencer.publishingLimits,
+  reviewTriggers: characterTypeBlueprints.influencer.reviewTriggers,
   referencePolicy: DEFAULT_REFERENCE_POLICY,
-  scenes: [],
+  scenes: characterTypeBlueprints.influencer.scenes,
   status: "draft",
   notes: "",
 };
@@ -152,6 +159,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     if (!selectedCharacter) return;
     setDraft({
       avatar: selectedCharacter.avatar,
+      avatarType: selectedCharacter.avatarType ?? "influencer",
       avatarShort: selectedCharacter.avatarShort,
       displayName: selectedCharacter.displayName,
       businessProfile: selectedCharacter.businessProfile,
@@ -160,6 +168,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       captionTone: selectedCharacter.captionTone,
       brandFit: selectedCharacter.brandFit,
       publishingLimits: selectedCharacter.publishingLimits,
+      reviewTriggers: selectedCharacter.reviewTriggers ?? [],
       referencePolicy: selectedCharacter.referencePolicy,
       scenes: selectedCharacter.scenes,
       status: selectedCharacter.status,
@@ -202,6 +211,26 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     setSelectedAvatar(null);
     setDraft(DEFAULT_CHARACTER);
     setMessage(null);
+  };
+
+  const applyBlueprint = (avatarType: CharacterAvatarType) => {
+    const blueprint = characterTypeBlueprints[avatarType];
+    setDraft((prev) => ({
+      ...prev,
+      avatarType,
+      businessProfile: blueprint.businessProfile,
+      primaryObjective: prev.primaryObjective || blueprint.primaryObjective,
+      contentPillars: blueprint.contentPillars,
+      captionTone: blueprint.captionTone,
+      brandFit: blueprint.brandFit,
+      publishingLimits: blueprint.publishingLimits,
+      reviewTriggers: blueprint.reviewTriggers,
+      scenes: prev.scenes.length > 0 ? prev.scenes : blueprint.scenes,
+    }));
+    setMessage({
+      type: "success",
+      text: `${blueprint.label} blueprint applied. You can still edit every default.`,
+    });
   };
 
   const save = async () => {
@@ -328,13 +357,58 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                     {STATUS_LABELS[character.status]}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">{character.avatar}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {character.avatar} ·{" "}
+                  {characterTypeBlueprints[character.avatarType ?? "influencer"]?.label ??
+                    "Influencer"}
+                </p>
               </button>
             ))}
           </div>
         </section>
 
         <section className="rounded-lg border border-border bg-surface-raised p-5">
+          <div className="mb-5 rounded-md border border-border bg-surface p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                  Avatar type
+                </h3>
+                <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                  The type controls starter scenes, tone, limits, review triggers, and later
+                  generation strategy. It is the opposite of a blank generic form.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => applyBlueprint(draft.avatarType)}
+                className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
+              >
+                Apply blueprint defaults
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              {characterTypeOptions.map((option) => {
+                const isActive = draft.avatarType === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => applyBlueprint(option.value)}
+                    className={`rounded-md border p-3 text-left transition ${
+                      isActive
+                        ? "border-accent bg-accent/10"
+                        : "border-border bg-surface-raised hover:border-gray-600"
+                    }`}
+                  >
+                    <p className="font-semibold text-gray-100">{option.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">{option.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-3">
             <label className="text-sm text-gray-400">
               Display name
@@ -448,6 +522,17 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                 }
                 className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
                 placeholder="No medical claims, no political endorsements..."
+              />
+            </label>
+            <label className="text-sm text-gray-400">
+              Review triggers
+              <textarea
+                value={joinList(draft.reviewTriggers)}
+                onChange={(event) =>
+                  updateDraft("reviewTriggers", splitList(event.target.value))
+                }
+                className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
+                placeholder="sponsored content, factual claims, intimacy boundaries..."
               />
             </label>
           </div>
