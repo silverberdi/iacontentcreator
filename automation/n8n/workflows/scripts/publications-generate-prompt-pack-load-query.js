@@ -15,7 +15,7 @@ WITH job AS (
   FROM publication_jobs
   WHERE publication_job_id = ${sql(publicationJobId)}::uuid
   LIMIT 1
-), refs AS (
+), scene_refs AS (
   SELECT
     car.asset_id,
     car.bucket,
@@ -23,7 +23,10 @@ WITH job AS (
     car.status,
     car.is_canonical,
     car.created_at,
-    car.metadata
+    car.metadata,
+    'scene-canon' AS reference_role,
+    'scene-canon' AS reference_source,
+    1 AS reference_priority
   FROM canonical_asset_registry car
   JOIN job pj ON pj.avatar = car.avatar
   WHERE car.scene = (SELECT scene FROM job)
@@ -38,6 +41,37 @@ WITH job AS (
     END,
     car.created_at DESC
   LIMIT 6
+), identity_refs AS (
+  SELECT
+    car.asset_id,
+    car.bucket,
+    car.object_path,
+    car.status,
+    car.is_canonical,
+    car.created_at,
+    car.metadata,
+    'identity-canon' AS reference_role,
+    'identity-canon-fallback' AS reference_source,
+    2 AS reference_priority
+  FROM canonical_asset_registry car
+  JOIN job pj ON pj.avatar = car.avatar
+  WHERE car.scene IN ('portrait-canon', 'public-identity')
+    AND car.asset_type = 'raw-image'
+    AND COALESCE(car.status, '') IN ('canonical', 'selected', 'raw')
+  ORDER BY
+    CASE
+      WHEN COALESCE(car.is_canonical, false) = true OR car.status = 'canonical' THEN 1
+      WHEN car.status = 'selected' THEN 2
+      WHEN car.status = 'raw' THEN 3
+      ELSE 4
+    END,
+    car.created_at DESC
+  LIMIT 4
+), refs AS (
+  SELECT * FROM scene_refs
+  UNION ALL
+  SELECT * FROM identity_refs
+  WHERE NOT EXISTS (SELECT 1 FROM scene_refs)
 ), human_feedback AS (
   SELECT
     car.asset_id,
@@ -88,10 +122,20 @@ SELECT
       'url', '/minio/' || bucket || '/' || object_path,
       'comfyInputName', NULLIF(metadata->>'comfyInputName', ''),
       'comfyLoadable', NULLIF(metadata->>'comfyInputName', '') IS NOT NULL,
-      'source', 'canonical_asset_registry'
-    ))
+      'referenceRole', reference_role,
+      'source', reference_source
+    ) ORDER BY reference_priority, created_at DESC)
     FROM refs
   ), '[]'::jsonb) AS "referenceImages",
+  COALESCE((
+    SELECT jsonb_build_object(
+      'strategy', CASE WHEN EXISTS (SELECT 1 FROM scene_refs) THEN 'scene-canon' ELSE 'identity-canon-fallback' END,
+      'sceneReferenceCount', (SELECT COUNT(*) FROM scene_refs),
+      'identityReferenceCount', (SELECT COUNT(*) FROM identity_refs),
+      'usesActiveIngestProfile', false,
+      'note', 'Creative reference selection is resolved from canonical_asset_registry by avatar and scene. Active ingest profiles are ignored.'
+    )
+  ), '{}'::jsonb) AS "referenceResolution",
   COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
       'assetId', asset_id,

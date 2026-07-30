@@ -2148,7 +2148,7 @@ As an operator, I want to guide a publication with human creative direction and 
 
 ## US-046 — Character Onboarding Foundation
 
-Status: Backlog
+Status: In Progress
 Priority: P0
 Epic: EPIC-11 Character Scale And Identity
 Wave: Wave 3 Character Onboarding
@@ -2159,28 +2159,28 @@ As an operator, I want to create and prepare a new character through a guided on
 
 ### Acceptance Criteria
 
-- [ ] Operator can create a draft character profile from the web console.
-- [ ] Onboarding captures display name, short handle, business profile, content pillars, caption tone, brand fit, and publishing limits.
-- [ ] Operator can define initial scenes or select starter scene templates.
+- [x] Operator can create a draft character profile from the web console.
+- [x] Onboarding captures display name, short handle, business profile, content pillars, caption tone, brand fit, and publishing limits.
+- [x] Operator can define initial scenes or select starter scene templates.
 - [ ] Operator can upload or select candidate identity reference images.
-- [ ] Operator can classify references as global identity canon or scene-specific canon.
-- [ ] Operator can see that ingest profiles are operational import recipes, not character identity profiles.
-- [ ] Character has visible onboarding status: `draft`, `references-needed`, `identity-review`, `ready-for-tests`, `ready`.
+- [x] Operator can classify references as global identity canon or scene-specific canon.
+- [x] Operator can see that ingest profiles are operational import recipes, not character identity profiles.
+- [x] Character has visible onboarding status: `draft`, `references-needed`, `identity-review`, `ready-for-tests`, `ready`.
 - [ ] Character cannot be used for normal publication jobs until minimum onboarding requirements are complete.
-- [ ] Standard UI uses human labels and guided steps; technical JSON/debug data remains behind technical mode.
-- [ ] Existing Estefania configuration can be represented by the same onboarding model without breaking current publication flows.
+- [x] Standard UI uses human labels and guided steps; technical JSON/debug data remains behind technical mode.
+- [x] Existing Estefania configuration can be represented by the same onboarding model without breaking current publication flows.
 
 ### Technical Tasks
 
-- [ ] Inventory current character, avatar catalog, scene catalog, prompt profile, and canonical registry data dependencies.
-- [ ] Define character onboarding view model and minimum-ready rules.
-- [ ] Add create/edit character API endpoints or n8n workflows.
-- [ ] Add onboarding UI entry point from Ops/Admin or Characters.
+- [x] Inventory current character, avatar catalog, scene catalog, prompt profile, and canonical registry data dependencies.
+- [x] Define character onboarding view model and minimum-ready rules.
+- [x] Add create/edit character API endpoints or n8n workflows.
+- [x] Add onboarding UI entry point from Ops/Admin or Characters.
 - [ ] Add reference image selection/upload step.
-- [ ] Add canon classification fields: `identity-canon`, `scene-canon`, `supporting-reference`, `rejected-reference`.
-- [ ] Add operator-facing copy that distinguishes character profiles, reference canon, and ingest profiles.
-- [ ] Persist onboarding status and validation checklist.
-- [ ] Add compatibility mapping for existing Estefania data.
+- [x] Add canon classification fields: `identity-canon`, `scene-canon`, `supporting-reference`, `rejected-reference`.
+- [x] Add operator-facing copy that distinguishes character profiles, reference canon, and ingest profiles.
+- [x] Persist onboarding status and validation checklist.
+- [x] Add compatibility mapping for existing Estefania data.
 
 ### Dependencies
 
@@ -2192,12 +2192,13 @@ As an operator, I want to create and prepare a new character through a guided on
 - This US is the umbrella for scaling beyond Estefania.
 - It should not attempt to solve image consistency quality by itself; it creates the structured path where identity hardening can run.
 - Ingest profiles should remain operational import configurations. They must not be presented as character identity profiles or used as creative reference source of truth.
+- Implemented first deployable slice on 2026-07-30 UTC: `Characters` tab, `/admin/characters/list`, `/admin/characters/save`, `character_onboarding` table, catalog sync, readiness checklist, and Estefania seed.
 
 ---
 
 ## US-047 — Character Identity Hardening
 
-Status: Backlog
+Status: In Progress
 Priority: P0
 Epic: EPIC-11 Character Scale And Identity
 Wave: Wave 3 Character Onboarding
@@ -2213,8 +2214,8 @@ As an operator, I want each character to pass an identity consistency hardening 
 - [ ] System shows which identity references are used by prompt pack and Comfy generation.
 - [ ] System shows which scene references are used by prompt pack and Comfy generation.
 - [ ] Character has an identity prompt/profile summary used consistently by brief and prompt-pack generation.
-- [ ] Prompt pack generation resolves references from `avatar + scene + assetType`, using scene canon when available and falling back to global identity canon when needed.
-- [ ] Prompt pack generation never depends on the active ingest profile to choose creative or identity references.
+- [x] Prompt pack generation resolves references from `avatar + scene + assetType`, using scene canon when available and falling back to global identity canon when needed.
+- [x] Prompt pack generation never depends on the active ingest profile to choose creative or identity references.
 - [ ] Operator can run controlled identity test generations across at least three scenes.
 - [ ] Identity test results separate identity drift, anatomy defects, composition defects, and scene/style mismatch.
 - [ ] Character is blocked from normal publishing until identity hardening passes or is explicitly overridden by an admin.
@@ -2224,10 +2225,10 @@ As an operator, I want each character to pass an identity consistency hardening 
 ### Technical Tasks
 
 - [ ] Define canonical identity reference rules and primary anchor selection.
-- [ ] Define scene-canon selection and fallback rules.
-- [ ] Add reference resolver for generation: `avatar + scene + assetType -> identity references + scene references`.
-- [ ] Extend prompt pack metadata with identity references actually used.
-- [ ] Extend prompt pack metadata with scene references actually used.
+- [x] Define scene-canon selection and fallback rules.
+- [x] Add reference resolver for generation: `avatar + scene + assetType -> identity references + scene references`.
+- [x] Extend prompt pack metadata with identity references actually used.
+- [x] Extend prompt pack metadata with scene references actually used.
 - [ ] Add identity profile fields to ai-gateway avatar profiles or equivalent character config.
 - [ ] Add controlled identity test job type or workflow.
 - [ ] Add identity QA summary and operator decision fields.
@@ -2243,3 +2244,4 @@ As an operator, I want each character to pass an identity consistency hardening 
 - This US turns what we learned from Estefania into a repeatable quality gate for every future character.
 - The goal is not stricter anatomy validation; it is stable character identity across otherwise valid images.
 - Generation should treat active ingest profile as irrelevant for creative reference selection. Active ingest profile only classifies files entering through generic ingest.
+- Implemented first resolver slice on 2026-07-30 UTC: prompt pack load context now prefers scene references and falls back to `portrait-canon` / `public-identity` identity anchors when no scene references exist. Metadata records `referenceResolution.usesActiveIngestProfile = false`.

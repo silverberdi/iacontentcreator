@@ -14,6 +14,7 @@ import Header from "./components/Header";
 import AutoIngestPanel from "./components/AutoIngestPanel";
 import BackupsPanel from "./components/BackupsPanel";
 import CatalogsPanel from "./components/CatalogsPanel";
+import CharactersPanel from "./components/CharactersPanel";
 import ContentCyclePanel from "./components/content-cycle/ContentCyclePanel";
 import DashboardTabs, { type DashboardTab } from "./components/DashboardTabs";
 import PageContainer from "./components/PageContainer";
@@ -188,6 +189,8 @@ export default function App({ currentUser }: AppProps) {
           : "Images that need a human decision";
       case "publications":
         return "Create and track Estefania influencer publication jobs";
+      case "characters":
+        return "Onboard characters, scenes, and visual canon readiness";
       case "content-cycle":
         return "Flujo guiado de contenido y publicación";
       case "ops":
@@ -204,6 +207,8 @@ export default function App({ currentUser }: AppProps) {
         return "Asset Review";
       case "publications":
         return "Publications";
+      case "characters":
+        return "Characters";
       case "content-cycle":
         return "Content Cycle";
       case "ops":
@@ -540,6 +545,12 @@ export default function App({ currentUser }: AppProps) {
                 onInitialPublicationJobLoaded={() => setPublicationJobToOpen(null)}
                 technicalMode={technicalMode}
               />
+            </div>
+          )}
+
+          {activeTab === "characters" && (
+            <div role="tabpanel">
+              <CharactersPanel onCatalogsChanged={() => void refreshCatalogOptions()} />
             </div>
           )}
 

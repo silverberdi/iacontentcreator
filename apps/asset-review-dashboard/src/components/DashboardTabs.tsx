@@ -1,11 +1,18 @@
 import PageContainer from "./PageContainer";
 
-export type DashboardTab = "home" | "review" | "publications" | "content-cycle" | "ops";
+export type DashboardTab =
+  | "home"
+  | "review"
+  | "publications"
+  | "characters"
+  | "content-cycle"
+  | "ops";
 
 const BASE_TABS: { id: DashboardTab; label: string; technicalOnly?: boolean }[] = [
   { id: "home", label: "Home" },
   { id: "review", label: "Asset Review" },
   { id: "publications", label: "Publications" },
+  { id: "characters", label: "Characters" },
   { id: "content-cycle", label: "Content Cycle", technicalOnly: true },
   { id: "ops", label: "Ops / Admin" },
 ];

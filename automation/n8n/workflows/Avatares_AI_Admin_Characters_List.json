@@ -1,0 +1,85 @@
+{
+  "id": "adminCharactersListV1",
+  "name": "Avatares AI - Admin - Characters List",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/characters/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2d21f0e2-f713-4a59-948d-1421732fba01",
+      "name": "POST /admin/characters/list",
+      "webhookId": "2f70ff9c-d544-4115-9b40-111111111111"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS character_onboarding (\n  avatar text PRIMARY KEY,\n  avatar_short text NOT NULL,\n  display_name text NOT NULL,\n  business_profile text NOT NULL DEFAULT 'influencer-brand',\n  primary_objective text NOT NULL DEFAULT '',\n  content_pillars jsonb NOT NULL DEFAULT '[]'::jsonb,\n  caption_tone jsonb NOT NULL DEFAULT '[]'::jsonb,\n  brand_fit jsonb NOT NULL DEFAULT '[]'::jsonb,\n  publishing_limits jsonb NOT NULL DEFAULT '[]'::jsonb,\n  reference_policy jsonb NOT NULL DEFAULT '{}'::jsonb,\n  scenes jsonb NOT NULL DEFAULT '[]'::jsonb,\n  onboarding_status text NOT NULL DEFAULT 'draft',\n  notes text,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now()\n);\nINSERT INTO character_onboarding (\n  avatar,\n  avatar_short,\n  display_name,\n  business_profile,\n  primary_objective,\n  content_pillars,\n  caption_tone,\n  brand_fit,\n  publishing_limits,\n  reference_policy,\n  scenes,\n  onboarding_status,\n  notes\n)\nSELECT\n  ac.avatar,\n  ac.avatar_short,\n  ac.display_name,\n  COALESCE(NULLIF(ac.avatar_kind, ''), 'influencer-brand'),\n  COALESCE(ac.description, ''),\n  '[]'::jsonb,\n  '[]'::jsonb,\n  '[]'::jsonb,\n  '[]'::jsonb,\n  '{\"identityCanon\":true,\"sceneCanon\":true,\"supportingReference\":true,\"rejectedReference\":true}'::jsonb,\n  COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'scene', sc.scene,\n      'displayName', sc.display_name,\n      'description', COALESCE(sc.description, '')\n    ) ORDER BY sc.display_name)\n    FROM scene_catalog sc\n    WHERE sc.avatar = ac.avatar AND sc.is_enabled = true\n  ), '[]'::jsonb),\n  'ready-for-tests',\n  'Imported from existing avatar catalog.'\nFROM avatar_catalog ac\nWHERE ac.is_enabled = true\nON CONFLICT (avatar) DO NOTHING;\nSELECT jsonb_build_object(\n  'characters', COALESCE(jsonb_agg(jsonb_build_object(\n    'avatar', avatar,\n    'avatarShort', avatar_short,\n    'displayName', display_name,\n    'businessProfile', business_profile,\n    'primaryObjective', primary_objective,\n    'contentPillars', content_pillars,\n    'captionTone', caption_tone,\n    'brandFit', brand_fit,\n    'publishingLimits', publishing_limits,\n    'referencePolicy', reference_policy,\n    'scenes', scenes,\n    'status', onboarding_status,\n    'notes', notes,\n    'createdAt', created_at,\n    'updatedAt', updated_at,\n    'readiness', jsonb_build_object(\n      'profileComplete', (avatar <> '' AND avatar_short <> '' AND display_name <> '' AND business_profile <> '' AND primary_objective <> '' AND jsonb_array_length(content_pillars) > 0 AND jsonb_array_length(caption_tone) > 0 AND jsonb_array_length(brand_fit) > 0),\n      'hasScenes', jsonb_array_length(scenes) > 0,\n      'hasReferencePlan', COALESCE((reference_policy->>'identityCanon')::boolean, false) AND COALESCE((reference_policy->>'sceneCanon')::boolean, false),\n      'readyForPublication', onboarding_status = 'ready'\n    )\n  ) ORDER BY display_name), '[]'::jsonb)\n) AS result\nFROM character_onboarding;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        304,
+        0
+      ],
+      "id": "9e0b0fc7-b2bf-4187-9338-7c7789c00807",
+      "name": "List Characters",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nconst result = typeof row.result === 'string' ? JSON.parse(row.result) : row.result;\nreturn [{ json: { ok: true, ...(result || { characters: [] }) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        0
+      ],
+      "id": "5c59e573-e710-4e97-b9a2-ae50c1194a37",
+      "name": "Return Characters"
+    }
+  ],
+  "connections": {
+    "POST /admin/characters/list": {
+      "main": [
+        [
+          {
+            "node": "List Characters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Characters": {
+      "main": [
+        [
+          {
+            "node": "Return Characters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
