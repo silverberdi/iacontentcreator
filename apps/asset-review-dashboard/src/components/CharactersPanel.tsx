@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  chatCharacterCanon,
   ingestCanonPortraitOutput,
   listCharacterCanons,
   listCharacterOnboarding,
@@ -27,7 +26,6 @@ import {
   applyCanonTopicAnswer,
   buildCanonMarkdown,
   buildCanonProposal,
-  compactLongOperatorAnswer,
 } from "../domain/characterCanonBuilder";
 import { CanonApprovalPanel } from "./characters/CanonApprovalPanel";
 import { CanonConversationPanel } from "./characters/CanonConversationPanel";
@@ -39,6 +37,7 @@ import { CharacterIdentityStepPanel } from "./characters/CharacterIdentityStepPa
 import { CharacterSummaryPanel } from "./characters/CharacterSummaryPanel";
 import { CharacterTypeStepPanel } from "./characters/CharacterTypeStepPanel";
 import { CharacterVisualStepPanel } from "./characters/CharacterVisualStepPanel";
+import { useCharacterCanonConversation } from "../hooks/useCharacterCanonConversation";
 import { useCharacterCanonImport } from "../hooks/useCharacterCanonImport";
 import { useCharacterReferences } from "../hooks/useCharacterReferences";
 import {
@@ -46,14 +45,11 @@ import {
   getCanonTopicProgress,
   getObjectiveReadinessProgress,
   getTopicEvidence,
-  normalizeSectionStatus,
-  topicLabel,
 } from "../domain/characterCanonReadiness";
 import type {
   CharacterAvatarType,
   CharacterCanonRecord,
   CharacterCanonSection,
-  CharacterCanonChatResponse,
   CharacterOnboardingRecord,
   CharacterOnboardingSavePayload,
   CharacterCanonPortraitJob,
@@ -103,15 +99,21 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     useState<CharacterCanonPortraitPromptPack | null>(null);
   const [canonInstructions, setCanonInstructions] = useState<string[]>([]);
   const [canonOutputUrl, setCanonOutputUrl] = useState("");
-  const [canonConversationNotes, setCanonConversationNotes] = useState("");
-  const [canonActiveTopic, setCanonActiveTopic] = useState("identity");
-  const [canonTopicAnswer, setCanonTopicAnswer] = useState("");
-  const [canonChatHistory, setCanonChatHistory] = useState<
-    Array<{ role: "operator" | "assistant"; content: string }>
-  >([]);
-  const [canonAssistantMessage, setCanonAssistantMessage] = useState("");
-  const [canonSuggestedQuestions, setCanonSuggestedQuestions] = useState<string[]>([]);
-  const [canonChatLoading, setCanonChatLoading] = useState(false);
+  const {
+    canonConversationNotes,
+    canonActiveTopic,
+    canonTopicAnswer,
+    canonAssistantMessage,
+    canonSuggestedQuestions,
+    canonChatLoading,
+    setCanonConversationNotes,
+    setCanonActiveTopic,
+    setCanonTopicAnswer,
+    setCanonAssistantMessage,
+    setCanonSuggestedQuestions,
+    resetCanonConversation,
+    applyGuidedCanonAnswer,
+  } = useCharacterCanonConversation();
   const [canonTab, setCanonTab] = useState<CanonTabId>("overview");
   const [canonDetailModal, setCanonDetailModal] = useState<{
     title: string;
@@ -289,13 +291,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     setCanonPromptPack(null);
     setCanonInstructions([]);
     setCanonOutputUrl("");
-    setCanonConversationNotes("");
-    setCanonActiveTopic("identity");
-    setCanonTopicAnswer("");
-    setCanonChatHistory([]);
-    setCanonAssistantMessage("");
-    setCanonSuggestedQuestions([]);
-    setCanonChatLoading(false);
+    resetCanonConversation();
     setCanonTab("overview");
     setCanonDetailModal(null);
     resetCanonImport();
@@ -427,144 +423,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       type: "success",
       text: "Canon proposal updated from the current character definition and conversation notes.",
     });
-  };
-
-  const mergeAiSectionUpdates = (
-    baseCanon: CharacterCanonRecord["canonJson"],
-    response: CharacterCanonChatResponse,
-  ): CharacterCanonRecord["canonJson"] => {
-    const updates = Array.isArray(response.sectionUpdates) ? response.sectionUpdates : [];
-    if (!updates.length) return baseCanon;
-    const sections = [...baseCanon.sections];
-    updates.forEach((update, index) => {
-      const key = update.key || `ai_update_${Date.now()}_${index}`;
-      const nextSection: CharacterCanonSection = {
-        ...update,
-        key,
-        label: update.label || topicLabel(canonActiveTopic),
-        status: normalizeSectionStatus(update.status),
-        summary: update.summary || "",
-        data: update.data && typeof update.data === "object" ? update.data : {},
-        sourceRefs: update.sourceRefs?.length ? update.sourceRefs : ["deepseek-canon-chat"],
-        providerTrace: update.providerTrace || response.providerTrace || null,
-      };
-      const existingIndex = sections.findIndex((section) => section.key === key);
-      if (existingIndex >= 0) {
-        sections[existingIndex] = nextSection;
-      } else {
-        sections.push(nextSection);
-      }
-    });
-    return {
-      ...baseCanon,
-      sections,
-      providerTrace: response.providerTrace || baseCanon.providerTrace,
-    };
-  };
-
-  const applyGuidedCanonAnswer = async () => {
-    if (!canonTopicAnswer.trim()) {
-      setDeepCanonMessage({ type: "error", text: "Write an answer before updating the canon proposal." });
-      return;
-    }
-    const compactedAnswer = compactLongOperatorAnswer(canonTopicAnswer);
-    const operatorMessage = [
-      `Topic: ${hasAnyCanon ? topicLabel(canonActiveTopic) : "Foundation"}`,
-      compactedAnswer.message,
-    ].join("\n\n");
-    setCanonChatLoading(true);
-    setDeepCanonMessage(null);
-    let deepSeekResponded = false;
-    let locallySavedCanon: CharacterCanonRecord | null = null;
-    const saveConversationProposal = async (proposal: CharacterCanonRecord["canonJson"], assistantMessage = "") => {
-      const markdown = buildCanonMarkdown(proposal.sections);
-      const result = await saveCharacterCanon({
-        avatar: proposal.avatar,
-        avatarType: proposal.avatarType,
-        displayName: proposal.displayName,
-        status: "operator-reviewed",
-        schemaVersion: "character-canon-v1",
-        canonJson: proposal,
-        canonMarkdown: markdown,
-        conversationSummary: [
-          canonConversationNotes.trim(),
-          `### ${topicLabel(canonActiveTopic)}`,
-          canonTopicAnswer.trim(),
-          assistantMessage ? `Assistant: ${assistantMessage}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
-        importSummary: "Autosaved from guided canon conversation.",
-      });
-      if (result.ok === false || !result.canon) {
-        throw new Error(result.message || result.reason || "Canon conversation could not be saved.");
-      }
-      setCanonProposal(result.canon.canonJson);
-      await loadCanons(proposal.avatar);
-      return result.canon;
-    };
-    try {
-      const operatorProposal = applyCanonTopicAnswer(visibleCanon, draft, canonActiveTopic, canonTopicAnswer);
-      locallySavedCanon = await saveConversationProposal(operatorProposal);
-      setDeepCanonMessage({
-        type: "success",
-        text: `Answer saved as canon proposal v${locallySavedCanon.canonVersion}. Analyzing with DeepSeek now...`,
-      });
-      const response = await chatCharacterCanon({
-        avatar: draft.avatar || slugify(draft.displayName),
-        avatarType: draft.avatarType,
-        displayName: draft.displayName,
-        currentCanon: locallySavedCanon.canonJson,
-        conversation: canonChatHistory,
-        operatorMessage,
-      });
-      deepSeekResponded = true;
-      const proposal = mergeAiSectionUpdates(locallySavedCanon.canonJson, response);
-      const savedCanon = await saveConversationProposal(proposal, response.assistantMessage || "");
-      setCanonAssistantMessage(response.assistantMessage || "");
-      setCanonSuggestedQuestions(response.suggestedQuestions ?? []);
-      setCanonChatHistory((prev) => [
-        ...prev,
-        { role: "operator", content: operatorMessage },
-        { role: "assistant", content: response.assistantMessage || "Updated canon proposal." },
-      ]);
-      setCanonConversationNotes((prev) =>
-        [
-          prev.trim(),
-          `### ${topicLabel(canonActiveTopic)}`,
-          canonTopicAnswer.trim(),
-          response.assistantMessage ? `Assistant: ${response.assistantMessage}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
-      );
-      setCanonTopicAnswer("");
-      setDeepCanonMessage({
-        type: "success",
-        text: compactedAnswer.isLong
-          ? `Long answer saved as canon proposal v${savedCanon.canonVersion}. DeepSeek received a compacted turn. Review before approval.`
-          : `DeepSeek responded and saved canon proposal v${savedCanon.canonVersion}. Review before approval.`,
-      });
-    } catch (err) {
-      const text = err instanceof Error ? err.message : "Character canon chat failed.";
-      if (locallySavedCanon) {
-        setDeepCanonMessage({
-          type: deepSeekResponded ? "error" : "success",
-          text: deepSeekResponded
-            ? `DeepSeek responded, but the AI-updated proposal could not be saved. Your operator answer remains saved as proposal v${locallySavedCanon.canonVersion}. Error: ${text}`
-            : `Your answer is saved as canon proposal v${locallySavedCanon.canonVersion}. DeepSeek analysis did not complete yet: ${text}`,
-        });
-      } else {
-        const proposal = applyCanonTopicAnswer(visibleCanon, draft, canonActiveTopic, canonTopicAnswer);
-        setCanonProposal(proposal);
-        setDeepCanonMessage({
-          type: "error",
-          text: `Autosave failed before DeepSeek analysis. Your answer is only on this screen: ${text}`,
-        });
-      }
-    } finally {
-      setCanonChatLoading(false);
-    }
   };
 
   const saveApprovedDeepCanon = async () => {
@@ -921,7 +779,18 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                   canonTopicAnswer={canonTopicAnswer}
                   setCanonTopicAnswer={setCanonTopicAnswer}
                   canonChatLoading={canonChatLoading}
-                  onApplyGuidedAnswer={() => void applyGuidedCanonAnswer()}
+                  onApplyGuidedAnswer={() =>
+                    void applyGuidedCanonAnswer({
+                      draft,
+                      visibleCanon,
+                      hasAnyCanon,
+                      conversationNotes: canonConversationNotes,
+                      onConversationNotesChange: setCanonConversationNotes,
+                      onMessage: setDeepCanonMessage,
+                      onProposal: setCanonProposal,
+                      onSaved: loadCanons,
+                    })
+                  }
                 />
               )}
 
