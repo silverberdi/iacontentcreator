@@ -23,6 +23,11 @@ POST /comfy/publication-status
 POST /comfy/download-output
 POST /comfy/prepare-reference
 POST /publication-image-qa
+GET /provider-routing
+POST /character-canon/chat
+POST /character-canon/consolidate
+POST /character-canon/import-extract
+POST /character-canon/conflicts
 ```
 
 `POST /publication-brief` expects publication job context and returns:
@@ -67,6 +72,16 @@ PORT=8095
 DEEPSEEK_API_KEY=...
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_BASE_URL=https://api.deepseek.com
+CHARACTER_CANON_PROVIDER=deepseek
+CHARACTER_CANON_MODEL=deepseek-chat
+CREATIVE_CANON_PROVIDER=deepseek
+CREATIVE_CANON_MODEL=deepseek-chat
+STRUCTURED_CANON_PROVIDER=deepseek
+STRUCTURED_CANON_MODEL=deepseek-chat
+CANON_IMPORT_PROVIDER=deepseek
+CANON_IMPORT_MODEL=deepseek-chat
+CANON_CONFLICT_PROVIDER=deepseek
+CANON_CONFLICT_MODEL=deepseek-chat
 COMFY_CLOUD_API_KEY=...
 COMFY_CLOUD_BASE_URL=https://cloud.comfy.org
 COMFY_CLOUD_API_PREFIX=/api
@@ -118,3 +133,16 @@ Local visual QA is meant to catch obvious anatomy defects, not subtle identity d
 The older `SILVERMAN_COMFYUI_*` variable names are still accepted as compatibility aliases, but new deployments should use `COMFY_CLOUD_*`.
 
 `COMFY_CLOUD_ENABLE_FACE_DETAILER` is disabled by default because some Comfy Cloud environments do not provide the `sam_hq_vit_l.pth` model required by the exported `FaceDetailer` branch.
+
+## Character Canon Provider Routing
+
+Character canon workflows are routed by task. The first implementation uses DeepSeek for every task, but the API keeps task-level routing explicit so future providers can be swapped without changing the canon schema.
+
+```text
+creativeCanon    -> character-canon/chat
+structuredCanon  -> character-canon/consolidate
+canonImport      -> character-canon/import-extract
+canonConflict    -> character-canon/conflicts
+```
+
+Each response includes `providerTrace` with task, provider, model, prompt profile, timestamp, latency, fallback status, and error summary when applicable. Store that trace with canon versions, canon sections, or import records when n8n persists AI-assisted changes.

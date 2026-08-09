@@ -174,6 +174,18 @@ export type PublicationPromptPack = {
   visualAvoidRules: string[];
   referenceImages: PublicationReferenceImage[];
   suggestedFormat: PublicationFormat | string;
+  characterSceneDirective?: {
+    canonUsed?: boolean;
+    identityLock?: string;
+    emotionalMagnetism?: string;
+    sceneBehavior?: string;
+    bodyRealism?: string;
+    wardrobeAndStyling?: string;
+    mustPreserve?: string[];
+    mustAvoid?: string[];
+    whyThisIsNotGeneric?: string;
+    [key: string]: unknown;
+  };
   comfyHints?: {
     aspectRatio?: string;
     outputIntent?: string;

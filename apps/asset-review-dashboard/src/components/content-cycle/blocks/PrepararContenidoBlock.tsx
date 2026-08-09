@@ -6,7 +6,7 @@ import {
   buildComfyPositivePrompt,
   formatAllowedMood,
 } from "../../../utils/contentCycleFlow";
-import type { SceneBriefData } from "../../../types/contentCycle";
+import type { PromptPackData, SceneBriefData } from "../../../types/contentCycle";
 import ActionButton from "../ActionButton";
 import ComfyPromptDetails from "../ComfyPromptDetails";
 
@@ -17,6 +17,7 @@ type PrepararContenidoBlockProps = {
   positivePrompt: string;
   negativePrompt: string;
   referenceImages: string[];
+  characterSceneDirective?: PromptPackData["characterSceneDirective"];
   jobId: string | null;
   showTechnical: boolean;
   loading: boolean;
@@ -31,6 +32,7 @@ export default function PrepararContenidoBlock({
   positivePrompt,
   negativePrompt,
   referenceImages,
+  characterSceneDirective,
   jobId,
   showTechnical,
   loading,
@@ -97,6 +99,63 @@ export default function PrepararContenidoBlock({
               <dd className="mt-1 text-sm text-emerald-200">Job creado</dd>
             </div>
           </dl>
+
+          {characterSceneDirective && (
+            <div className="mt-4 rounded-md border border-blue-900/60 bg-blue-950/25 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">
+                  Canon aplicado a la escena
+                </p>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                    characterSceneDirective.canonUsed
+                      ? "bg-emerald-950/70 text-emerald-200"
+                      : "bg-amber-950/70 text-amber-200"
+                  }`}
+                >
+                  {characterSceneDirective.canonUsed ? "Canon usado" : "Sin canon aprobado"}
+                </span>
+              </div>
+              <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                {characterSceneDirective.identityLock && (
+                  <div>
+                    <dt className="text-xs text-blue-100/60">Identidad</dt>
+                    <dd className="mt-1 text-sm text-blue-50">{characterSceneDirective.identityLock}</dd>
+                  </div>
+                )}
+                {characterSceneDirective.emotionalMagnetism && (
+                  <div>
+                    <dt className="text-xs text-blue-100/60">Magnetismo</dt>
+                    <dd className="mt-1 text-sm text-blue-50">
+                      {characterSceneDirective.emotionalMagnetism}
+                    </dd>
+                  </div>
+                )}
+                {characterSceneDirective.sceneBehavior && (
+                  <div>
+                    <dt className="text-xs text-blue-100/60">Cómo habita la escena</dt>
+                    <dd className="mt-1 text-sm text-blue-50">
+                      {characterSceneDirective.sceneBehavior}
+                    </dd>
+                  </div>
+                )}
+                {characterSceneDirective.bodyRealism && (
+                  <div>
+                    <dt className="text-xs text-blue-100/60">Realismo corporal</dt>
+                    <dd className="mt-1 text-sm text-blue-50">
+                      {characterSceneDirective.bodyRealism}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              {Array.isArray(characterSceneDirective.mustAvoid) &&
+                characterSceneDirective.mustAvoid.length > 0 && (
+                  <p className="mt-3 text-xs text-blue-100/70">
+                    Evitar: {characterSceneDirective.mustAvoid.join(", ")}
+                  </p>
+                )}
+            </div>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-2">
             {comfyPack && (

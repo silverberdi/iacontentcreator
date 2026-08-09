@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { listReviewCandidates, rejectAsset } from "../api/assetReviewApi";
+import { registerCharacterReference } from "../api/charactersApi";
 import {
   generatePublicationImages,
   loadPublicationJobsSummary,
@@ -290,6 +291,34 @@ export default function UnifiedReviewInboxPanel({
       await loadAssetCandidates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Asset could not be rejected.");
+    } finally {
+      setActionPendingId(null);
+    }
+  }
+
+  async function useAssetAsSceneCanon(asset: AssetCandidate) {
+    setActionPendingId(asset.assetId);
+    setActionMessage(null);
+    try {
+      const notes =
+        reviewNotes[asset.assetId] ||
+        `Approved as ${optionLabel(catalogOptions.avatars, asset.avatar)} / ${optionLabel(catalogOptions.scenes, asset.scene)} scene canon from Asset Review.`;
+      const result = await registerCharacterReference({
+        avatar: asset.avatar,
+        scene: asset.scene,
+        classification: "scene-canon",
+        objectPathOrUrl: `/minio/${asset.bucket}/${asset.objectPath}`,
+        reviewNotes: notes,
+      });
+      if (result.ok === false || !result.reference) {
+        throw new Error(result.message || result.reason || "Scene canon could not be saved.");
+      }
+      setActionMessage(
+        `Saved as scene canon for ${optionLabel(catalogOptions.avatars, asset.avatar)} / ${optionLabel(catalogOptions.scenes, asset.scene)}.`,
+      );
+      await loadAssetCandidates();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Scene canon could not be saved.");
     } finally {
       setActionPendingId(null);
     }
@@ -621,7 +650,7 @@ export default function UnifiedReviewInboxPanel({
                         {optionLabel(catalogOptions.scenes, asset.scene)}
                       </h3>
                       <p className="mt-1 text-sm text-gray-400">
-                        Decide whether this generated asset should remain available as a possible reference candidate.
+                        Decide whether this image should teach future generations how this character looks in this scene.
                       </p>
                     </div>
 
@@ -670,17 +699,20 @@ export default function UnifiedReviewInboxPanel({
                     <div className="mt-auto flex flex-wrap gap-2">
                       <button
                         type="button"
+                        onClick={() => void useAssetAsSceneCanon(asset)}
+                        disabled={actionPendingId === asset.assetId}
+                        className="rounded-md bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                      >
+                        {actionPendingId === asset.assetId ? "Saving..." : "Use as scene canon"}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void rejectAssetCandidate(asset)}
                         disabled={actionPendingId === asset.assetId}
                         className="rounded-md border border-red-900 bg-red-950 px-3 py-2 text-xs font-medium text-red-100 hover:border-red-600 disabled:opacity-50"
                       >
-                        {actionPendingId === asset.assetId ? "Rejecting..." : "Reject as reference candidate"}
+                        {actionPendingId === asset.assetId ? "Rejecting..." : "Reject reference"}
                       </button>
-                      {technicalMode && (
-                        <span className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-xs text-gray-400">
-                          Promote/select remains in technical grid
-                        </span>
-                      )}
                     </div>
 
                     {technicalMode && (

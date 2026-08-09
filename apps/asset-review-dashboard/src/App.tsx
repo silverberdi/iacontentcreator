@@ -210,7 +210,7 @@ export default function App({ currentUser }: AppProps) {
       case "characters":
         return "Characters";
       case "content-cycle":
-        return "Content Cycle";
+        return "Content Lab";
       case "ops":
         return "Ops / Admin";
       default:

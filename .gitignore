@@ -2,6 +2,7 @@
 ._*
 infra/snapshots/
 infra/snapshoots/
+backups/
 ESTRUCTURA.md
 apps/asset-review-dashboard/.env.example
 __pycache__/

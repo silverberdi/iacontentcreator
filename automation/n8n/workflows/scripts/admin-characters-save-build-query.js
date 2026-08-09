@@ -48,7 +48,7 @@ const status = allowedStatuses.has(String(body.status)) ? String(body.status) : 
 const notes = String(body.notes || '').trim();
 
 if (!avatar || !avatarShort || !displayName) {
-  return [{ json: { query: "SELECT false AS ok, 'displayName, avatar, and avatarShort are required' AS error;" } }];
+  return { json: { query: "SELECT false AS ok, 'displayName, avatar, and avatarShort are required' AS error;" } };
 }
 
 const query = `
@@ -113,12 +113,13 @@ WITH saved AS (
     updated_at = now()
   RETURNING *
 ), scene_rows AS (
-  SELECT saved.avatar, item->>'scene' AS scene, item->>'displayName' AS display_name, COALESCE(item->>'description', '') AS description
+  SELECT item->>'scene' AS scene, item->>'displayName' AS display_name, COALESCE(item->>'description', '') AS description
   FROM saved, jsonb_array_elements(saved.scenes) AS item
 ), scene_upsert AS (
-  INSERT INTO scene_catalog (avatar, scene, display_name, description, is_enabled, is_active)
-  SELECT avatar, scene, display_name, description, true, true FROM scene_rows
-  ON CONFLICT (avatar, scene) DO UPDATE SET
+  INSERT INTO scene_catalog (scene, display_name, description, is_enabled, is_active, avatar)
+  SELECT scene, display_name, description, true, true, NULL FROM scene_rows
+  ON CONFLICT (scene) DO UPDATE SET
+    avatar = NULL,
     display_name = EXCLUDED.display_name,
     description = EXCLUDED.description,
     is_enabled = true,
@@ -157,4 +158,4 @@ SELECT true AS ok,
 FROM saved;
 `;
 
-return [{ json: { query } }];
+return { json: { query } };

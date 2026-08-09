@@ -15,7 +15,6 @@ import type {
   SceneCatalogItem,
   WorkflowCatalogItem,
 } from "../types/catalogs";
-import { DEFAULT_SCENE_AVATAR } from "../types/catalogs";
 
 const EMPTY_OPTIONS: CatalogOptionsBundle = {
   avatars: [],
@@ -114,8 +113,7 @@ export function normalizeSceneListItem(raw: unknown): SceneCatalogItem {
 }
 
 export function sceneRowKey(item: SceneCatalogItem): string {
-  const avatar = readSceneAvatarFromRecord(item) ?? "";
-  return `${avatar}:${item.scene}`;
+  return item.scene;
 }
 
 function normalizeSceneOptions(
@@ -141,19 +139,20 @@ export function sceneAvatarPersisted(item: SceneCatalogItem): string | null {
   return readSceneAvatarFromRecord(item);
 }
 
-/** Default avatar for forms only (legacy row repair), not for pretending DB has a value. */
-export function sceneAvatarForForm(item: SceneCatalogItem): string {
-  return sceneAvatarPersisted(item) ?? DEFAULT_SCENE_AVATAR;
-}
-
 export function scenesForAvatar(
   scenes: CatalogSelectOption[],
   avatar: string,
 ): CatalogSelectOption[] {
-  if (!avatar.trim()) return scenes;
-  const withAvatar = scenes.filter((s) => s.avatar === avatar);
-  if (withAvatar.length > 0) return withAvatar;
-  return scenes;
+  const scopedScenes = avatar.trim()
+    ? scenes.filter((scene) => !scene.avatar || scene.avatar === avatar)
+    : scenes;
+  const deduped = new Map<string, CatalogSelectOption>();
+  for (const scene of scopedScenes) {
+    if (!deduped.has(scene.value) || scene.avatar === avatar) {
+      deduped.set(scene.value, scene);
+    }
+  }
+  return [...deduped.values()];
 }
 
 function normalizeSlugOptions(
@@ -229,7 +228,6 @@ export function staticFallbackOptions(): CatalogOptionsBundle {
     scenes: staticScenes.map((s) => ({
       value: s.id,
       label: s.label,
-      avatar: DEFAULT_SCENE_AVATAR,
     })),
     assetTypes: staticAssetTypes.map((t) => ({ value: t.id, label: t.label })),
     workflows: [{ value: "flux-krea-dev", label: "flux-krea-dev" }],

@@ -23,6 +23,18 @@ export type PromptPackData = {
   positivePrompt?: string;
   negativePrompt?: string;
   referenceImages?: string[];
+  characterSceneDirective?: {
+    canonUsed?: boolean;
+    identityLock?: string;
+    emotionalMagnetism?: string;
+    sceneBehavior?: string;
+    bodyRealism?: string;
+    wardrobeAndStyling?: string;
+    mustPreserve?: string[];
+    mustAvoid?: string[];
+    whyThisIsNotGeneric?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 };
 

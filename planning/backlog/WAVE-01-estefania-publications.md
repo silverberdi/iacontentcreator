@@ -2379,7 +2379,7 @@ As an operator, I want to generate canon portrait candidates, so that I can esta
 
 ## US-052 — Scene Pack Generation
 
-Status: Backlog
+Status: In Progress
 Priority: P0
 Epic: EPIC-11 Character Scale And Identity
 Wave: Wave 3 Character Onboarding
@@ -2481,3 +2481,185 @@ As an operator or admin, I want the system to recommend LoRA training only when 
 - [ ] Trained LoRA metadata can be registered back to the character.
 - [ ] Comfy generation can use the registered LoRA when available.
 - [ ] Training provider remains pluggable and separate from Comfy Cloud inference.
+
+---
+
+## US-057 — Conversational Character Canon Builder
+
+Status: Backlog
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator, I want to build a deep character canon through a guided conversation with AI, so that creating a new avatar feels like collaborative character development instead of filling technical forms or writing many manual documents.
+
+### Product Context
+
+The current onboarding wizard is useful as a technical foundation, but it compresses the character into a small set of fields such as objective, pillars, tone, limits, scenes, and visual strategy. That is not enough to recreate the depth we built manually for Estefania, Didi/Diana, Andres, or Donovan.
+
+The operator should be able to speak naturally about the character, disagree with AI proposals, add nuance, and iteratively shape the persona. The system should then consolidate that conversation into a structured, versioned canon stored in the database.
+
+### Acceptance Criteria
+
+- [ ] Operator can start a character-canon conversation from the Characters onboarding flow.
+- [ ] AI asks guided, non-technical questions based on avatar type: `influencer`, `gfe-bfe`, or `authority`.
+- [ ] Operator can answer in natural language, ask for changes, reject proposals, and refine sections.
+- [ ] Canon is stored in DB as structured `jsonb`, not as loose filesystem documents.
+- [ ] A human-readable Markdown rendering can be generated from the JSON and stored in DB as text for review, audit, or prompt context.
+- [ ] Canon versions are preserved, with status such as `draft`, `proposed`, `operator-reviewed`, `approved`, and `superseded`.
+- [ ] Operator can review canon by human sections: identity, psychology, appearance, voice, boundaries, visual DNA, wardrobe, scenes, content strategy, safety policy, anti-patterns, and type-specific extensions.
+- [ ] Operator can approve individual sections or request revision before approving the full canon.
+- [ ] GFE/BFE canon builder includes explicit controls for intimacy, sensuality, nudity policy, relationship framing, emotional dependency risk, platform boundaries, and premium/public separation.
+- [ ] Influencer canon builder includes brand affinity, commercial positioning, lifestyle territories, platform behavior, sponsorship limits, and public identity rules.
+- [ ] Authority canon builder includes expertise domain, credibility posture, claim boundaries, citation expectations, professional visual language, and trust-building content patterns.
+- [ ] Character readiness checks use the approved canon JSON, not only the compressed onboarding fields.
+- [ ] Prompt-pack generation can consume approved canon sections as context without requiring operators to edit JSON or Markdown.
+- [ ] Standard UI remains non-technical; raw JSON, schema version, and prompt/debug payloads are visible only in technical mode.
+
+### Technical Tasks
+
+- [ ] Design `character_canon_versions` or equivalent table with `avatar`, `canon_version`, `schema_version`, `status`, `canon_json jsonb`, `canon_markdown text`, `conversation_summary`, approval metadata, and timestamps.
+- [ ] Define a flexible base canon JSON shape with type-specific extension sections.
+- [ ] Add canon schema/readiness validation by avatar type without requiring hard migrations for every new section.
+- [ ] Add AI endpoint/workflow for conversational canon development.
+- [ ] Store conversation turns or summaries in DB for audit and iterative refinement.
+- [ ] Add UI for conversation, proposed canon sections, section approval, and revision requests.
+- [ ] Add renderer from canonical JSON to human-readable Markdown text stored in DB.
+- [ ] Wire approved canon into character onboarding readiness.
+- [ ] Wire approved canon into brief and prompt-pack context loading.
+- [ ] Add migration/backfill path for existing Estefania, Didi/Diana, Andres, and Donovan records when US-058 imports their existing documents.
+
+### Dependencies
+
+- US-046.
+- US-048.
+- US-049.
+
+### Notes
+
+- Database is the source of truth. Markdown files are not part of normal operation.
+- Markdown is allowed as a representation format only when stored in DB or exported intentionally.
+- MinIO remains the place for binary assets, reference images, datasets, and optional export snapshots.
+- The JSON canon must be extensible: future character-specific sections should be possible without breaking existing characters.
+- First implementation slice on 2026-07-30: added DB-backed canon versions, Characters UI `Canon` step, approved canon loading, local proposal builder, and prompt-pack context injection from approved canon. Full AI conversational turn handling remains pending.
+
+---
+
+## US-058 — Existing Markdown Canon Import To Database
+
+Status: In Progress
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator or admin, I want to import existing character Markdown canon documents into the database, so that characters already developed manually can be converted into structured, versioned canon without keeping loose files as the operational source of truth.
+
+### Product Context
+
+Several characters already have deep canon written across many Markdown files. Those documents contain important identity, psychology, appearance, voice, visual DNA, boundaries, scenes, and content rules. We need a safe migration path that preserves that work while moving the live system to DB-backed canon.
+
+This import should not simply concatenate files. AI should help classify, normalize, deduplicate, and convert the documents into `canon_json`, with a human-readable Markdown rendering stored in DB.
+
+### Acceptance Criteria
+
+- [ ] Admin can select an existing character folder or provide Markdown content for import.
+- [ ] System inventories source documents and shows what will be imported before writing to DB.
+- [ ] AI extracts structured canon sections from Markdown into `canon_json`.
+- [ ] Imported canon preserves source traceability: source filename/path, section mapping, import timestamp, and confidence/notes.
+- [ ] System detects duplicate, conflicting, or ambiguous statements and surfaces them for operator review.
+- [ ] Admin can preview imported JSON sections in human language before approving the import.
+- [ ] Imported canon creates a new DB canon version with status `proposed-import` or equivalent.
+- [ ] Operator can revise and approve the imported canon through the same flow as US-057.
+- [ ] Generated Markdown rendering is stored in DB as `canon_markdown` for readability and audit.
+- [ ] Existing Markdown files are treated as historical inputs only after import, not as live source of truth.
+- [ ] Import supports at least Estefania, Didi/Diana, Andres, and Donovan document structures.
+- [ ] Import can be rerun safely without overwriting an approved canon unless explicitly creating a new version.
+
+### Technical Tasks
+
+- [ ] Build markdown source inventory for local character folders.
+- [ ] Define import manifest format stored in DB, including source files, hashes, section mapping, and import status.
+- [ ] Add AI extraction workflow that maps Markdown content into the canonical JSON shape.
+- [ ] Add conflict detection for repeated or incompatible claims.
+- [ ] Add DB tables or fields for `character_canon_imports`, source traceability, and imported canon versions.
+- [ ] Add UI for import preview, conflict review, approval, and rollback/supersede behavior.
+- [ ] Add safe idempotency rules using file hashes and target avatar.
+- [ ] Add migration runbook for moving current character `.md` canon into DB.
+- [ ] Add tests or fixtures for at least one influencer, one GFE/BFE, and one authority import.
+
+### Dependencies
+
+- US-057.
+
+### Notes
+
+- This US exists specifically because the deep manual character work must not be lost or flattened into a few textareas.
+- The goal is to retire loose files as operational truth, not to discard their content.
+- Filesystem Markdown can remain as historical repository material, but production character canon should be DB-backed and versioned.
+- First implementation slice on 2026-07-30: migrated Estefania only into `character_canon_versions` as approved `character-canon-v1`, preserving 19 Markdown source documents as structured JSON sections plus DB-stored Markdown rendering. Didi/Diana intentionally not migrated yet for operator validation.
+
+---
+
+## US-059 — AI Provider Routing For Character Canon Workflows
+
+Status: In Progress
+Priority: P0
+Epic: EPIC-11 Character Scale And Identity
+Wave: Wave 3 Character Onboarding
+
+### User Story
+
+As an operator or admin, I want character canon workflows to choose or switch AI providers by task, so that creative conversation, structured extraction, contradiction detection, prompt generation, and QA are not permanently tied to a single provider such as DeepSeek.
+
+### Product Context
+
+Character creation is not one generic AI task. Some steps benefit from a conversational/creative model, others from strict JSON discipline, others from analytical comparison, and others from low-cost fast classification. The system should start with the provider currently available, but its architecture must allow provider switching without rewriting the character onboarding flow.
+
+Standard operators should not need to understand model names. Admin/technical mode should expose which provider was used, why it was selected, and whether fallback occurred.
+
+### Acceptance Criteria
+
+- [ ] Canon conversation can use a configurable `creativeCanonProvider`.
+- [ ] Canon consolidation can use a configurable `structuredCanonProvider`.
+- [ ] Markdown import extraction can use a configurable `canonImportProvider`.
+- [ ] Conflict/contradiction detection can use a configurable `canonConflictProvider`.
+- [ ] Prompt-pack generation can continue using its own configurable provider without being forced to match canon providers.
+- [ ] Visual QA remains independently configurable and can stay local or provider-based.
+- [ ] Admin can set provider mode per task: `auto`, explicit provider/model, or disabled where applicable.
+- [ ] Standard UI uses human labels such as `Auto`, `Creative`, `Structured`, and `Review`; raw provider/model details remain in technical mode.
+- [ ] Every AI-assisted canon operation stores provider trace metadata in DB.
+- [ ] Provider trace includes task name, provider, model, prompt/profile version, timestamp, fallback status, latency when available, and error summary when applicable.
+- [ ] If a selected provider fails, configured fallback behavior is explicit: retry, fallback provider, or require human action.
+- [ ] Canon versions record which provider produced or modified each section.
+- [ ] Operator can see when a canon section was AI-generated, imported, manually edited, or approved by a human.
+- [ ] DeepSeek remains supported but is not hardcoded as the only path.
+
+### Technical Tasks
+
+- [ ] Extend `ai-gateway` with task-level routing keys for character canon workflows.
+- [ ] Define provider config keys for `creativeCanonProvider`, `structuredCanonProvider`, `canonImportProvider`, `canonConflictProvider`, and existing prompt/QA providers.
+- [ ] Add DB fields or JSON metadata for provider traces on `character_canon_versions`, canon sections, import records, and conversation turns.
+- [ ] Add n8n workflow payload conventions for provider routing and provider trace pass-through.
+- [ ] Add technical-mode UI for viewing and selecting provider routing per canon task.
+- [ ] Add safe defaults using current available provider(s), initially DeepSeek where no better provider is configured.
+- [ ] Add fallback policy support: no fallback, fallback-to-auto, fallback-to-specific-provider, or human-review-required.
+- [ ] Add provider trace display in canon version history.
+- [ ] Add tests or fixtures proving that changing provider config does not require changing character canon schema.
+
+### Dependencies
+
+- US-057.
+- US-058.
+- US-002A.
+- US-002C.
+
+### Notes
+
+- This is a product and architecture guardrail: canon workflows must remain model/provider portable.
+- The operator experience should feel like talking to the studio, not choosing infrastructure.
+- Provider switching must not compromise auditability; every AI contribution needs traceability.
+- First implementation slice on 2026-07-30: `ai-gateway` exposes task-level character canon routes with DeepSeek defaults for creative conversation, structured consolidation, Markdown import extraction, and conflict detection. `GET /provider-routing` shows active routing; responses include `providerTrace`.

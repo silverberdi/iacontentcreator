@@ -7,6 +7,66 @@ export type CharacterOnboardingStatus =
 
 export type CharacterAvatarType = "influencer" | "gfe-bfe" | "authority";
 
+export type CharacterCanonStatus =
+  | "draft"
+  | "proposed"
+  | "proposed-import"
+  | "operator-reviewed"
+  | "approved"
+  | "superseded";
+
+export type CharacterCanonSectionStatus = "missing" | "draft" | "review-needed" | "approved";
+
+export type AiProviderTrace = {
+  task: string;
+  provider: string;
+  model: string;
+  promptProfile?: string;
+  timestamp?: string;
+  fallbackUsed?: boolean;
+  status?: string;
+  latencyMs?: number | null;
+  errorSummary?: string | null;
+};
+
+export type CharacterCanonSection = {
+  key: string;
+  label: string;
+  status: CharacterCanonSectionStatus;
+  summary: string;
+  data: Record<string, unknown>;
+  sourceRefs?: string[];
+  providerTrace?: AiProviderTrace | null;
+};
+
+export type CharacterCanonRecord = {
+  id?: string;
+  avatar: string;
+  canonVersion: number;
+  schemaVersion: string;
+  status: CharacterCanonStatus;
+  canonJson: {
+    avatar: string;
+    avatarType: CharacterAvatarType;
+    displayName: string;
+    sections: CharacterCanonSection[];
+    extensions?: Record<string, unknown>;
+    providerTrace?: AiProviderTrace | null;
+    source?: {
+      kind: "conversation" | "markdown-import" | "manual";
+      importedFrom?: string[];
+      importedAt?: string;
+    };
+  };
+  canonMarkdown: string;
+  conversationSummary?: string;
+  importSummary?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type ReferencePolicy = {
   identityCanon: boolean;
   sceneCanon: boolean;
@@ -62,8 +122,10 @@ export type CharacterOnboardingRecord = {
     profileComplete: boolean;
     hasScenes: boolean;
     hasReferencePlan: boolean;
+    hasApprovedCanon?: boolean;
     readyForPublication: boolean;
   };
+  approvedCanon?: CharacterCanonRecord | null;
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -84,6 +146,58 @@ export type CharacterOnboardingSavePayload = Omit<
 export type CharacterOnboardingSaveResponse = {
   ok?: boolean;
   character?: CharacterOnboardingRecord;
+  message?: string;
+  reason?: string;
+};
+
+export type CharacterCanonListPayload = {
+  avatar: string;
+};
+
+export type CharacterCanonListResponse = {
+  ok?: boolean;
+  canons?: CharacterCanonRecord[];
+  approvedCanon?: CharacterCanonRecord | null;
+  message?: string;
+  reason?: string;
+};
+
+export type CharacterCanonSavePayload = {
+  avatar: string;
+  avatarType: CharacterAvatarType;
+  displayName: string;
+  status: CharacterCanonStatus;
+  schemaVersion?: string;
+  canonJson: CharacterCanonRecord["canonJson"];
+  canonMarkdown: string;
+  conversationSummary?: string;
+  importSummary?: string;
+};
+
+export type CharacterCanonSaveResponse = {
+  ok?: boolean;
+  canon?: CharacterCanonRecord;
+  message?: string;
+  reason?: string;
+};
+
+export type CharacterCanonChatPayload = {
+  avatar: string;
+  avatarType: CharacterAvatarType;
+  displayName: string;
+  currentCanon?: CharacterCanonRecord["canonJson"] | null;
+  conversation?: Array<{ role: "operator" | "assistant"; content: string }>;
+  operatorMessage: string;
+};
+
+export type CharacterCanonChatResponse = {
+  ok?: boolean;
+  assistantMessage?: string;
+  suggestedQuestions?: string[];
+  extractedSignals?: Record<string, unknown>;
+  sectionUpdates?: CharacterCanonSection[];
+  providerTrace?: AiProviderTrace;
+  error?: string;
   message?: string;
   reason?: string;
 };
@@ -121,6 +235,24 @@ export type CharacterReferenceRegisterResponse = {
   reason?: string;
 };
 
+export type CharacterReferenceUploadResponse = {
+  ok?: boolean;
+  upload?: {
+    bucket: string;
+    objectPath: string;
+    publicUrl: string;
+    sha256: string;
+    byteLength: number;
+    mimeType: string;
+    sourceFilename?: string;
+    classification?: string;
+    scene?: string;
+  };
+  error?: string;
+  message?: string;
+  reason?: string;
+};
+
 export type CharacterCanonPortraitJob = {
   jobId?: string;
   avatar?: string;
@@ -151,6 +283,7 @@ export type CharacterCanonPortraitQueuePayload = {
   brandFit: string[];
   publishingLimits: string[];
   reviewTriggers: string[];
+  approvedCanon?: CharacterCanonRecord | null;
   notes?: string;
 };
 

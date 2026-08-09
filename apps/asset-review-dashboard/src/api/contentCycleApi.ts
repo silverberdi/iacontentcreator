@@ -59,6 +59,10 @@ function parsePromptPack(data: unknown): PromptPackData {
     positivePrompt: pickString(nested.positivePrompt ?? record.positivePrompt),
     negativePrompt: pickString(nested.negativePrompt ?? record.negativePrompt),
     referenceImages: pickStringArray(nested.referenceImages ?? record.referenceImages),
+    characterSceneDirective:
+      nested.characterSceneDirective && typeof nested.characterSceneDirective === "object"
+        ? (nested.characterSceneDirective as PromptPackData["characterSceneDirective"])
+        : undefined,
   };
 }
 

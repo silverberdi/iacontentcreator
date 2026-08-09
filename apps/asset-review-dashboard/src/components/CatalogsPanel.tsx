@@ -16,13 +16,9 @@ import type {
   WorkflowCatalogItem,
 } from "../types/catalogs";
 import { WORKFLOW_CATALOG, MODEL_CATALOG } from "../data/catalogTerminology";
-import { CATALOG_KINDS, DEFAULT_DISABLE_REASON, DEFAULT_SCENE_AVATAR } from "../types/catalogs";
+import { CATALOG_KINDS, DEFAULT_DISABLE_REASON } from "../types/catalogs";
 import { formatDate } from "../utils/format";
-import {
-  normalizeCatalogList,
-  sceneAvatarPersisted,
-  sceneRowKey,
-} from "../utils/catalogNormalize";
+import { normalizeCatalogList, sceneRowKey } from "../utils/catalogNormalize";
 import {
   DEFAULT_PAGE_SIZE,
   matchesSearch,
@@ -43,13 +39,12 @@ type DisableTarget = {
   catalog: CatalogKind;
   slug: string;
   displayName: string;
-  /** Required for scene_catalog composite key */
   avatar?: string;
 };
 
 const emptyDrafts = (): Record<CatalogKind, Record<string, string>> => ({
   avatars: { avatar: "", avatarShort: "", avatarKind: "", displayName: "", description: "" },
-  scenes: { avatar: DEFAULT_SCENE_AVATAR, scene: "", displayName: "", description: "" },
+  scenes: { scene: "", displayName: "", description: "" },
   assetTypes: { assetType: "", displayName: "", description: "" },
   workflows: { workflow: "", displayName: "", description: "" },
   models: { model: "", provider: "", displayName: "", description: "" },
@@ -155,7 +150,6 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
     setDrafts((prev) => ({
       ...prev,
       scenes: {
-        avatar: sceneAvatarPersisted(item) ?? "",
         scene: item.scene,
         displayName: item.displayName ?? "",
         description: item.description ?? "",
@@ -243,13 +237,11 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
         }
         case "scenes": {
           const d = drafts.scenes;
-          if (!d.avatar.trim()) throw new Error("Avatar is required");
           if (!d.scene.trim()) throw new Error("Scene slug is required");
           if (!d.displayName.trim()) throw new Error("displayName is required");
           payload = {
             catalog: "scenes",
             catalogType: "scenes",
-            avatar: d.avatar.trim(),
             scene: d.scene.trim(),
             displayName: d.displayName.trim(),
             description: d.description.trim() || undefined,
@@ -311,7 +303,7 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
 
       setSuccess(`Saved ${activeKind} item "${slug}".`);
       if (activeKind === "scenes" && payload.catalog === "scenes") {
-        setEditingKey(`${payload.avatar}:${payload.scene}`);
+        setEditingKey(payload.scene);
       } else {
         setEditingKey(slug);
       }
@@ -329,7 +321,6 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
     catalog: CatalogKind,
     slug: string,
     isEnabled: boolean,
-    sceneAvatar?: string,
   ) => {
     setStatusPending(`${catalog}:${slug}`);
     setError(null);
@@ -341,7 +332,6 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
       ...(catalog === "avatars" && { avatar: slug }),
       ...(catalog === "scenes" && {
         scene: slug,
-        avatar: sceneAvatar?.trim() || DEFAULT_SCENE_AVATAR,
       }),
       ...(catalog === "assetTypes" && { assetType: slug }),
       ...(catalog === "workflows" && { workflow: slug }),
@@ -382,7 +372,6 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
         ...(disableTarget.catalog === "avatars" && { avatar: disableTarget.slug }),
         ...(disableTarget.catalog === "scenes" && {
           scene: disableTarget.slug,
-          avatar: disableTarget.avatar ?? DEFAULT_SCENE_AVATAR,
         }),
         ...(disableTarget.catalog === "assetTypes" && { assetType: disableTarget.slug }),
         ...(disableTarget.catalog === "workflows" && { workflow: disableTarget.slug }),
@@ -437,7 +426,7 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
       }
       if (activeKind === "scenes" && "scene" in item) {
         const row = item as SceneCatalogItem;
-        return matchesSearch([row.scene, sceneAvatarPersisted(row), row.avatar, ...base], q);
+        return matchesSearch([row.scene, ...base], q);
       }
       if (activeKind === "assetTypes" && "assetType" in item) {
         return matchesSearch([(item as AssetTypeCatalogItem).assetType, ...base], q);
@@ -456,7 +445,6 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
   const tablePageCount = totalPages(filteredItems.length, tablePageSize);
   const safeTablePage = Math.min(tablePage, tablePageCount);
   const pagedItems = paginateArray(filteredItems, safeTablePage, tablePageSize);
-  const scenesMissingAvatar = list.scenes.filter((s) => !sceneAvatarPersisted(s)).length;
 
   const renderTable = () => {
     if (activeKind === "avatars") {
@@ -510,7 +498,6 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
         <table className="min-w-full divide-y divide-border text-left text-sm">
           <thead className="bg-surface-overlay/60 text-xs uppercase tracking-wide text-gray-400">
             <tr>
-              <th className="px-3 py-2">Avatar</th>
               <th className="px-3 py-2">Scene</th>
               <th className="px-3 py-2">Display</th>
               <th className="px-3 py-2">Description</th>
@@ -521,10 +508,8 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
           </thead>
           <tbody className="divide-y divide-border">
             {(pagedItems as SceneCatalogItem[]).map((item) => {
-              const persistedAvatar = sceneAvatarPersisted(item);
               const rowKey = sceneRowKey(item);
               const pending = statusPending === `scenes:${item.scene}`;
-              const statusAvatar = persistedAvatar ?? undefined;
               return (
                 <tr
                   key={rowKey}
@@ -536,18 +521,6 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
                         : undefined
                   }
                 >
-                  <td className="px-3 py-2 font-mono">
-                    {persistedAvatar ? (
-                      <span className="text-gray-200">{persistedAvatar}</span>
-                    ) : (
-                      <span
-                        className="text-amber-300"
-                        title="API response has no avatar for this scene"
-                      >
-                        — missing
-                      </span>
-                    )}
-                  </td>
                   <td className="px-3 py-2 font-mono">{item.scene}</td>
                   <td className="px-3 py-2">{item.displayName ?? "—"}</td>
                   <td className="max-w-xs truncate px-3 py-2 text-gray-400">
@@ -571,14 +544,11 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
                         <button
                           type="button"
                           className={actionBtn}
-                          disabled={busy || !statusAvatar}
-                          title={statusAvatar ? undefined : "Cannot disable without avatar in API row"}
+                          disabled={busy}
                           onClick={() =>
-                            statusAvatar &&
                             setDisableTarget({
                               catalog: "scenes",
                               slug: item.scene,
-                              avatar: statusAvatar,
                               displayName: item.displayName ?? item.scene,
                             })
                           }
@@ -589,12 +559,8 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
                         <button
                           type="button"
                           className={actionBtn}
-                          disabled={busy || pending || !statusAvatar}
-                          title={statusAvatar ? undefined : "Cannot enable without avatar in API row"}
-                          onClick={() =>
-                            statusAvatar &&
-                            void handleSetEnabled("scenes", item.scene, true, statusAvatar)
-                          }
+                          disabled={busy || pending}
+                          onClick={() => void handleSetEnabled("scenes", item.scene, true)}
                         >
                           Enable
                         </button>
@@ -742,42 +708,8 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
     }
     if (activeKind === "scenes") {
       const d = drafts.scenes;
-      const lockSceneAvatar = Boolean(editingKey && d.avatar.trim());
-      const avatarSelectOptions = (() => {
-        const options = list.avatars.map((a) => ({
-          value: a.avatar,
-          label: a.displayName ? `${a.displayName} (${a.avatar})` : a.avatar,
-        }));
-        if (d.avatar && !options.some((o) => o.value === d.avatar)) {
-          options.unshift({ value: d.avatar, label: d.avatar });
-        }
-        return options;
-      })();
-
       return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-gray-400">
-              avatar <span className="text-red-400">*</span>
-            </span>
-            <select
-              className={inputClass}
-              value={d.avatar}
-              required
-              disabled={busy || lockSceneAvatar}
-              onChange={(e) => updateDraftField("scenes", "avatar", e.target.value)}
-            >
-              <option value="">— Select avatar —</option>
-              {avatarSelectOptions.length === 0 && (
-                <option value={DEFAULT_SCENE_AVATAR}>{DEFAULT_SCENE_AVATAR}</option>
-              )}
-              {avatarSelectOptions.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-          </label>
           <label className="flex flex-col gap-1 text-sm"><span className="text-gray-400">scene (slug)</span><input className={inputClass} value={d.scene} disabled={busy || Boolean(editingKey)} onChange={(e) => updateDraftField("scenes", "scene", e.target.value)} /></label>
           <label className="flex flex-col gap-1 text-sm"><span className="text-gray-400">displayName</span><input className={inputClass} value={d.displayName} disabled={busy} onChange={(e) => updateDraftField("scenes", "displayName", e.target.value)} /></label>
           <label className="flex flex-col gap-1 text-sm sm:col-span-2"><span className="text-gray-400">description</span><input className={inputClass} value={d.description} disabled={busy} onChange={(e) => updateDraftField("scenes", "description", e.target.value)} /></label>
@@ -885,24 +817,12 @@ export default function CatalogsPanel({ technicalMode, onCatalogsChanged }: Cata
           {CATALOG_KINDS.find((kind) => kind.id === activeKind)?.description}
         </p>
 
-        {activeKind === "scenes" && list.scenes.length > 0 && scenesMissingAvatar === list.scenes.length && (
-          <p className="mb-3 rounded-md border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">
-            The catalog list API returned scenes without an <code className="text-xs">avatar</code>{" "}
-            field. The dashboard cannot display or send avatar until the list response includes it
-            (e.g. <code className="text-xs">avatar: &quot;estefania-montealegre&quot;</code> per row).
+        {activeKind === "scenes" && (
+          <p className="mb-3 rounded-md border border-blue-900/50 bg-blue-950/20 px-3 py-2 text-sm text-blue-100/80">
+            Scenes are shared templates. Character-specific behavior should be handled by canon or
+            scene brief overrides, not by duplicating scene rows.
           </p>
         )}
-        {activeKind === "scenes" &&
-          scenesMissingAvatar > 0 &&
-          scenesMissingAvatar < list.scenes.length && (
-            <p className="mb-3 rounded-md border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">
-              {scenesMissingAvatar} scene(s) are missing <code className="text-xs">avatar</code> in the
-              API response. Edit each row, select avatar, and save. SQL backfill:{" "}
-              <code className="text-xs">
-                UPDATE scene_catalog SET avatar = &apos;estefania-montealegre&apos; WHERE avatar IS NULL;
-              </code>
-            </p>
-          )}
 
         {itemsForKind.length > 0 && (
           <TableFilterBar

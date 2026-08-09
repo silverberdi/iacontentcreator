@@ -17,6 +17,26 @@ CREATE TABLE IF NOT EXISTS character_onboarding (
 );
 ALTER TABLE character_onboarding ADD COLUMN IF NOT EXISTS avatar_type text NOT NULL DEFAULT 'influencer';
 ALTER TABLE character_onboarding ADD COLUMN IF NOT EXISTS review_triggers jsonb NOT NULL DEFAULT '[]'::jsonb;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE TABLE IF NOT EXISTS character_canon_versions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  avatar text NOT NULL REFERENCES character_onboarding(avatar) ON DELETE CASCADE,
+  canon_version integer NOT NULL,
+  schema_version text NOT NULL DEFAULT 'character-canon-v1',
+  status text NOT NULL DEFAULT 'draft',
+  canon_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+  canon_markdown text NOT NULL DEFAULT '',
+  conversation_summary text,
+  import_summary text,
+  approved_at timestamptz,
+  approved_by text,
+  superseded_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (avatar, canon_version)
+);
+CREATE INDEX IF NOT EXISTS character_canon_versions_avatar_status_idx
+  ON character_canon_versions (avatar, status, canon_version DESC);
 
 INSERT INTO character_onboarding (
   avatar,
@@ -60,7 +80,7 @@ SELECT
       'description', COALESCE(sc.description, '')
     ) ORDER BY sc.display_name)
     FROM scene_catalog sc
-    WHERE sc.avatar = ac.avatar AND sc.is_enabled = true
+    WHERE sc.is_enabled = true
   ), '[]'::jsonb),
   'ready-for-tests',
   'Imported from existing avatar catalog.'
@@ -100,10 +120,36 @@ SELECT jsonb_build_object(
     'notes', notes,
     'createdAt', created_at,
     'updatedAt', updated_at,
+    'approvedCanon', (
+      SELECT jsonb_build_object(
+        'id', ccv.id,
+        'avatar', ccv.avatar,
+        'canonVersion', ccv.canon_version,
+        'schemaVersion', ccv.schema_version,
+        'status', ccv.status,
+        'canonJson', ccv.canon_json,
+        'canonMarkdown', ccv.canon_markdown,
+        'conversationSummary', ccv.conversation_summary,
+        'importSummary', ccv.import_summary,
+        'approvedAt', ccv.approved_at,
+        'approvedBy', ccv.approved_by,
+        'createdAt', ccv.created_at,
+        'updatedAt', ccv.updated_at
+      )
+      FROM character_canon_versions ccv
+      WHERE ccv.avatar = character_onboarding.avatar AND ccv.status = 'approved'
+      ORDER BY ccv.canon_version DESC
+      LIMIT 1
+    ),
     'readiness', jsonb_build_object(
       'profileComplete', (avatar <> '' AND avatar_short <> '' AND display_name <> '' AND avatar_type <> '' AND business_profile <> '' AND primary_objective <> '' AND jsonb_array_length(content_pillars) > 0 AND jsonb_array_length(caption_tone) > 0 AND jsonb_array_length(brand_fit) > 0 AND jsonb_array_length(review_triggers) > 0),
       'hasScenes', jsonb_array_length(scenes) > 0,
       'hasReferencePlan', COALESCE((reference_policy->>'identityCanon')::boolean, false) AND COALESCE((reference_policy->>'sceneCanon')::boolean, false),
+      'hasApprovedCanon', EXISTS (
+        SELECT 1
+        FROM character_canon_versions ccv
+        WHERE ccv.avatar = character_onboarding.avatar AND ccv.status = 'approved'
+      ),
       'readyForPublication', onboarding_status = 'ready'
     )
   ) ORDER BY display_name), '[]'::jsonb)

@@ -90,7 +90,6 @@ export type CatalogUpsertPayload =
       catalog: "scenes";
       /** Wire field expected by catalog upsert workflow */
       catalogType: "scenes";
-      avatar: string;
       scene: string;
       displayName: string;
       description?: string;
@@ -141,12 +140,9 @@ export type CatalogSetStatusResponse = {
   reason?: string;
 };
 
-/** Default avatar for legacy scene_catalog rows missing avatar. */
-export const DEFAULT_SCENE_AVATAR = "estefania-montealegre";
-
 export const CATALOG_KINDS: { id: CatalogKind; label: string; description: string }[] = [
   { id: "avatars", label: "Avatars", description: "Characters / avatars available for ingest and review." },
-  { id: "scenes", label: "Scenes", description: "Scene slugs tied to avatar content sets." },
+  { id: "scenes", label: "Scenes", description: "Shared scene templates. Character-specific behavior belongs in canon or scene brief overrides." },
   {
     id: "assetTypes",
     label: "Asset types",

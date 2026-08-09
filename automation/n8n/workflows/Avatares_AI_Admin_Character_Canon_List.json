@@ -1,0 +1,110 @@
+{
+  "id": "adminCharacterCanonListV1",
+  "name": "Avatares AI - Admin - Character Canon List",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/characters/canon/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e4eb3455-45d7-4c8f-9718-111111111157",
+      "name": "POST /admin/characters/canon/list",
+      "webhookId": "e4eb3455-45d7-4c8f-9718-111111111157"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null) return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\n\nconst body = $json.body || $json;\nconst avatar = String(body.avatar || '').trim();\n\nif (!avatar) {\n  return [{ json: { query: \"SELECT false AS ok, 'avatar is required' AS error;\" } }];\n}\n\nconst query = `\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\nCREATE TABLE IF NOT EXISTS character_canon_versions (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  avatar text NOT NULL REFERENCES character_onboarding(avatar) ON DELETE CASCADE,\n  canon_version integer NOT NULL,\n  schema_version text NOT NULL DEFAULT 'character-canon-v1',\n  status text NOT NULL DEFAULT 'draft',\n  canon_json jsonb NOT NULL DEFAULT '{}'::jsonb,\n  canon_markdown text NOT NULL DEFAULT '',\n  conversation_summary text,\n  import_summary text,\n  approved_at timestamptz,\n  approved_by text,\n  superseded_at timestamptz,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now(),\n  UNIQUE (avatar, canon_version)\n);\nCREATE INDEX IF NOT EXISTS character_canon_versions_avatar_status_idx\n  ON character_canon_versions (avatar, status, canon_version DESC);\nCREATE TABLE IF NOT EXISTS character_canon_imports (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  avatar text NOT NULL REFERENCES character_onboarding(avatar) ON DELETE CASCADE,\n  source_kind text NOT NULL DEFAULT 'markdown-import',\n  source_manifest jsonb NOT NULL DEFAULT '{}'::jsonb,\n  source_hash text NOT NULL,\n  status text NOT NULL DEFAULT 'proposed-import',\n  canon_version_id uuid REFERENCES character_canon_versions(id) ON DELETE SET NULL,\n  import_notes text,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now(),\n  UNIQUE (avatar, source_hash)\n);\n\nSELECT true AS ok,\n  jsonb_build_object(\n    'canons', COALESCE(jsonb_agg(jsonb_build_object(\n      'id', id,\n      'avatar', avatar,\n      'canonVersion', canon_version,\n      'schemaVersion', schema_version,\n      'status', status,\n      'canonJson', canon_json,\n      'canonMarkdown', canon_markdown,\n      'conversationSummary', conversation_summary,\n      'importSummary', import_summary,\n      'approvedAt', approved_at,\n      'approvedBy', approved_by,\n      'createdAt', created_at,\n      'updatedAt', updated_at\n    ) ORDER BY canon_version DESC), '[]'::jsonb),\n    'approvedCanon', (\n      SELECT jsonb_build_object(\n        'id', approved.id,\n        'avatar', approved.avatar,\n        'canonVersion', approved.canon_version,\n        'schemaVersion', approved.schema_version,\n        'status', approved.status,\n        'canonJson', approved.canon_json,\n        'canonMarkdown', approved.canon_markdown,\n        'conversationSummary', approved.conversation_summary,\n        'importSummary', approved.import_summary,\n        'approvedAt', approved.approved_at,\n        'approvedBy', approved.approved_by,\n        'createdAt', approved.created_at,\n        'updatedAt', approved.updated_at\n      )\n      FROM character_canon_versions approved\n      WHERE approved.avatar = ${sql(avatar)} AND approved.status = 'approved'\n      ORDER BY approved.canon_version DESC\n      LIMIT 1\n    )\n  ) AS result\nFROM character_canon_versions\nWHERE avatar = ${sql(avatar)};\n`;\n\nreturn [{ json: { query } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        0
+      ],
+      "id": "e4eb3455-45d7-4c8f-9718--code",
+      "name": "Build Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        0
+      ],
+      "id": "e4eb3455-45d7-4c8f-971-postgres",
+      "name": "List Character Canon",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, message: row.error || 'Character canon request failed.' } }];\n}\nconst result = typeof row.result === 'string' ? JSON.parse(row.result) : row.result;\nconst canon = typeof row.canon === 'string' ? JSON.parse(row.canon) : row.canon;\nreturn [{ json: { ok: true, ...(result || {}), ...(canon ? { canon } : {}) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        0
+      ],
+      "id": "e4eb3455-45d7-4c8f-971-return",
+      "name": "Return Character Canon"
+    }
+  ],
+  "connections": {
+    "POST /admin/characters/canon/list": {
+      "main": [
+        [
+          {
+            "node": "Build Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Query": {
+      "main": [
+        [
+          {
+            "node": "List Character Canon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Character Canon": {
+      "main": [
+        [
+          {
+            "node": "Return Character Canon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": true
+}

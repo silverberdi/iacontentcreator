@@ -82,6 +82,11 @@ if (!promptPack) {
         sceneAvoidRules: parseJson(row.sceneAvoidRules, []),
         sceneContentAngle: row.sceneContentAngle,
         scenePromptNotes: row.scenePromptNotes,
+        approvedCanon: {
+          version: row.approvedCanonVersion || null,
+          canonJson: parseJson(row.approvedCanonJson, null),
+          canonMarkdown: row.approvedCanonMarkdown || "",
+        },
         referenceImages,
         humanFeedback: feedbackForPrompt,
       },

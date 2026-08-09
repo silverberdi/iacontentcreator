@@ -7,6 +7,34 @@ const PORT = Number(process.env.PORT || 8095);
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_TOKEN || "";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 const DEEPSEEK_BASE_URL = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
+const DEFAULT_CANON_PROVIDER = process.env.CHARACTER_CANON_PROVIDER || "deepseek";
+const DEFAULT_CANON_MODEL = process.env.CHARACTER_CANON_MODEL || DEEPSEEK_MODEL;
+const CANON_PROVIDER_CONFIG = {
+  creativeCanon: {
+    task: "creativeCanon",
+    provider: process.env.CREATIVE_CANON_PROVIDER || DEFAULT_CANON_PROVIDER,
+    model: process.env.CREATIVE_CANON_MODEL || DEFAULT_CANON_MODEL,
+    fallback: process.env.CREATIVE_CANON_FALLBACK || "human-review-required",
+  },
+  structuredCanon: {
+    task: "structuredCanon",
+    provider: process.env.STRUCTURED_CANON_PROVIDER || DEFAULT_CANON_PROVIDER,
+    model: process.env.STRUCTURED_CANON_MODEL || DEFAULT_CANON_MODEL,
+    fallback: process.env.STRUCTURED_CANON_FALLBACK || "human-review-required",
+  },
+  canonImport: {
+    task: "canonImport",
+    provider: process.env.CANON_IMPORT_PROVIDER || DEFAULT_CANON_PROVIDER,
+    model: process.env.CANON_IMPORT_MODEL || DEFAULT_CANON_MODEL,
+    fallback: process.env.CANON_IMPORT_FALLBACK || "human-review-required",
+  },
+  canonConflict: {
+    task: "canonConflict",
+    provider: process.env.CANON_CONFLICT_PROVIDER || DEFAULT_CANON_PROVIDER,
+    model: process.env.CANON_CONFLICT_MODEL || DEFAULT_CANON_MODEL,
+    fallback: process.env.CANON_CONFLICT_FALLBACK || "human-review-required",
+  },
+};
 const VISUAL_QA_API_KEY = process.env.VISUAL_QA_API_KEY || "";
 const VISUAL_QA_BASE_URL = (process.env.VISUAL_QA_BASE_URL || "").replace(/\/$/, "");
 const VISUAL_QA_MODEL = process.env.VISUAL_QA_MODEL || "";
@@ -89,6 +117,29 @@ function normalizeArray(value, fallback = []) {
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function providerTrace({ task, provider, model, started, status = "ok", fallbackUsed = false, error = null }) {
+  return {
+    task,
+    provider,
+    model,
+    promptProfile: "character-canon-v1",
+    timestamp: new Date().toISOString(),
+    fallbackUsed,
+    status,
+    latencyMs: started ? Date.now() - started : null,
+    errorSummary: error ? String(error).slice(0, 500) : null,
+  };
+}
+
+function canonProviderFor(task) {
+  return CANON_PROVIDER_CONFIG[task] || {
+    task,
+    provider: DEFAULT_CANON_PROVIDER,
+    model: DEFAULT_CANON_MODEL,
+    fallback: "human-review-required",
+  };
 }
 
 function randomSeed() {
@@ -1045,6 +1096,397 @@ async function callDeepSeek(context) {
   };
 }
 
+async function callDeepSeekJsonTask({ task, systemPrompt, payload, requiredKeys = [] }) {
+  const route = canonProviderFor(task);
+  const started = Date.now();
+  if (route.provider !== "deepseek") {
+    return {
+      ok: false,
+      error: `Provider ${route.provider} is configured for ${task}, but only deepseek is implemented in this gateway slice`,
+      category: "provider_not_implemented",
+      providerTrace: providerTrace({
+        task,
+        provider: route.provider,
+        model: route.model,
+        started,
+        status: "error",
+        error: "provider_not_implemented",
+      }),
+    };
+  }
+  if (!DEEPSEEK_API_KEY) {
+    return {
+      ok: false,
+      error: "DEEPSEEK_API_KEY is not configured",
+      category: "missing_credentials",
+      providerTrace: providerTrace({
+        task,
+        provider: "deepseek",
+        model: route.model,
+        started,
+        status: "error",
+        error: "missing_credentials",
+      }),
+    };
+  }
+
+  const callModel = async (model) => fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: JSON.stringify(payload) },
+      ],
+      temperature: task === "structuredCanon" || task === "canonImport" ? 0.2 : 0.65,
+      response_format: { type: "json_object" },
+    }),
+  });
+  let activeModel = route.model;
+  let fallbackUsed = false;
+  let response = await callModel(activeModel);
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const error = data?.error?.message || data?.message || text.slice(0, 300) || response.statusText;
+    const canRetryWithStableDeepSeek =
+      task === "creativeCanon" &&
+      activeModel !== "deepseek-chat" &&
+      /too busy|temporarily|overload|rate/i.test(error);
+    if (canRetryWithStableDeepSeek) {
+      activeModel = "deepseek-chat";
+      fallbackUsed = true;
+      response = await callModel(activeModel);
+      const retryText = await response.text();
+      let retryData = null;
+      try {
+        retryData = retryText ? JSON.parse(retryText) : null;
+      } catch {
+        retryData = null;
+      }
+      if (response.ok) {
+        data = retryData;
+      } else {
+        const retryError =
+          retryData?.error?.message || retryData?.message || retryText.slice(0, 300) || response.statusText;
+        return {
+          ok: false,
+          error: retryError,
+          category: "provider_error",
+          providerTrace: providerTrace({
+            task,
+            provider: "deepseek",
+            model: activeModel,
+            started,
+            status: "error",
+            fallbackUsed,
+            error: retryError,
+          }),
+        };
+      }
+    } else {
+    return {
+      ok: false,
+      error,
+      category: "provider_error",
+      providerTrace: providerTrace({
+        task,
+        provider: "deepseek",
+        model: activeModel,
+        started,
+        status: "error",
+        fallbackUsed,
+        error,
+      }),
+    };
+    }
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  let parsed;
+  try {
+    parsed = typeof content === "string" ? JSON.parse(content) : content;
+  } catch {
+    return {
+      ok: false,
+      error: "DeepSeek returned non-JSON content",
+      category: "invalid_provider_json",
+      providerTrace: providerTrace({
+        task,
+        provider: "deepseek",
+        model: activeModel,
+        started,
+        status: "error",
+        fallbackUsed,
+        error: "invalid_provider_json",
+      }),
+    };
+  }
+
+  const missing = requiredKeys.filter((key) => parsed?.[key] === undefined);
+  if (missing.length) {
+    return {
+      ok: false,
+      error: `DeepSeek response is missing required keys: ${missing.join(", ")}`,
+      category: "invalid_provider_shape",
+      providerTrace: providerTrace({
+        task,
+        provider: "deepseek",
+        model: activeModel,
+        started,
+        status: "error",
+        fallbackUsed,
+        error: `missing ${missing.join(", ")}`,
+      }),
+    };
+  }
+
+  return {
+    ok: true,
+    result: parsed,
+    providerTrace: providerTrace({
+      task,
+      provider: "deepseek",
+      model: activeModel,
+      started,
+      fallbackUsed,
+    }),
+  };
+}
+
+function normalizeCanonSections(sections = [], fallback = {}) {
+  if (!Array.isArray(sections)) return [];
+  return sections.map((section, index) => ({
+    key: String(section.key || `section_${index + 1}`).replace(/[^a-zA-Z0-9_-]/g, "_"),
+    label: String(section.label || section.key || `Section ${index + 1}`),
+    status: ["missing", "draft", "review-needed", "approved"].includes(section.status)
+      ? section.status
+      : "review-needed",
+    summary: String(section.summary || ""),
+    data: section.data && typeof section.data === "object" ? section.data : {},
+    sourceRefs: normalizeArray(section.sourceRefs || section.source_refs || fallback.sourceRefs || []),
+    providerTrace: section.providerTrace || fallback.providerTrace || null,
+  }));
+}
+
+function canonMarkdownFromSections(sections = []) {
+  return sections
+    .map((section) => {
+      const source = section.sourceRefs?.length ? `\n\nSource refs: ${section.sourceRefs.join(", ")}` : "";
+      return `## ${section.label}\n\n${section.summary}${source}`;
+    })
+    .join("\n\n");
+}
+
+function compactCanonForChat(canon) {
+  if (!canon || typeof canon !== "object") return null;
+  const sections = Array.isArray(canon.sections) ? canon.sections : [];
+  const importantStatuses = new Set(["missing", "draft", "review-needed"]);
+  const relevantSections = sections
+    .filter((section) => importantStatuses.has(section.status))
+    .slice(0, 18);
+  const fallbackSections = sections.slice(0, Math.max(0, 18 - relevantSections.length));
+  const selected = [...relevantSections, ...fallbackSections].slice(0, 18);
+  return {
+    avatar: canon.avatar || null,
+    avatarType: canon.avatarType || null,
+    displayName: canon.displayName || null,
+    source: canon.source || null,
+    sectionCount: sections.length,
+    statusCounts: sections.reduce((counts, section) => {
+      const status = section.status || "unknown";
+      counts[status] = (counts[status] || 0) + 1;
+      return counts;
+    }, {}),
+    sections: selected.map((section) => ({
+      key: section.key,
+      label: section.label,
+      status: section.status,
+      summary: String(section.summary || "").slice(0, 900),
+      sourceRefs: Array.isArray(section.sourceRefs) ? section.sourceRefs.slice(0, 5) : [],
+    })),
+  };
+}
+
+function compactConversationForChat(conversation = []) {
+  if (!Array.isArray(conversation)) return [];
+  return conversation.slice(-8).map((turn) => ({
+    role: turn.role || "operator",
+    content: String(turn.content || "").slice(0, 1800),
+  }));
+}
+
+function localCanonChatFallback(input = {}, error = "") {
+  const topicMatch = String(input.operatorMessage || input.message || "").match(/^Topic:\s*(.+)$/im);
+  const topic = topicMatch?.[1]?.trim() || "este bloque del canon";
+  const displayName = input.displayName || input.avatar || "el personaje";
+  return {
+    ok: true,
+    assistantMessage: [
+      `DeepSeek esta ocupado en este momento, pero tu respuesta ya quedo capturada localmente para ${displayName}.`,
+      `Mientras vuelve el proveedor, revisa ${topic} con esta logica: que sea especifico, consistente con el tipo ${input.avatarType || "del personaje"}, y que deje claros los limites operativos.`,
+      "Siguiente paso recomendado: responde una decision concreta que cierre una ambiguedad, no otro bloque general.",
+    ].join(" "),
+    suggestedQuestions: [
+      `Que limite de ${topic} no debe romperse nunca?`,
+      `Que detalle de ${topic} ayuda a distinguir a ${displayName} de otro personaje parecido?`,
+      `Que situacion deberia disparar revision humana antes de publicar?`,
+    ],
+    extractedSignals: {
+      fallback: "provider_busy",
+      preservedOperatorAnswer: true,
+      providerError: String(error).slice(0, 300),
+    },
+    sectionUpdates: [],
+    providerTrace: providerTrace({
+      task: "creativeCanon",
+      provider: "local-fallback",
+      model: "deterministic-canon-chat-fallback",
+      started: Date.now(),
+      status: "degraded",
+      fallbackUsed: true,
+      error,
+    }),
+  };
+}
+
+async function runCharacterCanonChat(input = {}) {
+  const systemPrompt = [
+    "You are a senior character development partner for an AI character studio.",
+    "Have a warm but precise creative conversation.",
+    "Ask useful questions, name risks, and propose next refinements.",
+    "Return JSON only.",
+    "Required shape: { assistantMessage: string, suggestedQuestions: string[], extractedSignals: object, sectionUpdates: array }.",
+  ].join(" ");
+  const payload = {
+    task: "character canon creative conversation",
+    avatar: input.avatar,
+    avatarType: input.avatarType,
+    displayName: input.displayName,
+    currentCanon: compactCanonForChat(input.currentCanon),
+    conversation: compactConversationForChat(input.conversation),
+    operatorMessage: input.operatorMessage || input.message || "",
+  };
+  const call = await callDeepSeekJsonTask({
+    task: "creativeCanon",
+    systemPrompt,
+    payload,
+    requiredKeys: ["assistantMessage", "suggestedQuestions"],
+  });
+  if (!call.ok) {
+    if (call.category === "provider_error" && /too busy|temporarily|overload|rate/i.test(call.error || "")) {
+      return localCanonChatFallback(input, call.error);
+    }
+    return call;
+  }
+  return {
+    ok: true,
+    assistantMessage: String(call.result.assistantMessage || ""),
+    suggestedQuestions: normalizeArray(call.result.suggestedQuestions),
+    extractedSignals: call.result.extractedSignals || {},
+    sectionUpdates: Array.isArray(call.result.sectionUpdates) ? call.result.sectionUpdates : [],
+    providerTrace: call.providerTrace,
+  };
+}
+
+async function runCharacterCanonConsolidate(input = {}) {
+  const systemPrompt = [
+    "You convert character-development conversation and onboarding fields into structured canon JSON.",
+    "Preserve nuance. Do not flatten boundaries or identity rules.",
+    "Return JSON only.",
+    "Required shape: { canonJson: { avatar, avatarType, displayName, sections: [] }, canonMarkdown: string, readinessNotes: string[] }.",
+  ].join(" ");
+  const call = await callDeepSeekJsonTask({
+    task: "structuredCanon",
+    systemPrompt,
+    payload: input,
+    requiredKeys: ["canonJson"],
+  });
+  if (!call.ok) return call;
+  const canonJson = call.result.canonJson || {};
+  const sections = normalizeCanonSections(canonJson.sections, { providerTrace: call.providerTrace });
+  const normalizedCanonJson = {
+    ...canonJson,
+    avatar: canonJson.avatar || input.avatar,
+    avatarType: canonJson.avatarType || input.avatarType || "influencer",
+    displayName: canonJson.displayName || input.displayName || input.avatar,
+    sections,
+    providerTrace: call.providerTrace,
+  };
+  return {
+    ok: true,
+    canonJson: normalizedCanonJson,
+    canonMarkdown: String(call.result.canonMarkdown || canonMarkdownFromSections(sections)),
+    readinessNotes: normalizeArray(call.result.readinessNotes),
+    providerTrace: call.providerTrace,
+  };
+}
+
+async function runCharacterCanonImportExtract(input = {}) {
+  const systemPrompt = [
+    "You import existing Markdown character canon into structured DB canon.",
+    "Preserve source traceability and do not discard important details.",
+    "Detect ambiguous or conflicting statements for human review.",
+    "Return JSON only.",
+    "Required shape: { canonJson: { avatar, avatarType, displayName, sections: [] }, canonMarkdown: string, conflicts: [] }.",
+  ].join(" ");
+  const call = await callDeepSeekJsonTask({
+    task: "canonImport",
+    systemPrompt,
+    payload: input,
+    requiredKeys: ["canonJson"],
+  });
+  if (!call.ok) return call;
+  const canonJson = call.result.canonJson || {};
+  const sections = normalizeCanonSections(canonJson.sections, { providerTrace: call.providerTrace });
+  return {
+    ok: true,
+    canonJson: {
+      ...canonJson,
+      avatar: canonJson.avatar || input.avatar,
+      avatarType: canonJson.avatarType || input.avatarType || "influencer",
+      displayName: canonJson.displayName || input.displayName || input.avatar,
+      sections,
+      providerTrace: call.providerTrace,
+    },
+    canonMarkdown: String(call.result.canonMarkdown || canonMarkdownFromSections(sections)),
+    conflicts: Array.isArray(call.result.conflicts) ? call.result.conflicts : [],
+    providerTrace: call.providerTrace,
+  };
+}
+
+async function runCharacterCanonConflicts(input = {}) {
+  const systemPrompt = [
+    "You review character canon for contradictions, unsafe ambiguity, missing boundaries, and identity drift risks.",
+    "Return JSON only.",
+    "Required shape: { conflicts: [], missingDecisions: [], riskSummary: string }.",
+  ].join(" ");
+  const call = await callDeepSeekJsonTask({
+    task: "canonConflict",
+    systemPrompt,
+    payload: input,
+    requiredKeys: ["conflicts", "riskSummary"],
+  });
+  if (!call.ok) return call;
+  return {
+    ok: true,
+    conflicts: Array.isArray(call.result.conflicts) ? call.result.conflicts : [],
+    missingDecisions: normalizeArray(call.result.missingDecisions),
+    riskSummary: String(call.result.riskSummary || ""),
+    providerTrace: call.providerTrace,
+  };
+}
+
 function normalizePromptPack(raw, context) {
   const source = raw && typeof raw === "object" ? raw : {};
   const job = context.job || {};
@@ -1079,15 +1521,52 @@ function normalizePromptPack(raw, context) {
     source.compositionPolicy && typeof source.compositionPolicy === "object"
       ? source.compositionPolicy
       : {};
+  const characterSceneDirective =
+    source.characterSceneDirective && typeof source.characterSceneDirective === "object"
+      ? source.characterSceneDirective
+      : {};
+  const directive = {
+    contractVersion: "character-scene-directive-v1",
+    canonUsed: Boolean(context.approvedCanon?.canonMarkdown || context.approvedCanon?.canonJson),
+    identityLock: String(characterSceneDirective.identityLock || "").trim(),
+    emotionalMagnetism: String(characterSceneDirective.emotionalMagnetism || "").trim(),
+    sceneBehavior: String(characterSceneDirective.sceneBehavior || "").trim(),
+    bodyRealism: String(characterSceneDirective.bodyRealism || "").trim(),
+    wardrobeAndStyling: String(characterSceneDirective.wardrobeAndStyling || "").trim(),
+    mustPreserve: normalizeArray(characterSceneDirective.mustPreserve, []),
+    mustAvoid: normalizeArray(characterSceneDirective.mustAvoid, []),
+    whyThisIsNotGeneric: String(characterSceneDirective.whyThisIsNotGeneric || "").trim(),
+  };
+  const directivePositive = [
+    directive.identityLock ? `Identity lock: ${directive.identityLock}.` : "",
+    directive.emotionalMagnetism ? `Emotional presence: ${directive.emotionalMagnetism}.` : "",
+    directive.sceneBehavior ? `Scene behavior: ${directive.sceneBehavior}.` : "",
+    directive.bodyRealism ? `Body realism: ${directive.bodyRealism}.` : "",
+    directive.wardrobeAndStyling ? `Wardrobe and styling: ${directive.wardrobeAndStyling}.` : "",
+    directive.mustPreserve.length ? `Must preserve: ${directive.mustPreserve.join(", ")}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const directiveNegative = [
+    directive.mustAvoid.join(", "),
+    "generic stock photo woman, fashion editorial model, starvation-thin body, doll-like face, plastic skin, 3D render, mannequin, anime, over-polished beauty ad, off-character expression, identity drift",
+  ]
+    .filter(Boolean)
+    .join(", ");
   const promptPack = {
-    positivePrompt: String(source.positivePrompt || "").trim(),
-    negativePrompt: String(source.negativePrompt || "").trim(),
+    positivePrompt: [directivePositive, String(source.positivePrompt || "").trim()]
+      .filter(Boolean)
+      .join("\n\n"),
+    negativePrompt: [String(source.negativePrompt || "").trim(), directiveNegative]
+      .filter(Boolean)
+      .join(", "),
     identityReminders: normalizeArray(source.identityReminders, [
       `${context.avatarDisplayName || job.avatar || "Estefanía Montealegre"} must remain visually consistent with approved reference images`,
       "photorealistic lifestyle portrait, natural expression, believable candid presence",
     ]),
     sceneDetails: String(source.sceneDetails || brief.visualIntent || "").trim(),
     visualAvoidRules: normalizeArray(source.visualAvoidRules, []),
+    characterSceneDirective: directive,
     referenceImages: sortedReferenceImages,
     identityReferences,
     preparedIdentityReferences,
@@ -1140,6 +1619,7 @@ function normalizePromptPack(raw, context) {
       publicationJobId: job.publicationJobId || context.publicationJobId || null,
       generatedFrom: "publication-brief",
       generator: "deepseek-publication-prompt-pack-v1",
+      approvedCanonVersion: context.approvedCanon?.version || null,
     },
   };
 
@@ -1155,6 +1635,10 @@ function normalizePromptPack(raw, context) {
 
 function buildPromptPackMessages(context) {
   const profile = context.avatarProfileSummary || {};
+  const approvedCanon = context.approvedCanon && typeof context.approvedCanon === "object"
+    ? context.approvedCanon
+    : {};
+  const approvedCanonMarkdown = String(approvedCanon.canonMarkdown || "").slice(0, 9000);
   const humanFeedback = Array.isArray(context.humanFeedback) ? context.humanFeedback.slice(0, 8) : [];
   const operatorBriefFeedback =
     context.operatorBriefFeedback && typeof context.operatorBriefFeedback === "object"
@@ -1181,6 +1665,9 @@ function buildPromptPackMessages(context) {
     `You are the image prompt director for ${profile.displayName || "Estefanía Montealegre"}, a fictional AI influencer.`,
     "Return only strict JSON.",
     "You own the final Comfy image prompt. Do not delegate composition to templates.",
+    "The approved character canon is not passive documentation. It is the active contract for identity, emotional energy, body realism, styling, boundaries, and scene behavior.",
+    "If approved canon is provided, translate it into concrete visual direction. Do not generate a generic attractive person in the requested location.",
+    "Every prompt must answer: why is this recognizably this character, in this scene, with this emotional posture?",
     "Use human review feedback as advisory memory, not as a permanent identity rewrite.",
     "Do not overfit to one review note; preserve brand identity and the current scene brief.",
     "Create one coherent visual instruction, not a list of conflicting pose ideas.",
@@ -1188,6 +1675,7 @@ function buildPromptPackMessages(context) {
     "Do not mention feet for waist-up or medium close-up framing.",
     "Hands must be either clearly simple and relaxed, or mostly out of frame. Avoid phones, cups, bags, passports, or objects in hands unless explicitly required.",
     "Do not overload the negative prompt. Keep it focused on defects that matter for image generation.",
+    "Negative prompts must include character-specific anti-patterns when relevant: generic stock-photo woman, fashion model body, doll/plastic skin, 3D render, mannequin, over-polished beauty ad, starvation-thin proportions, off-character energy.",
     "The operator will not edit JSON; produce a usable prompt pack now.",
     operatorFeedbackNotes
       ? "Operator brief feedback has already been applied to the brief; reflect it concretely in the image prompt without merely quoting it."
@@ -1202,6 +1690,16 @@ function buildPromptPackMessages(context) {
       identityReminders: ["string"],
       sceneDetails: "string",
       visualAvoidRules: ["string"],
+      characterSceneDirective: {
+        identityLock: "string",
+        emotionalMagnetism: "string",
+        sceneBehavior: "string",
+        bodyRealism: "string",
+        wardrobeAndStyling: "string",
+        mustPreserve: ["string"],
+        mustAvoid: ["string"],
+        whyThisIsNotGeneric: "string",
+      },
       compositionPolicy: {
         framing: "string",
         pose: "string",
@@ -1218,6 +1716,13 @@ function buildPromptPackMessages(context) {
       },
     },
     ...context,
+    approvedCanonSummary: {
+      version: approvedCanon.version || null,
+      hasCanon: Boolean(approvedCanonMarkdown || approvedCanon.canonJson),
+      canonMarkdown: approvedCanonMarkdown,
+      instruction:
+        "Use this canon to create a character-scene directive. Extract visual DNA, emotional energy, intimacy/attraction posture, body realism, wardrobe/styling, boundaries, and anti-patterns. Do not quote the canon at length; translate it into image-generation language.",
+    },
     humanFeedbackSummary: {
       feedbackCount: compactHumanFeedback.length,
       categories: humanFeedbackCategories,
@@ -1233,6 +1738,11 @@ function buildPromptPackMessages(context) {
         : "No operator brief feedback has been applied.",
     },
     hardRules: [
+      "The positive prompt must include a character-specific identity lock and emotional posture, not only the location/action.",
+      "The positive prompt must describe how the character inhabits the scene in a way that matches the approved canon.",
+      "If the character type is GFE/BFE, preserve approachable romantic/companion magnetism without making the image explicit or performative.",
+      "Do not let the template turn the character into a generic model, stock photo, doll, anime character, or luxury influencer unless canon explicitly says so.",
+      "Healthy believable adult body proportions are required. Never imply starvation-thin, childlike, plastic, mannequin, or exaggerated model proportions.",
       "Use exactly one physically plausible pose.",
       "Prefer waist-up or medium close-up framing.",
       "If human feedback is present, address repeated rejection categories without making the image stiff or over-constrained.",
@@ -1542,6 +2052,33 @@ async function handlePublicationPromptPack(req, res, requestId) {
   jsonResponse(res, status, { requestId, ...result });
 }
 
+async function handleCharacterCanonTask(req, res, requestId, route, runner) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    jsonResponse(res, 400, { ok: false, requestId, error: "Invalid JSON body", category: "invalid_request" });
+    return;
+  }
+
+  const result = await runner(body);
+  const status = result.ok ? 200 : result.category === "missing_credentials" ? 503 : 502;
+  console.log(
+    JSON.stringify({
+      requestId,
+      route,
+      ok: result.ok,
+      provider: result.providerTrace?.provider || "deepseek",
+      model: result.providerTrace?.model || DEEPSEEK_MODEL,
+      task: result.providerTrace?.task || route,
+      category: result.category || "ok",
+      latencyMs: result.providerTrace?.latencyMs || 0,
+      error: result.ok ? undefined : String(result.error || result.message || "").slice(0, 240),
+    }),
+  );
+  jsonResponse(res, status, { requestId, ...result });
+}
+
 async function handleAvatarProfile(req, res, requestId) {
   let body;
   try {
@@ -1741,6 +2278,7 @@ const server = http.createServer(async (req, res) => {
             configured: Boolean(DEEPSEEK_API_KEY),
             model: DEEPSEEK_MODEL,
           },
+          characterCanon: CANON_PROVIDER_CONFIG,
           avatarProfiles: {
             root: AVATAR_PROFILE_ROOT,
             estefania: Boolean(loadAvatarProfile("estefania-montealegre")),
@@ -1769,6 +2307,21 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/provider-routing") {
+      jsonResponse(res, 200, {
+        ok: true,
+        providers: {
+          deepseek: {
+            configured: Boolean(DEEPSEEK_API_KEY),
+            model: DEEPSEEK_MODEL,
+            baseUrl: DEEPSEEK_BASE_URL,
+          },
+        },
+        characterCanon: CANON_PROVIDER_CONFIG,
+      });
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/publication-brief") {
       await handlePublicationBrief(req, res, requestId);
       return;
@@ -1786,6 +2339,26 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/avatar-profile") {
       await handleAvatarProfile(req, res, requestId);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/character-canon/chat") {
+      await handleCharacterCanonTask(req, res, requestId, "character-canon-chat", runCharacterCanonChat);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/character-canon/consolidate") {
+      await handleCharacterCanonTask(req, res, requestId, "character-canon-consolidate", runCharacterCanonConsolidate);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/character-canon/import-extract") {
+      await handleCharacterCanonTask(req, res, requestId, "character-canon-import-extract", runCharacterCanonImportExtract);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/character-canon/conflicts") {
+      await handleCharacterCanonTask(req, res, requestId, "character-canon-conflicts", runCharacterCanonConflicts);
       return;
     }
 

@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +29,10 @@ const port = Number(process.env.PORT || 8088);
 const publicBaseUrl = (process.env.PUBLIC_BASE_URL || `http://localhost:${port}`).replace(/\/$/, "");
 const webhookBaseUrl = (process.env.N8N_WEBHOOK_BASE_URL || "http://n8n:5678/webhook").replace(/\/$/, "");
 const minioBaseUrl = (process.env.MINIO_BASE_URL || "http://minio:9000").replace(/\/$/, "");
+const minioBucket = process.env.MINIO_BUCKET || process.env.MINIO_DEFAULT_BUCKET || "iacontentcreator-assets";
+const minioAccessKey = process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER || "";
+const minioSecretKey = process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD || "";
+const minioRegion = process.env.MINIO_REGION || "us-east-1";
 const aiGatewayBaseUrl = (process.env.AI_GATEWAY_BASE_URL || "http://ai-gateway:8095").replace(/\/$/, "");
 const storePath = process.env.AUTH_STORE_PATH || "/data/auth-users.json";
 const sessionSecret = requiredEnv("SESSION_SECRET");
@@ -189,6 +193,145 @@ async function readJsonBody(req) {
   for await (const chunk of req) chunks.push(chunk);
   if (chunks.length === 0) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+async function readRawBody(req, maxBytes = 12 * 1024 * 1024) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      const error = new Error("Request body too large.");
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+function parseMultipartFormData(req, body) {
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  if (!boundaryMatch) return { fields: {}, files: [] };
+  const boundary = `--${boundaryMatch[1] || boundaryMatch[2]}`;
+  const parts = body.toString("binary").split(boundary).slice(1, -1);
+  const fields = {};
+  const files = [];
+  for (const part of parts) {
+    const trimmed = part.replace(/^\r\n/, "").replace(/\r\n$/, "");
+    const separatorIndex = trimmed.indexOf("\r\n\r\n");
+    if (separatorIndex < 0) continue;
+    const rawHeaders = trimmed.slice(0, separatorIndex);
+    const rawContent = trimmed.slice(separatorIndex + 4);
+    const headers = {};
+    for (const line of rawHeaders.split("\r\n")) {
+      const [name, ...rest] = line.split(":");
+      if (name) headers[name.toLowerCase()] = rest.join(":").trim();
+    }
+    const disposition = headers["content-disposition"] || "";
+    const name = disposition.match(/name="([^"]+)"/)?.[1] || "";
+    const filename = disposition.match(/filename="([^"]*)"/)?.[1] || "";
+    const content = Buffer.from(rawContent, "binary");
+    if (filename) {
+      files.push({
+        fieldName: name,
+        filename,
+        contentType: headers["content-type"] || "application/octet-stream",
+        buffer: content,
+      });
+    } else if (name) {
+      fields[name] = content.toString("utf8");
+    }
+  }
+  return { fields, files };
+}
+
+function safeObjectPart(value, fallback = "file") {
+  return String(value || fallback)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120) || fallback;
+}
+
+function hmac(key, value, encoding) {
+  return createHmac("sha256", key).update(value).digest(encoding);
+}
+
+function s3SigningKey(secretKey, dateStamp, region, service) {
+  const kDate = hmac(`AWS4${secretKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  return hmac(kService, "aws4_request");
+}
+
+async function putMinioObject({ bucket, objectPath, buffer, contentType }) {
+  if (!minioAccessKey || !minioSecretKey) {
+    throw new Error("MINIO_ACCESS_KEY/MINIO_SECRET_KEY or MINIO_ROOT_USER/MINIO_ROOT_PASSWORD are required for uploads.");
+  }
+  const endpoint = new URL(minioBaseUrl);
+  const encodedPath = objectPath
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  const url = `${minioBaseUrl}/${encodeURIComponent(bucket)}/${encodedPath}`;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = createHash("sha256").update(buffer).digest("hex");
+  const canonicalUri = `/${encodeURIComponent(bucket)}/${encodedPath}`;
+  const canonicalHeaders = [
+    `content-type:${contentType}`,
+    `host:${endpoint.host}`,
+    `x-amz-content-sha256:${payloadHash}`,
+    `x-amz-date:${amzDate}`,
+    "",
+  ].join("\n");
+  const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+  const canonicalRequest = [
+    "PUT",
+    canonicalUri,
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+  const credentialScope = `${dateStamp}/${minioRegion}/s3/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    createHash("sha256").update(canonicalRequest).digest("hex"),
+  ].join("\n");
+  const signature = hmac(s3SigningKey(minioSecretKey, dateStamp, minioRegion, "s3"), stringToSign, "hex");
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(buffer.length),
+      "Host": endpoint.host,
+      "X-Amz-Content-Sha256": payloadHash,
+      "X-Amz-Date": amzDate,
+      "Authorization": `AWS4-HMAC-SHA256 Credential=${minioAccessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    },
+    body: buffer,
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text.slice(0, 300) || `MinIO upload failed (${response.status})`);
+  }
+  return {
+    bucket,
+    objectPath,
+    publicUrl: `/minio/${bucket}/${objectPath}`,
+    sha256: payloadHash,
+    byteLength: buffer.length,
+    mimeType: contentType,
+  };
 }
 
 async function handleLogin(req, res) {
@@ -405,6 +548,64 @@ async function handleOpsApi(req, res, pathname) {
       } catch {
         body = { raw: text };
       }
+      const ok = response.ok && body?.ok !== false;
+      console.log(
+        JSON.stringify({
+          route: "character-canon-chat",
+          upstreamStatus: response.status,
+          upstreamOk: response.ok,
+          bodyOk: body?.ok,
+          ok,
+          error: body?.error ? String(body.error).slice(0, 240) : undefined,
+        }),
+      );
+      return sendJson(res, response.ok ? 200 : 502, {
+        upstreamStatus: response.status,
+        ...body,
+        ok,
+      });
+    } catch (error) {
+      return sendJson(res, 502, {
+        ok: false,
+        service: "ai-gateway",
+        error: error instanceof Error ? error.message : "ai-gateway health check failed",
+      });
+    }
+  }
+
+  return sendJson(res, 404, { error: "Not found" });
+}
+
+async function handleCharacterCanonApi(req, res, pathname) {
+  const user = requireApproved(req, res);
+  if (!user) return;
+
+  if (pathname === "/api/character-canon/chat" && req.method === "POST") {
+    try {
+      const payload = await readJsonBody(req);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+      let response;
+      try {
+        response = await fetch(`${aiGatewayBaseUrl}/character-canon/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Request-Id": `console-character-canon-chat-${Date.now()}`,
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      const text = await response.text();
+      let body;
+      try {
+        body = text ? JSON.parse(text) : {};
+      } catch {
+        body = { raw: text };
+      }
       return sendJson(res, response.ok ? 200 : 502, {
         ok: response.ok && body?.ok !== false,
         upstreamStatus: response.status,
@@ -414,7 +615,81 @@ async function handleOpsApi(req, res, pathname) {
       return sendJson(res, 502, {
         ok: false,
         service: "ai-gateway",
-        error: error instanceof Error ? error.message : "ai-gateway health check failed",
+        error:
+          error instanceof Error && error.name === "AbortError"
+            ? "character canon chat timed out after 120s"
+            : error instanceof Error
+              ? error.message
+              : "character canon chat failed",
+      });
+    }
+  }
+
+  return sendJson(res, 404, { error: "Not found" });
+}
+
+async function handleCharactersApi(req, res, pathname) {
+  const user = requireApproved(req, res);
+  if (!user) return;
+
+  if (pathname === "/api/characters/reference-upload" && req.method === "POST") {
+    try {
+      const body = await readRawBody(req);
+      const { fields, files } = parseMultipartFormData(req, body);
+      const file = files.find((item) => item.fieldName === "file") || files[0];
+      if (!file) {
+        return sendJson(res, 400, { ok: false, error: "Select an image file before uploading." });
+      }
+      const avatar = safeObjectPart(fields.avatar, "");
+      if (!avatar) {
+        return sendJson(res, 400, { ok: false, error: "avatar is required." });
+      }
+      const classification = safeObjectPart(fields.classification || "identity-candidate");
+      const scene = safeObjectPart(fields.scene || "portrait-canon");
+      const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+      if (!allowedTypes.has(file.contentType)) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: "Only PNG, JPEG, or WebP images can be uploaded.",
+        });
+      }
+      if (file.buffer.length < 1000) {
+        return sendJson(res, 400, { ok: false, error: "Image file is too small or empty." });
+      }
+      const extByType = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/webp": ".webp",
+      };
+      const ext = extByType[file.contentType] || extname(file.filename) || ".png";
+      const timestamp = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "").replace("T", "T");
+      const originalName = safeObjectPart(file.filename.replace(/\.[^.]+$/, ""), "reference");
+      const objectPath = [
+        "avatars",
+        avatar,
+        "references",
+        `${classification}-${scene}-${timestamp}-${randomBytes(4).toString("hex")}-${originalName}${ext}`,
+      ].join("/");
+      const uploaded = await putMinioObject({
+        bucket: minioBucket,
+        objectPath,
+        buffer: file.buffer,
+        contentType: file.contentType,
+      });
+      return sendJson(res, 200, {
+        ok: true,
+        upload: {
+          ...uploaded,
+          sourceFilename: file.filename,
+          classification,
+          scene,
+          uploadedBy: user.email,
+        },
+      });
+    } catch (error) {
+      return sendJson(res, error.statusCode || 500, {
+        ok: false,
+        error: error instanceof Error ? error.message : "Reference image upload failed.",
       });
     }
   }
@@ -456,6 +731,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/auth/callback") return handleCallback(req, res);
     if (pathname.startsWith("/api/auth/")) return handleAuthApi(req, res, pathname);
     if (pathname.startsWith("/api/ops/")) return handleOpsApi(req, res, pathname);
+    if (pathname.startsWith("/api/characters/")) return handleCharactersApi(req, res, pathname);
+    if (pathname.startsWith("/api/character-canon/")) return handleCharacterCanonApi(req, res, pathname);
     if (pathname.startsWith("/webhook/")) return proxyWebhook(req, res, pathname);
     if (pathname.startsWith("/minio/")) return proxyMinio(req, res, pathname);
     return serveStatic(req, res, pathname);

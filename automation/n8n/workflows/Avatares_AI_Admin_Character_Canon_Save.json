@@ -1,0 +1,110 @@
+{
+  "id": "adminCharacterCanonSaveV1",
+  "name": "Avatares AI - Admin - Character Canon Save",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin/characters/canon/save",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c86529f4-4664-4ad5-bc43-111111111158",
+      "name": "POST /admin/characters/canon/save",
+      "webhookId": "c86529f4-4664-4ad5-bc43-111111111158"
+    },
+    {
+      "parameters": {
+        "jsCode": "function sql(value) {\n  if (value === undefined || value === null) return 'NULL';\n  return \"'\" + String(value).replace(/'/g, \"''\") + \"'\";\n}\nfunction sqlJson(value) {\n  return sql(JSON.stringify(value ?? null)) + '::jsonb';\n}\nfunction slug(value) {\n  return String(value || '')\n    .trim()\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n    .replace(/-{2,}/g, '-');\n}\n\nconst body = $json.body || $json;\nconst avatar = slug(body.avatar || body.canonJson?.avatar || '');\nconst allowedStatuses = new Set([\n  'draft',\n  'proposed',\n  'proposed-import',\n  'operator-reviewed',\n  'approved',\n  'superseded',\n]);\nconst status = allowedStatuses.has(String(body.status)) ? String(body.status) : 'draft';\nconst schemaVersion = String(body.schemaVersion || body.schema_version || 'character-canon-v1').trim();\nconst canonJson = body.canonJson && typeof body.canonJson === 'object' ? body.canonJson : {};\nconst canonMarkdown = String(body.canonMarkdown || body.canon_markdown || '').trim();\nconst conversationSummary = String(body.conversationSummary || body.conversation_summary || '').trim();\nconst importSummary = String(body.importSummary || body.import_summary || '').trim();\nconst approvedBy = String(body.approvedBy || body.approved_by || 'operator').trim();\n\nif (!avatar || !canonJson || Object.keys(canonJson).length === 0) {\n  return [{ json: { query: \"SELECT false AS ok, 'avatar and canonJson are required' AS error;\" } }];\n}\n\nconst query = `\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\nCREATE TABLE IF NOT EXISTS character_canon_versions (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  avatar text NOT NULL REFERENCES character_onboarding(avatar) ON DELETE CASCADE,\n  canon_version integer NOT NULL,\n  schema_version text NOT NULL DEFAULT 'character-canon-v1',\n  status text NOT NULL DEFAULT 'draft',\n  canon_json jsonb NOT NULL DEFAULT '{}'::jsonb,\n  canon_markdown text NOT NULL DEFAULT '',\n  conversation_summary text,\n  import_summary text,\n  approved_at timestamptz,\n  approved_by text,\n  superseded_at timestamptz,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now(),\n  UNIQUE (avatar, canon_version)\n);\nCREATE INDEX IF NOT EXISTS character_canon_versions_avatar_status_idx\n  ON character_canon_versions (avatar, status, canon_version DESC);\nCREATE TABLE IF NOT EXISTS character_canon_imports (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  avatar text NOT NULL REFERENCES character_onboarding(avatar) ON DELETE CASCADE,\n  source_kind text NOT NULL DEFAULT 'markdown-import',\n  source_manifest jsonb NOT NULL DEFAULT '{}'::jsonb,\n  source_hash text NOT NULL,\n  status text NOT NULL DEFAULT 'proposed-import',\n  canon_version_id uuid REFERENCES character_canon_versions(id) ON DELETE SET NULL,\n  import_notes text,\n  created_at timestamptz NOT NULL DEFAULT now(),\n  updated_at timestamptz NOT NULL DEFAULT now(),\n  UNIQUE (avatar, source_hash)\n);\n\nWITH next_version AS (\n  SELECT COALESCE(MAX(canon_version), 0) + 1 AS canon_version\n  FROM character_canon_versions\n  WHERE avatar = ${sql(avatar)}\n), superseded AS (\n  UPDATE character_canon_versions\n  SET status = 'superseded',\n      superseded_at = now(),\n      updated_at = now()\n  WHERE avatar = ${sql(avatar)}\n    AND status = 'approved'\n    AND ${status === 'approved' ? 'true' : 'false'}\n  RETURNING id\n), saved AS (\n  INSERT INTO character_canon_versions (\n    avatar,\n    canon_version,\n    schema_version,\n    status,\n    canon_json,\n    canon_markdown,\n    conversation_summary,\n    import_summary,\n    approved_at,\n    approved_by\n  )\n  SELECT\n    ${sql(avatar)},\n    next_version.canon_version,\n    ${sql(schemaVersion)},\n    ${sql(status)},\n    ${sqlJson(canonJson)},\n    ${sql(canonMarkdown)},\n    ${sql(conversationSummary)},\n    ${sql(importSummary)},\n    CASE WHEN ${sql(status)} = 'approved' THEN now() ELSE NULL END,\n    CASE WHEN ${sql(status)} = 'approved' THEN ${sql(approvedBy)} ELSE NULL END\n  FROM next_version\n  RETURNING *\n)\nSELECT true AS ok,\n  jsonb_build_object(\n    'id', id,\n    'avatar', avatar,\n    'canonVersion', canon_version,\n    'schemaVersion', schema_version,\n    'status', status,\n    'canonJson', canon_json,\n    'canonMarkdown', canon_markdown,\n    'conversationSummary', conversation_summary,\n    'importSummary', import_summary,\n    'approvedAt', approved_at,\n    'approvedBy', approved_by,\n    'createdAt', created_at,\n    'updatedAt', updated_at\n  ) AS canon\nFROM saved;\n`;\n\nreturn [{ json: { query } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        0
+      ],
+      "id": "c86529f4-4664-4ad5-bc43--code",
+      "name": "Build Query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        0
+      ],
+      "id": "c86529f4-4664-4ad5-bc4-postgres",
+      "name": "Save Character Canon",
+      "credentials": {
+        "postgres": {
+          "id": "0hjEP0oTqW1YY9UO",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first()?.json || {};\nif (row.ok === false || row.ok === 'f') {\n  return [{ json: { ok: false, message: row.error || 'Character canon request failed.' } }];\n}\nconst result = typeof row.result === 'string' ? JSON.parse(row.result) : row.result;\nconst canon = typeof row.canon === 'string' ? JSON.parse(row.canon) : row.canon;\nreturn [{ json: { ok: true, ...(result || {}), ...(canon ? { canon } : {}) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        0
+      ],
+      "id": "c86529f4-4664-4ad5-bc4-return",
+      "name": "Return Saved Canon"
+    }
+  ],
+  "connections": {
+    "POST /admin/characters/canon/save": {
+      "main": [
+        [
+          {
+            "node": "Build Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Query": {
+      "main": [
+        [
+          {
+            "node": "Save Character Canon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Character Canon": {
+      "main": [
+        [
+          {
+            "node": "Return Saved Canon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": true
+}

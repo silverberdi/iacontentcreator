@@ -116,11 +116,13 @@ function mergePromptDisplay(
   positivePrompt: string;
   negativePrompt: string;
   referenceImages: string[];
+  characterSceneDirective: PromptPackData["characterSceneDirective"] | undefined;
 } {
   return {
     positivePrompt: promptPack?.positivePrompt ?? sceneBrief?.positivePrompt ?? "",
     negativePrompt: promptPack?.negativePrompt ?? sceneBrief?.negativePrompt ?? "",
     referenceImages: promptPack?.referenceImages ?? sceneBrief?.referenceImages ?? [],
+    characterSceneDirective: promptPack?.characterSceneDirective,
   };
 }
 

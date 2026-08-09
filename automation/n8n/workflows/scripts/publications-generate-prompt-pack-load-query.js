@@ -31,7 +31,7 @@ WITH job AS (
   JOIN job pj ON pj.avatar = car.avatar
   WHERE car.scene = (SELECT scene FROM job)
     AND car.asset_type = 'raw-image'
-    AND COALESCE(car.status, '') IN ('canonical', 'selected', 'raw')
+    AND COALESCE(car.status, '') IN ('canonical', 'selected')
   ORDER BY
     CASE
       WHEN COALESCE(car.is_canonical, false) = true OR car.status = 'canonical' THEN 1
@@ -57,7 +57,7 @@ WITH job AS (
   JOIN job pj ON pj.avatar = car.avatar
   WHERE car.scene IN ('portrait-canon', 'public-identity')
     AND car.asset_type = 'raw-image'
-    AND COALESCE(car.status, '') IN ('canonical', 'selected', 'raw')
+    AND COALESCE(car.status, '') IN ('canonical', 'selected')
   ORDER BY
     CASE
       WHEN COALESCE(car.is_canonical, false) = true OR car.status = 'canonical' THEN 1
@@ -86,6 +86,21 @@ WITH job AS (
     AND car.asset_id::text <> COALESCE(pj.metadata->>'latestGeneratedAssetId', '')
   ORDER BY car.created_at DESC
   LIMIT 8
+), approved_canon AS (
+  SELECT
+    ccv.canon_json,
+    ccv.canon_markdown,
+    ccv.canon_version,
+    ccv.status,
+    ccv.updated_at
+  FROM character_canon_versions ccv
+  JOIN job pj ON pj.avatar = ccv.avatar
+  WHERE ccv.status IN ('approved', 'operator-reviewed')
+  ORDER BY
+    CASE ccv.status WHEN 'approved' THEN 1 WHEN 'operator-reviewed' THEN 2 ELSE 3 END,
+    ccv.canon_version DESC,
+    ccv.updated_at DESC
+  LIMIT 1
 )
 SELECT
   true AS ok,
@@ -110,6 +125,9 @@ SELECT
   COALESCE(sb.avoid, '[]'::jsonb) AS "sceneAvoidRules",
   COALESCE(sb.content_angle, '') AS "sceneContentAngle",
   COALESCE(sb.prompt_notes, '') AS "scenePromptNotes",
+  (SELECT canon_json FROM approved_canon) AS "approvedCanonJson",
+  COALESCE((SELECT canon_markdown FROM approved_canon), '') AS "approvedCanonMarkdown",
+  (SELECT canon_version FROM approved_canon) AS "approvedCanonVersion",
   COALESCE((
     SELECT jsonb_agg(jsonb_build_object(
       'assetId', asset_id,
@@ -148,7 +166,7 @@ SELECT
   ${sql(JSON.stringify(manualPromptPack))}::jsonb AS "manualPromptPack"
 FROM job pj
 LEFT JOIN avatar_catalog ac ON ac.avatar = pj.avatar
-LEFT JOIN scene_catalog sc ON sc.avatar = pj.avatar AND sc.scene = pj.scene
+LEFT JOIN scene_catalog sc ON sc.scene = pj.scene
 LEFT JOIN scene_brief_catalog sb ON sb.avatar = pj.avatar AND sb.scene = pj.scene
 LIMIT 1;
 `;

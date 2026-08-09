@@ -552,6 +552,7 @@ export default function PublicationsPanel({
   ) as PublicationPromptPack & { operatorSummary?: Record<string, unknown> };
   const promptOperatorSummary = readRecord(promptPackPreview.operatorSummary);
   const promptCompositionPolicy = readRecord(promptPackPreview.compositionPolicy);
+  const promptCharacterSceneDirective = promptPackPreview.characterSceneDirective;
   const promptHumanFeedbackInfluence = readRecord(promptPackPreview.humanFeedbackInfluence);
   const promptHumanFeedbackCategories = Array.isArray(promptHumanFeedbackInfluence.categories)
     ? promptHumanFeedbackInfluence.categories.map(String).filter(Boolean)
@@ -2375,6 +2376,60 @@ export default function PublicationsPanel({
 
           {promptPackText && !technicalMode ? (
             <div className="grid gap-3 rounded-md border border-border bg-surface p-4 text-sm">
+              {promptCharacterSceneDirective ? (
+                <div className="rounded-md border border-blue-800/60 bg-blue-950/30 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-blue-200">
+                      Canon aplicado a esta escena
+                    </p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        promptCharacterSceneDirective.canonUsed
+                          ? "bg-emerald-900/60 text-emerald-100"
+                          : "bg-amber-900/60 text-amber-100"
+                      }`}
+                    >
+                      {promptCharacterSceneDirective.canonUsed ? "Canon usado" : "Sin canon aprobado"}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                    {promptCharacterSceneDirective.identityLock && (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-blue-300/80">Identidad</p>
+                        <p className="mt-1 text-gray-200">{promptCharacterSceneDirective.identityLock}</p>
+                      </div>
+                    )}
+                    {promptCharacterSceneDirective.emotionalMagnetism && (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-blue-300/80">Energía</p>
+                        <p className="mt-1 text-gray-200">{promptCharacterSceneDirective.emotionalMagnetism}</p>
+                      </div>
+                    )}
+                    {promptCharacterSceneDirective.sceneBehavior && (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-blue-300/80">Conducta en escena</p>
+                        <p className="mt-1 text-gray-200">{promptCharacterSceneDirective.sceneBehavior}</p>
+                      </div>
+                    )}
+                    {promptCharacterSceneDirective.bodyRealism && (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-blue-300/80">Realismo físico</p>
+                        <p className="mt-1 text-gray-200">{promptCharacterSceneDirective.bodyRealism}</p>
+                      </div>
+                    )}
+                  </div>
+                  {Array.isArray(promptCharacterSceneDirective.mustAvoid) &&
+                    promptCharacterSceneDirective.mustAvoid.length > 0 && (
+                      <p className="mt-3 text-xs text-blue-100/90">
+                        Evitar: {promptCharacterSceneDirective.mustAvoid.join(", ")}
+                      </p>
+                    )}
+                </div>
+              ) : (
+                <div className="rounded-md border border-amber-800/50 bg-amber-950/20 px-3 py-2 text-xs text-amber-100">
+                  Este prompt pack no muestra una directiva de canon. Si es un job anterior, regenera el prompt pack antes de generar otra imagen.
+                </div>
+              )}
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Visual direction</p>
                 <p className="mt-1 text-gray-200">

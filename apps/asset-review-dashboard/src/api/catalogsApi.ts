@@ -29,7 +29,6 @@ export async function upsertCatalogItem(
       ? {
           catalogType: payload.catalogType,
           catalog: payload.catalog,
-          avatar: payload.avatar,
           scene: payload.scene,
           displayName: payload.displayName,
           ...(payload.description ? { description: payload.description } : {}),

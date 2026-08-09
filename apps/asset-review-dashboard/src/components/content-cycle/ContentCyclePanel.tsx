@@ -275,6 +275,7 @@ export default function ContentCyclePanel() {
               positivePrompt={promptDisplay.positivePrompt}
               negativePrompt={promptDisplay.negativePrompt}
               referenceImages={promptDisplay.referenceImages}
+              characterSceneDirective={promptDisplay.characterSceneDirective}
               jobId={data.jobId}
               showTechnical={showTechnical}
               loading={isLoading("prepareContent")}

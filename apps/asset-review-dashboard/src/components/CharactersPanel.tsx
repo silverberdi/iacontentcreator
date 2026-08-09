@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  chatCharacterCanon,
   ingestCanonPortraitOutput,
+  listCharacterCanons,
   listCharacterOnboarding,
   listCharacterReferences,
   queueCanonPortraitGeneration,
   registerCharacterReference,
   runCanonPortraitGeneration,
+  saveCharacterCanon,
   saveCharacterOnboarding,
+  uploadCharacterReferenceImage,
 } from "../api/charactersApi";
 import {
   characterTypeBlueprints,
@@ -14,6 +18,10 @@ import {
 } from "../data/characterBlueprints";
 import type {
   CharacterAvatarType,
+  CharacterCanonRecord,
+  CharacterCanonSection,
+  CharacterCanonSectionStatus,
+  CharacterCanonChatResponse,
   CharacterOnboardingRecord,
   CharacterOnboardingSavePayload,
   CharacterOnboardingStatus,
@@ -21,7 +29,6 @@ import type {
   CharacterCanonPortraitPromptPack,
   CharacterReferenceClassification,
   CharacterReferenceRecord,
-  CharacterSceneDraft,
   ReferencePolicy,
 } from "../types/characters";
 
@@ -36,20 +43,27 @@ const STATUS_LABELS: Record<CharacterOnboardingStatus, string> = {
 type WizardStepId =
   | "type"
   | "identity"
-  | "voice"
-  | "limits"
-  | "scenes"
+  | "canon"
   | "visual"
   | "summary";
 
+type CanonTabId = "overview" | "import" | "conversation" | "document" | "sections" | "approval";
+
 const WIZARD_STEPS: { id: WizardStepId; label: string; helper: string }[] = [
   { id: "type", label: "Type", helper: "Choose the blueprint." },
-  { id: "identity", label: "Identity", helper: "Name and objective." },
-  { id: "voice", label: "Voice", helper: "Pillars, tone, and fit." },
-  { id: "limits", label: "Limits", helper: "Rules and review triggers." },
-  { id: "scenes", label: "Scenes", helper: "Starter contexts." },
-  { id: "visual", label: "Visual", helper: "Canon strategy." },
-  { id: "summary", label: "Summary", helper: "Save and continue." },
+  { id: "identity", label: "Identity", helper: "Name and objective only." },
+  { id: "canon", label: "Canon", helper: "Build the character truth." },
+  { id: "visual", label: "Visual", helper: "Reference strategy." },
+  { id: "summary", label: "Summary", helper: "Review operational output." },
+];
+
+const CANON_TABS: { id: CanonTabId; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "import", label: "Import" },
+  { id: "conversation", label: "Conversation" },
+  { id: "document", label: "Document" },
+  { id: "sections", label: "Sections" },
+  { id: "approval", label: "Approval" },
 ];
 
 const DEFAULT_REFERENCE_POLICY: ReferencePolicy = {
@@ -115,18 +129,11 @@ const REFERENCE_CLASSIFICATION_OPTIONS: {
 ];
 
 const EMPTY_REFERENCE_FORM = {
-  classification: "identity-canon" as CharacterReferenceClassification,
+  classification: "identity-candidate" as CharacterReferenceClassification,
   scene: "portrait-canon",
   objectPathOrUrl: "",
   reviewNotes: "",
 };
-
-function splitList(value: string): string[] {
-  return value
-    .split(/[\n,;]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
 
 function joinList(value: string[] | undefined): string {
   return (value ?? []).join(", ");
@@ -140,6 +147,500 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-");
+}
+
+const CANON_READINESS_TOPICS = [
+  {
+    key: "identity",
+    label: "Identity",
+    matches: ["identity", "overview", "character_core", "canon"],
+  },
+  {
+    key: "psychology",
+    label: "Psychology",
+    matches: ["psychology", "emotional", "behavior", "private_life", "childhood", "adolescence"],
+  },
+  {
+    key: "appearance",
+    label: "Appearance",
+    matches: ["appearance", "visual", "visual_dna", "wardrobe", "cinematic", "camera"],
+  },
+  {
+    key: "voice",
+    label: "Voice",
+    matches: ["voice", "speaking", "caption", "expression", "tone"],
+  },
+  {
+    key: "boundaries",
+    label: "Limits",
+    matches: ["boundaries", "safety", "limits", "review", "romantic_dynamics"],
+  },
+  {
+    key: "scenes",
+    label: "Scenes",
+    matches: ["scene", "lifestyle", "social_life", "locations", "present_day"],
+  },
+  {
+    key: "content",
+    label: "Content",
+    matches: ["content", "positioning", "brand", "music", "references"],
+  },
+];
+
+const CANON_TOPIC_GUIDES: Record<
+  string,
+  {
+    prompt: string;
+    examples: string[];
+  }
+> = {
+  identity: {
+    prompt:
+      "Who is this character when nobody is watching? Define origin, current life, emotional center, and what must remain true across every scene.",
+    examples: [
+      "Where are they from and where do they live now?",
+      "What life tension or desire shapes them?",
+      "What should never change about their identity?",
+    ],
+  },
+  psychology: {
+    prompt:
+      "Describe their inner world: fears, attachments, contradictions, wounds, habits, and how they behave under pressure.",
+    examples: [
+      "What do they want but rarely say directly?",
+      "What makes them pull closer or step back?",
+      "What contradiction makes them feel human?",
+    ],
+  },
+  appearance: {
+    prompt:
+      "Define the visual DNA: body, face, styling, wardrobe, sensuality level, camera language, and visual anti-patterns.",
+    examples: [
+      "How should they look in a portrait?",
+      "What clothing, colors, or framing belong to them?",
+      "What visual outcomes should be rejected?",
+    ],
+  },
+  voice: {
+    prompt:
+      "Define how they speak: tone, vocabulary, emotional rhythm, humor, flirting style, and phrases they would avoid.",
+    examples: [
+      "Are they direct, poetic, playful, reserved?",
+      "How do they write a caption?",
+      "What sounds out of character?",
+    ],
+  },
+  boundaries: {
+    prompt:
+      "Define hard limits: safety, intimacy, nudity, claims, emotional dependency, public/private separation, and review triggers.",
+    examples: [
+      "What can be sensual and what crosses the line?",
+      "What must always require human review?",
+      "What should the character never promise?",
+    ],
+  },
+  scenes: {
+    prompt:
+      "Define recurring scenes: where this character appears, what mood each scene carries, and what visual references matter.",
+    examples: [
+      "What are their 3-5 canonical environments?",
+      "Which scenes are public vs private?",
+      "What props or settings reinforce identity?",
+    ],
+  },
+  content: {
+    prompt:
+      "Define what this character publishes: content pillars, formats, audience relationship, monetization posture, and anti-patterns.",
+    examples: [
+      "What topics can they post about every week?",
+      "What does the audience come to them for?",
+      "What would make the account feel fake or cheap?",
+    ],
+  },
+};
+
+const OBJECTIVE_READINESS_PROFILES: Record<
+  CharacterAvatarType,
+  {
+    label: string;
+    description: string;
+    criteria: {
+      key: string;
+      label: string;
+      matches: string[];
+      missingHint: string;
+    }[];
+  }
+> = {
+  "gfe-bfe": {
+    label: "GFE / BFE readiness",
+    description:
+      "Measures whether the character is safe and specific enough for companion-style emotional intimacy, not just whether the general persona exists.",
+    criteria: [
+      {
+        key: "intimacy_policy",
+        label: "Intimacy policy",
+        matches: ["intimacy", "intimidad", "romantic", "romant", "sensual", "nudity", "desnudez"],
+        missingHint: "Define sensuality, nudity policy, romantic tone, and what crosses the line.",
+      },
+      {
+        key: "dependency_safety",
+        label: "Dependency safety",
+        matches: ["dependency", "dependencia", "vulnerability", "vulnerab", "loneliness", "soledad", "manipulation"],
+        missingHint: "Define anti-dependency rules, vulnerability handling, and non-manipulative behavior.",
+      },
+      {
+        key: "relationship_progression",
+        label: "Relationship progression",
+        matches: ["progression", "progres", "closeness", "cercania", "trust", "confianza", "relationship"],
+        missingHint: "Define how closeness develops, what is earned over time, and what is never promised.",
+      },
+      {
+        key: "public_private_split",
+        label: "Public/private split",
+        matches: ["public", "private", "premium", "monetization", "monetiz", "subscription", "suscrip"],
+        missingHint: "Separate public content, private experience, premium limits, and disclosure rules.",
+      },
+      {
+        key: "audience_eligibility",
+        label: "Audience eligibility",
+        matches: ["adult", "18", "edad", "eligibility", "eligible", "consent", "consentimiento"],
+        missingHint: "Define adult-only handling, consent, eligibility, and disallowed users/situations.",
+      },
+    ],
+  },
+  influencer: {
+    label: "Influencer readiness",
+    description:
+      "Measures whether the character can operate as a believable public lifestyle/brand account.",
+    criteria: [
+      {
+        key: "brand_positioning",
+        label: "Brand positioning",
+        matches: ["brand", "marca", "sponsor", "commercial", "partnership", "collaboration"],
+        missingHint: "Define brand fit, sponsorship rules, commercial posture, and forbidden categories.",
+      },
+      {
+        key: "content_calendar",
+        label: "Content system",
+        matches: ["content", "pillar", "format", "series", "calendar", "platform"],
+        missingHint: "Define recurring content pillars, formats, platform behavior, and posting patterns.",
+      },
+      {
+        key: "public_identity",
+        label: "Public identity",
+        matches: ["public", "audience", "followers", "persona", "online", "presence"],
+        missingHint: "Define how the public account behaves, what it reveals, and what remains private.",
+      },
+      {
+        key: "claims_safety",
+        label: "Claims safety",
+        matches: ["claim", "medical", "wellness", "skincare", "political", "review", "regulated"],
+        missingHint: "Define claim boundaries, review triggers, disclosures, and regulated-topic limits.",
+      },
+      {
+        key: "visual_consistency",
+        label: "Visual consistency",
+        matches: ["visual", "wardrobe", "camera", "style", "aesthetic", "reference"],
+        missingHint: "Define recognizable styling, camera language, scenes, and visual anti-patterns.",
+      },
+    ],
+  },
+  authority: {
+    label: "Authority readiness",
+    description:
+      "Measures whether the character can publish credible expert content without overclaiming.",
+    criteria: [
+      {
+        key: "expertise_domain",
+        label: "Expertise domain",
+        matches: ["expertise", "domain", "field", "territory", "knowledge", "credibility"],
+        missingHint: "Define what the character is qualified to discuss and where authority comes from.",
+      },
+      {
+        key: "claim_boundaries",
+        label: "Claim boundaries",
+        matches: ["claim", "citation", "source", "evidence", "regulated", "legal", "financial", "medical"],
+        missingHint: "Define citations, factual boundaries, regulated topics, and uncertainty language.",
+      },
+      {
+        key: "trust_posture",
+        label: "Trust posture",
+        matches: ["trust", "credibility", "humility", "opinion", "disclosure", "transparency"],
+        missingHint: "Define credibility posture, humility, disclosure, and how opinion is separated from fact.",
+      },
+      {
+        key: "teaching_style",
+        label: "Teaching style",
+        matches: ["teaching", "education", "explainer", "framework", "analysis", "advice"],
+        missingHint: "Define how the character explains, teaches, analyzes, and structures useful content.",
+      },
+      {
+        key: "professional_visuals",
+        label: "Professional visuals",
+        matches: ["professional", "office", "studio", "podcast", "event", "visual", "camera"],
+        missingHint: "Define visual language, professional scenes, and credibility-building aesthetics.",
+      },
+    ],
+  },
+};
+
+function getSectionText(section: CharacterCanonSection): string {
+  const fullMarkdown = section.data?.fullMarkdown;
+  return [
+    section.key,
+    section.label,
+    section.summary,
+    typeof fullMarkdown === "string" ? fullMarkdown : "",
+    section.sourceRefs?.join(" ") ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function scoreEvidence(evidenceChars: number) {
+  return evidenceChars >= 2500 ? 100 : evidenceChars >= 900 ? 70 : evidenceChars >= 250 ? 40 : evidenceChars > 0 ? 20 : 0;
+}
+
+function topicLabel(topicKey: string): string {
+  return CANON_READINESS_TOPICS.find((topic) => topic.key === topicKey)?.label ?? "Canon topic";
+}
+
+function sectionMatchesTopic(section: CharacterCanonSection, topicKey: string): boolean {
+  const topic = CANON_READINESS_TOPICS.find((item) => item.key === topicKey);
+  if (!topic) return false;
+  const text = getSectionText(section);
+  return topic.matches.some((token) => text.includes(token));
+}
+
+function getTopicEvidence(
+  canon: CharacterCanonRecord["canonJson"] | null,
+  topicKey: string,
+): CharacterCanonSection[] {
+  return (canon?.sections ?? []).filter((section) => sectionMatchesTopic(section, topicKey)).slice(0, 4);
+}
+
+function normalizeSectionStatus(status: unknown): CharacterCanonSectionStatus {
+  return status === "missing" || status === "draft" || status === "approved"
+    ? status
+    : "review-needed";
+}
+
+function getCanonTopicProgress(canon: CharacterCanonRecord["canonJson"] | null) {
+  const sections = canon?.sections ?? [];
+  return CANON_READINESS_TOPICS.map((topic) => {
+    const matchedSections = sections.filter((section) => {
+      const text = getSectionText(section);
+      return topic.matches.some((token) => text.includes(token));
+    });
+    const evidenceChars = matchedSections.reduce((total, section) => {
+      const fullMarkdown = section.data?.fullMarkdown;
+      return total + section.summary.length + (typeof fullMarkdown === "string" ? fullMarkdown.length : 0);
+    }, 0);
+    const score = scoreEvidence(evidenceChars);
+    return {
+      ...topic,
+      score,
+      sectionCount: matchedSections.length,
+      status: score >= 70 ? "healthy" : score > 0 ? "thin" : "missing",
+    };
+  });
+}
+
+function getObjectiveReadinessProgress(
+  canon: CharacterCanonRecord["canonJson"] | null,
+  avatarType: CharacterAvatarType,
+) {
+  const profile = OBJECTIVE_READINESS_PROFILES[avatarType];
+  const sections = canon?.sections ?? [];
+  const criteria = profile.criteria.map((criterion) => {
+    const matchedSections = sections.filter((section) => {
+      const text = getSectionText(section);
+      return criterion.matches.some((token) => text.includes(token.toLowerCase()));
+    });
+    const evidenceChars = matchedSections.reduce((total, section) => {
+      const fullMarkdown = section.data?.fullMarkdown;
+      return total + section.summary.length + (typeof fullMarkdown === "string" ? fullMarkdown.length : 0);
+    }, 0);
+    const score = scoreEvidence(evidenceChars);
+    return {
+      ...criterion,
+      score,
+      sectionCount: matchedSections.length,
+      status: score >= 70 ? "healthy" : score > 0 ? "thin" : "missing",
+    };
+  });
+  const score = Math.round(
+    criteria.reduce((total, criterion) => total + criterion.score, 0) / Math.max(criteria.length, 1),
+  );
+  return {
+    ...profile,
+    score,
+    criteria,
+    weakCriteria: criteria.filter((criterion) => criterion.status !== "healthy"),
+  };
+}
+
+function readinessBarClass(score: number) {
+  return score >= 80 ? "bg-emerald-500" : score >= 50 ? "bg-amber-500" : "bg-red-500";
+}
+
+function hashString(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).padStart(8, "0");
+}
+
+function buildImportedCanon(
+  draft: CharacterOnboardingSavePayload,
+  importName: string,
+  markdownInput: string,
+): CharacterCanonRecord["canonJson"] {
+  const chunks = markdownInput
+    .split(/\n(?=#{1,2}\s+)/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+  const sections = (chunks.length ? chunks : [markdownInput.trim()]).map((chunk, index) => {
+    const firstLine = chunk.split("\n").find((line) => line.trim()) ?? `Imported section ${index + 1}`;
+    const label = firstLine.replace(/^#+\s*/, "").trim().slice(0, 90) || `Imported section ${index + 1}`;
+    const keyBase = slugify(label) || `imported-section-${index + 1}`;
+    const summary = chunk
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && !line.startsWith("---"))
+      .slice(0, 5)
+      .join(" ")
+      .slice(0, 700);
+    return {
+      key: `${keyBase}-${index + 1}`,
+      label,
+      status: "review-needed" as const,
+      summary: summary || "Imported canon section needs review.",
+      data: {
+        sourcePath: importName || "operator-import",
+        fullMarkdown: chunk,
+      },
+      sourceRefs: [importName || "operator-import"],
+    };
+  });
+
+  return {
+    avatar: draft.avatar || slugify(draft.displayName),
+    avatarType: draft.avatarType,
+    displayName: draft.displayName,
+    sections,
+    source: {
+      kind: "markdown-import",
+      importedFrom: [importName || "operator-import"],
+      importedAt: new Date().toISOString(),
+    },
+  };
+}
+
+function applyCanonTopicAnswer(
+  baseCanon: CharacterCanonRecord["canonJson"] | null,
+  draft: CharacterOnboardingSavePayload,
+  topicKey: string,
+  answer: string,
+): CharacterCanonRecord["canonJson"] {
+  const answerText = answer.trim();
+  const label = topicLabel(topicKey);
+  const key = `guided_${topicKey}`;
+  const now = new Date().toISOString();
+  const base = baseCanon ?? buildCanonProposal(draft, "");
+  const existingIndex = base.sections.findIndex((section) => section.key === key);
+  const existing = existingIndex >= 0 ? base.sections[existingIndex] : null;
+  const previousMarkdown =
+    existing && typeof existing.data.fullMarkdown === "string" ? existing.data.fullMarkdown : "";
+  const fullMarkdown = [
+    previousMarkdown,
+    `## Operator answer - ${now}`,
+    "",
+    answerText,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const nextSection: CharacterCanonSection = {
+    key,
+    label,
+    status: "review-needed",
+    summary: answerText.slice(0, 700),
+    data: {
+      topic: topicKey,
+      fullMarkdown,
+      updatedAt: now,
+    },
+    sourceRefs: ["guided-canon-conversation"],
+  };
+
+  const sections =
+    existingIndex >= 0
+      ? base.sections.map((section, index) => (index === existingIndex ? nextSection : section))
+      : [...base.sections, nextSection];
+
+  return {
+    ...base,
+    avatar: draft.avatar || base.avatar || slugify(draft.displayName),
+    avatarType: draft.avatarType,
+    displayName: draft.displayName || base.displayName,
+    sections,
+    source: {
+      kind: "conversation",
+      importedFrom: base.source?.importedFrom ?? [],
+      importedAt: base.source?.importedAt ?? now,
+    },
+  };
+}
+
+function isImportWrapperSection(section: CharacterCanonSection) {
+  const fullMarkdown = typeof section.data.fullMarkdown === "string" ? section.data.fullMarkdown : "";
+  return /\.md$/i.test(section.label.trim()) && fullMarkdown.length < 120;
+}
+
+function compactLongOperatorAnswer(answer: string) {
+  const text = answer.trim();
+  const maxDirectChars = 4500;
+  if (text.length <= maxDirectChars) {
+    return {
+      isLong: false,
+      message: text,
+    };
+  }
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const signalLines = lines
+    .filter((line) =>
+      /%|falta|gap|riesgo|recomend|fortaleza|debilidad|gfe|bfe|canon|identidad|visual|limite|límite|intimidad/i.test(
+        line,
+      ),
+    )
+    .slice(0, 24);
+  const head = text.slice(0, 2200);
+  const tail = text.slice(-1800);
+  return {
+    isLong: true,
+    message: [
+      "The operator provided a long answer, possibly developed with another AI assistant.",
+      "Treat it as the operator's answer to this turn, not as a separate imported document.",
+      "Use the compacted evidence below to continue the conversation and update canon sections.",
+      "",
+      `Original length: ${text.length} characters.`,
+      "",
+      "Detected signal lines:",
+      signalLines.length ? signalLines.map((line) => `- ${line}`).join("\n") : "- No explicit signal lines detected.",
+      "",
+      "Opening excerpt:",
+      head,
+      "",
+      "Closing excerpt:",
+      tail,
+    ].join("\n"),
+  };
 }
 
 function inferStatus(payload: CharacterOnboardingSavePayload): CharacterOnboardingStatus {
@@ -190,21 +691,153 @@ function isStepComplete(step: WizardStepId, draft: CharacterOnboardingSavePayloa
       return Boolean(
         draft.displayName && draft.avatar && draft.avatarShort && draft.primaryObjective,
       );
-    case "voice":
-      return (
-        draft.contentPillars.length > 0 &&
-        draft.captionTone.length > 0 &&
-        draft.brandFit.length > 0
-      );
-    case "limits":
-      return draft.publishingLimits.length > 0 && draft.reviewTriggers.length > 0;
-    case "scenes":
-      return draft.scenes.some((scene) => scene.scene && scene.displayName);
+    case "canon":
+      return Boolean(draft.primaryObjective);
     case "visual":
       return draft.referencePolicy.identityCanon && draft.referencePolicy.sceneCanon;
     case "summary":
       return inferStatus(draft) !== "draft";
   }
+}
+
+function buildCanonMarkdown(sections: CharacterCanonSection[]): string {
+  return sections
+    .map((section) => {
+      const source = section.sourceRefs?.length
+        ? `\n\nSource refs: ${section.sourceRefs.join(", ")}`
+        : "";
+      return `## ${section.label}\n\n${section.summary}${source}`;
+    })
+    .join("\n\n");
+}
+
+function buildCanonProposal(
+  draft: CharacterOnboardingSavePayload,
+  conversationNotes: string,
+): CharacterCanonRecord["canonJson"] {
+  const baseSource = conversationNotes.trim()
+    ? ["operator-conversation-notes"]
+    : ["onboarding-fields"];
+  const sections: CharacterCanonSection[] = [
+    {
+      key: "identity",
+      label: "Identity",
+      status: draft.displayName && draft.primaryObjective ? "review-needed" : "missing",
+      summary: `${draft.displayName || "Unnamed character"} exists to ${draft.primaryObjective || "define a clear creative objective"}.`,
+      data: {
+        displayName: draft.displayName,
+        businessProfile: draft.businessProfile,
+        primaryObjective: draft.primaryObjective,
+      },
+      sourceRefs: baseSource,
+    },
+    {
+      key: "voice",
+      label: "Voice And Tone",
+      status: draft.captionTone.length ? "review-needed" : "missing",
+      summary: `Voice should feel ${joinList(draft.captionTone) || "not defined yet"}.`,
+      data: {
+        captionTone: draft.captionTone,
+        contentPillars: draft.contentPillars,
+      },
+      sourceRefs: baseSource,
+    },
+    {
+      key: "boundaries",
+      label: "Boundaries And Safety",
+      status: draft.publishingLimits.length || draft.reviewTriggers.length ? "review-needed" : "missing",
+      summary: `Publishing limits: ${joinList(draft.publishingLimits) || "pending"}. Review triggers: ${joinList(draft.reviewTriggers) || "pending"}.`,
+      data: {
+        publishingLimits: draft.publishingLimits,
+        reviewTriggers: draft.reviewTriggers,
+      },
+      sourceRefs: baseSource,
+    },
+    {
+      key: "visual_dna",
+      label: "Visual DNA",
+      status: draft.brandFit.length ? "review-needed" : "missing",
+      summary: `Visual brand fit: ${joinList(draft.brandFit) || "pending"}.`,
+      data: {
+        brandFit: draft.brandFit,
+        referencePolicy: draft.referencePolicy,
+      },
+      sourceRefs: baseSource,
+    },
+    {
+      key: "scenes",
+      label: "Scenes",
+      status: draft.scenes.length ? "review-needed" : "missing",
+      summary: `Starter scenes: ${draft.scenes.map((scene) => scene.displayName || scene.scene).join(", ") || "pending"}.`,
+      data: {
+        scenes: draft.scenes,
+      },
+      sourceRefs: baseSource,
+    },
+    {
+      key: "operator_conversation",
+      label: "Operator Conversation",
+      status: conversationNotes.trim() ? "review-needed" : "missing",
+      summary: conversationNotes.trim() || "No conversational nuance captured yet.",
+      data: {
+        notes: conversationNotes.trim(),
+      },
+      sourceRefs: ["operator-input"],
+    },
+  ];
+
+  if (draft.avatarType === "gfe-bfe") {
+    sections.push({
+      key: "relationship_dynamics",
+      label: "Relationship Dynamics",
+      status: "review-needed",
+      summary:
+        "Define intimacy, sensuality, public/private separation, emotional dependency risk, nudity policy, and premium boundaries before publication.",
+      data: {
+        requiredControls: [
+          "intimacyLevel",
+          "sensualityLevel",
+          "nudityPolicy",
+          "publicPrivateSeparation",
+          "emotionalDependencyRisk",
+          "premiumBoundaries",
+        ],
+      },
+      sourceRefs: ["gfe-bfe-blueprint"],
+    });
+  }
+
+  if (draft.avatarType === "authority") {
+    sections.push({
+      key: "authority_model",
+      label: "Authority Model",
+      status: "review-needed",
+      summary:
+        "Define expertise domain, credibility posture, claim boundaries, citation expectations, and trust-building patterns.",
+      data: {
+        requiredControls: [
+          "expertiseDomain",
+          "credibilityPosture",
+          "claimBoundaries",
+          "citationExpectations",
+          "trustPatterns",
+        ],
+      },
+      sourceRefs: ["authority-blueprint"],
+    });
+  }
+
+  return {
+    avatar: draft.avatar || slugify(draft.displayName),
+    avatarType: draft.avatarType,
+    displayName: draft.displayName,
+    sections,
+    source: {
+      kind: "conversation",
+      importedFrom: [],
+      importedAt: new Date().toISOString(),
+    },
+  };
 }
 
 type CharactersPanelProps = {
@@ -214,12 +847,16 @@ type CharactersPanelProps = {
 export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelProps) {
   const [characters, setCharacters] = useState<CharacterOnboardingRecord[]>([]);
   const [references, setReferences] = useState<CharacterReferenceRecord[]>([]);
+  const [canons, setCanons] = useState<CharacterCanonRecord[]>([]);
+  const [approvedCanon, setApprovedCanon] = useState<CharacterCanonRecord | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [draft, setDraft] = useState<CharacterOnboardingSavePayload>(DEFAULT_CHARACTER);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [referencesLoading, setReferencesLoading] = useState(false);
   const [referenceSaving, setReferenceSaving] = useState(false);
+  const [referenceUploading, setReferenceUploading] = useState(false);
+  const [referenceUploadFile, setReferenceUploadFile] = useState<File | null>(null);
   const [referenceForm, setReferenceForm] = useState(EMPTY_REFERENCE_FORM);
   const [canonSaving, setCanonSaving] = useState(false);
   const [canonRunning, setCanonRunning] = useState(false);
@@ -229,6 +866,25 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     useState<CharacterCanonPortraitPromptPack | null>(null);
   const [canonInstructions, setCanonInstructions] = useState<string[]>([]);
   const [canonOutputUrl, setCanonOutputUrl] = useState("");
+  const [canonConversationNotes, setCanonConversationNotes] = useState("");
+  const [canonActiveTopic, setCanonActiveTopic] = useState("identity");
+  const [canonTopicAnswer, setCanonTopicAnswer] = useState("");
+  const [canonChatHistory, setCanonChatHistory] = useState<
+    Array<{ role: "operator" | "assistant"; content: string }>
+  >([]);
+  const [canonAssistantMessage, setCanonAssistantMessage] = useState("");
+  const [canonSuggestedQuestions, setCanonSuggestedQuestions] = useState<string[]>([]);
+  const [canonChatLoading, setCanonChatLoading] = useState(false);
+  const [canonTab, setCanonTab] = useState<CanonTabId>("overview");
+  const [canonDetailModal, setCanonDetailModal] = useState<{
+    title: string;
+    body: string;
+  } | null>(null);
+  const [canonImportName, setCanonImportName] = useState("");
+  const [canonImportText, setCanonImportText] = useState("");
+  const [canonImporting, setCanonImporting] = useState(false);
+  const [canonProposal, setCanonProposal] =
+    useState<CharacterCanonRecord["canonJson"] | null>(null);
   const [activeStep, setActiveStep] = useState<WizardStepId>("type");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
@@ -241,10 +897,56 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [deepCanonMessage, setDeepCanonMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const selectedCharacter = useMemo(
     () => characters.find((character) => character.avatar === selectedAvatar) ?? null,
     [characters, selectedAvatar],
+  );
+  const reviewCanon = canons.find((canon) => canon.status !== "superseded") ?? null;
+  const draftCanon = useMemo(() => buildCanonProposal(draft, canonConversationNotes), [draft, canonConversationNotes]);
+  const visibleCanon =
+    canonProposal ??
+    approvedCanon?.canonJson ??
+    reviewCanon?.canonJson ??
+    (activeStep === "canon" ? draftCanon : null);
+  const visibleCanonRecord = approvedCanon ?? reviewCanon;
+  const visibleCanonSections = visibleCanon?.sections.filter((section) => !isImportWrapperSection(section)) ?? [];
+  const hiddenImportWrapperCount = (visibleCanon?.sections.length ?? 0) - visibleCanonSections.length;
+  const visibleCanonMarkdown = useMemo(() => {
+    const persisted = visibleCanonRecord?.canonMarkdown?.trim();
+    if (persisted) return persisted;
+    if (visibleCanonSections.length > 0) return buildCanonMarkdown(visibleCanonSections);
+    return "";
+  }, [visibleCanonRecord?.canonMarkdown, visibleCanonSections]);
+  const hasAnyCanon = Boolean(visibleCanon);
+  const canonTopicProgress = useMemo(() => getCanonTopicProgress(visibleCanon), [visibleCanon]);
+  const canonReadinessScore = Math.round(
+    canonTopicProgress.reduce((total, topic) => total + topic.score, 0) /
+      Math.max(canonTopicProgress.length, 1),
+  );
+  const objectiveReadiness = useMemo(
+    () => getObjectiveReadinessProgress(visibleCanon, draft.avatarType),
+    [visibleCanon, draft.avatarType],
+  );
+  const missingCanonTopics = canonTopicProgress.filter((topic) => topic.status !== "healthy");
+  const activeCanonGuide = hasAnyCanon
+    ? CANON_TOPIC_GUIDES[canonActiveTopic] ?? CANON_TOPIC_GUIDES.identity
+    : {
+        prompt:
+          "Let's build this character from zero. Who is this character and what should they make people feel?",
+        examples: [
+          "What is their emotional center?",
+          "What is their purpose as a digital character?",
+          "What should never change about them?",
+        ],
+      };
+  const activeTopicEvidence = useMemo(
+    () => getTopicEvidence(visibleCanon, canonActiveTopic),
+    [visibleCanon, canonActiveTopic],
   );
 
   const loadCharacters = async () => {
@@ -314,10 +1016,36 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   useEffect(() => {
     if (!selectedAvatar) {
       setReferences([]);
+      setCanons([]);
+      setApprovedCanon(null);
       return;
     }
     void loadReferences(selectedAvatar);
+    void loadCanons(selectedAvatar);
   }, [selectedAvatar]);
+
+  const loadCanons = async (avatar: string) => {
+    try {
+      const result = await listCharacterCanons({ avatar });
+      if (result.ok === false) {
+        throw new Error(result.message || result.reason || "Character canon could not load.");
+      }
+      const nextCanons = result.canons ?? [];
+      setCanons(nextCanons);
+      setApprovedCanon(result.approvedCanon ?? null);
+      const latestReviewCanon = nextCanons.find((canon) => canon.status !== "superseded") ?? null;
+      if (latestReviewCanon) {
+        setCanonProposal(latestReviewCanon.canonJson);
+        setCanonConversationNotes(latestReviewCanon.conversationSummary ?? "");
+        const assistantMatch = latestReviewCanon.conversationSummary?.match(/Assistant:\s*([\s\S]*)$/);
+        setCanonAssistantMessage(assistantMatch?.[1]?.trim() ?? "");
+        setCanonSuggestedQuestions([]);
+      }
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Character canon could not load.";
+      setDeepCanonMessage({ type: "error", text });
+    }
+  };
 
   const updateDraft = <K extends keyof CharacterOnboardingSavePayload>(
     key: K,
@@ -327,42 +1055,34 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     setMessage(null);
   };
 
-  const updateScene = (index: number, patch: Partial<CharacterSceneDraft>) => {
-    setDraft((prev) => ({
-      ...prev,
-      scenes: prev.scenes.map((scene, sceneIndex) =>
-        sceneIndex === index ? { ...scene, ...patch } : scene,
-      ),
-    }));
-  };
-
-  const addScene = () => {
-    setDraft((prev) => ({
-      ...prev,
-      scenes: [...prev.scenes, { scene: "", displayName: "", description: "" }],
-    }));
-  };
-
-  const removeScene = (index: number) => {
-    setDraft((prev) => ({
-      ...prev,
-      scenes: prev.scenes.filter((_, sceneIndex) => sceneIndex !== index),
-    }));
-  };
-
   const startNewCharacter = () => {
     setSelectedAvatar(null);
     setDraft(DEFAULT_CHARACTER);
     setReferences([]);
+    setCanons([]);
+    setApprovedCanon(null);
     setReferenceForm(EMPTY_REFERENCE_FORM);
     setCanonJob(null);
     setCanonPromptPack(null);
     setCanonInstructions([]);
     setCanonOutputUrl("");
+    setCanonConversationNotes("");
+    setCanonActiveTopic("identity");
+    setCanonTopicAnswer("");
+    setCanonChatHistory([]);
+    setCanonAssistantMessage("");
+    setCanonSuggestedQuestions([]);
+    setCanonChatLoading(false);
+    setCanonTab("overview");
+    setCanonDetailModal(null);
+    setCanonImportName("");
+    setCanonImportText("");
+    setCanonProposal(null);
     setActiveStep("type");
     setMessage(null);
     setReferenceMessage(null);
     setCanonMessage(null);
+    setDeepCanonMessage(null);
   };
 
   const applyBlueprint = (avatarType: CharacterAvatarType) => {
@@ -385,7 +1105,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     });
   };
 
-  const save = async () => {
+  const save = async (options: { silent?: boolean } = {}) => {
     const nextStatus = draft.status === "ready" ? "ready" : inferStatus(draft);
     const payload = {
       ...draft,
@@ -403,9 +1123,9 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     if (!payload.avatar || !payload.avatarShort || !payload.displayName) {
       setMessage({
         type: "error",
-        text: "Display name, avatar slug, and short handle are required.",
+        text: "Display name is required to create the character draft.",
       });
-      return;
+      return false;
     }
 
     setSaving(true);
@@ -418,10 +1138,14 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       setSelectedAvatar(result.character.avatar);
       await loadCharacters();
       onCatalogsChanged?.();
-      setMessage({ type: "success", text: "Character onboarding saved." });
+      if (!options.silent) {
+        setMessage({ type: "success", text: "Character onboarding saved." });
+      }
+      return true;
     } catch (err) {
       const text = err instanceof Error ? err.message : "Character could not be saved.";
       setMessage({ type: "error", text });
+      return false;
     } finally {
       setSaving(false);
     }
@@ -485,6 +1209,65 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     }
   };
 
+  const uploadAndRegisterReference = async () => {
+    const payloadAvatar = draft.avatar || slugify(draft.displayName);
+    const payloadScene = referenceForm.scene || "portrait-canon";
+    if (!payloadAvatar) {
+      setReferenceMessage({
+        type: "error",
+        text: "Save or define the character avatar before uploading references.",
+      });
+      return;
+    }
+    if (!referenceUploadFile) {
+      setReferenceMessage({ type: "error", text: "Choose an image file from your computer first." });
+      return;
+    }
+    setReferenceUploading(true);
+    setReferenceMessage(null);
+    try {
+      const uploaded = await uploadCharacterReferenceImage({
+        avatar: payloadAvatar,
+        scene: payloadScene,
+        classification: referenceForm.classification,
+        file: referenceUploadFile,
+      });
+      const objectPathOrUrl = uploaded.upload?.publicUrl;
+      if (!objectPathOrUrl) {
+        throw new Error("Upload succeeded but did not return a MinIO path.");
+      }
+      const result = await registerCharacterReference({
+        avatar: payloadAvatar,
+        scene: payloadScene,
+        classification: referenceForm.classification,
+        objectPathOrUrl,
+        reviewNotes:
+          referenceForm.reviewNotes ||
+          `Uploaded from local file: ${referenceUploadFile.name}`,
+      });
+      if (result.ok === false || !result.reference) {
+        throw new Error(result.message || result.reason || "Uploaded image could not be registered.");
+      }
+      setSelectedAvatar(payloadAvatar);
+      await loadReferences(payloadAvatar);
+      setReferenceUploadFile(null);
+      setReferenceForm((prev) => ({
+        ...prev,
+        objectPathOrUrl: "",
+        reviewNotes: "",
+      }));
+      setReferenceMessage({
+        type: "success",
+        text: "Image uploaded and registered in visual canon.",
+      });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Image upload failed.";
+      setReferenceMessage({ type: "error", text });
+    } finally {
+      setReferenceUploading(false);
+    }
+  };
+
   const queueCanonPortrait = async () => {
     const payloadAvatar = draft.avatar || slugify(draft.displayName);
     if (!payloadAvatar || !draft.displayName || !draft.primaryObjective) {
@@ -509,6 +1292,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
         brandFit: draft.brandFit,
         publishingLimits: draft.publishingLimits,
         reviewTriggers: draft.reviewTriggers,
+        approvedCanon,
         notes: draft.notes,
       });
       if (result.ok === false || !result.job?.jobId) {
@@ -527,6 +1311,267 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     } finally {
       setCanonSaving(false);
     }
+  };
+
+  const buildDeepCanonProposal = () => {
+    const base = visibleCanon ?? buildCanonProposal(draft, "");
+    const proposal = canonConversationNotes.trim()
+      ? applyCanonTopicAnswer(base, draft, "operator_notes", canonConversationNotes)
+      : base;
+    setCanonProposal(proposal);
+    setDeepCanonMessage({
+      type: "success",
+      text: "Canon proposal updated from the current character definition and conversation notes.",
+    });
+  };
+
+  const mergeAiSectionUpdates = (
+    baseCanon: CharacterCanonRecord["canonJson"],
+    response: CharacterCanonChatResponse,
+  ): CharacterCanonRecord["canonJson"] => {
+    const updates = Array.isArray(response.sectionUpdates) ? response.sectionUpdates : [];
+    if (!updates.length) return baseCanon;
+    const sections = [...baseCanon.sections];
+    updates.forEach((update, index) => {
+      const key = update.key || `ai_update_${Date.now()}_${index}`;
+      const nextSection: CharacterCanonSection = {
+        ...update,
+        key,
+        label: update.label || topicLabel(canonActiveTopic),
+        status: normalizeSectionStatus(update.status),
+        summary: update.summary || "",
+        data: update.data && typeof update.data === "object" ? update.data : {},
+        sourceRefs: update.sourceRefs?.length ? update.sourceRefs : ["deepseek-canon-chat"],
+        providerTrace: update.providerTrace || response.providerTrace || null,
+      };
+      const existingIndex = sections.findIndex((section) => section.key === key);
+      if (existingIndex >= 0) {
+        sections[existingIndex] = nextSection;
+      } else {
+        sections.push(nextSection);
+      }
+    });
+    return {
+      ...baseCanon,
+      sections,
+      providerTrace: response.providerTrace || baseCanon.providerTrace,
+    };
+  };
+
+  const applyGuidedCanonAnswer = async () => {
+    if (!canonTopicAnswer.trim()) {
+      setDeepCanonMessage({ type: "error", text: "Write an answer before updating the canon proposal." });
+      return;
+    }
+    const compactedAnswer = compactLongOperatorAnswer(canonTopicAnswer);
+    const operatorMessage = [
+      `Topic: ${hasAnyCanon ? topicLabel(canonActiveTopic) : "Foundation"}`,
+      compactedAnswer.message,
+    ].join("\n\n");
+    setCanonChatLoading(true);
+    setDeepCanonMessage(null);
+    let deepSeekResponded = false;
+    let locallySavedCanon: CharacterCanonRecord | null = null;
+    const saveConversationProposal = async (proposal: CharacterCanonRecord["canonJson"], assistantMessage = "") => {
+      const markdown = buildCanonMarkdown(proposal.sections);
+      const result = await saveCharacterCanon({
+        avatar: proposal.avatar,
+        avatarType: proposal.avatarType,
+        displayName: proposal.displayName,
+        status: "operator-reviewed",
+        schemaVersion: "character-canon-v1",
+        canonJson: proposal,
+        canonMarkdown: markdown,
+        conversationSummary: [
+          canonConversationNotes.trim(),
+          `### ${topicLabel(canonActiveTopic)}`,
+          canonTopicAnswer.trim(),
+          assistantMessage ? `Assistant: ${assistantMessage}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        importSummary: "Autosaved from guided canon conversation.",
+      });
+      if (result.ok === false || !result.canon) {
+        throw new Error(result.message || result.reason || "Canon conversation could not be saved.");
+      }
+      setCanonProposal(result.canon.canonJson);
+      await loadCanons(proposal.avatar);
+      return result.canon;
+    };
+    try {
+      const operatorProposal = applyCanonTopicAnswer(visibleCanon, draft, canonActiveTopic, canonTopicAnswer);
+      locallySavedCanon = await saveConversationProposal(operatorProposal);
+      setDeepCanonMessage({
+        type: "success",
+        text: `Answer saved as canon proposal v${locallySavedCanon.canonVersion}. Analyzing with DeepSeek now...`,
+      });
+      const response = await chatCharacterCanon({
+        avatar: draft.avatar || slugify(draft.displayName),
+        avatarType: draft.avatarType,
+        displayName: draft.displayName,
+        currentCanon: locallySavedCanon.canonJson,
+        conversation: canonChatHistory,
+        operatorMessage,
+      });
+      deepSeekResponded = true;
+      const proposal = mergeAiSectionUpdates(locallySavedCanon.canonJson, response);
+      const savedCanon = await saveConversationProposal(proposal, response.assistantMessage || "");
+      setCanonAssistantMessage(response.assistantMessage || "");
+      setCanonSuggestedQuestions(response.suggestedQuestions ?? []);
+      setCanonChatHistory((prev) => [
+        ...prev,
+        { role: "operator", content: operatorMessage },
+        { role: "assistant", content: response.assistantMessage || "Updated canon proposal." },
+      ]);
+      setCanonConversationNotes((prev) =>
+        [
+          prev.trim(),
+          `### ${topicLabel(canonActiveTopic)}`,
+          canonTopicAnswer.trim(),
+          response.assistantMessage ? `Assistant: ${response.assistantMessage}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+      );
+      setCanonTopicAnswer("");
+      setDeepCanonMessage({
+        type: "success",
+        text: compactedAnswer.isLong
+          ? `Long answer saved as canon proposal v${savedCanon.canonVersion}. DeepSeek received a compacted turn. Review before approval.`
+          : `DeepSeek responded and saved canon proposal v${savedCanon.canonVersion}. Review before approval.`,
+      });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Character canon chat failed.";
+      if (locallySavedCanon) {
+        setDeepCanonMessage({
+          type: deepSeekResponded ? "error" : "success",
+          text: deepSeekResponded
+            ? `DeepSeek responded, but the AI-updated proposal could not be saved. Your operator answer remains saved as proposal v${locallySavedCanon.canonVersion}. Error: ${text}`
+            : `Your answer is saved as canon proposal v${locallySavedCanon.canonVersion}. DeepSeek analysis did not complete yet: ${text}`,
+        });
+      } else {
+        const proposal = applyCanonTopicAnswer(visibleCanon, draft, canonActiveTopic, canonTopicAnswer);
+        setCanonProposal(proposal);
+        setDeepCanonMessage({
+          type: "error",
+          text: `Autosave failed before DeepSeek analysis. Your answer is only on this screen: ${text}`,
+        });
+      }
+    } finally {
+      setCanonChatLoading(false);
+    }
+  };
+
+  const saveApprovedDeepCanon = async () => {
+    const proposal = canonProposal ?? reviewCanon?.canonJson ?? buildCanonProposal(draft, canonConversationNotes);
+    const markdown = buildCanonMarkdown(proposal.sections);
+    setSaving(true);
+    setDeepCanonMessage(null);
+    try {
+      const result = await saveCharacterCanon({
+        avatar: proposal.avatar,
+        avatarType: proposal.avatarType,
+        displayName: proposal.displayName,
+        status: "approved",
+        canonJson: proposal,
+        canonMarkdown: markdown,
+        conversationSummary: canonConversationNotes.trim(),
+      });
+      if (result.ok === false || !result.canon) {
+        throw new Error(result.message || result.reason || "Deep canon could not be saved.");
+      }
+      setApprovedCanon(result.canon);
+      await loadCanons(proposal.avatar);
+      setDeepCanonMessage({
+        type: "success",
+        text: "Approved deep canon saved in the database.",
+      });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Deep canon could not be saved.";
+      setDeepCanonMessage({ type: "error", text });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const previewImportedCanon = () => {
+    const text = canonImportText.trim();
+    if (!text) {
+      setDeepCanonMessage({ type: "error", text: "Paste Markdown or select files before previewing an import." });
+      return;
+    }
+    const proposal = buildImportedCanon(draft, canonImportName, text);
+    setCanonProposal(proposal);
+    setDeepCanonMessage({
+      type: "success",
+      text: `Import preview ready with ${proposal.sections.length} section${proposal.sections.length === 1 ? "" : "s"}. Review coverage before saving.`,
+    });
+  };
+
+  const saveImportedCanon = async () => {
+    const text = canonImportText.trim();
+    if (!text) {
+      setDeepCanonMessage({ type: "error", text: "Paste Markdown or select files before saving an import." });
+      return;
+    }
+    const proposal = buildImportedCanon(draft, canonImportName, text);
+    const markdown = text;
+    setCanonImporting(true);
+    setDeepCanonMessage(null);
+    try {
+      const result = await saveCharacterCanon({
+        avatar: proposal.avatar,
+        avatarType: proposal.avatarType,
+        displayName: proposal.displayName,
+        status: "proposed-import",
+        schemaVersion: "character-canon-v1",
+        canonJson: {
+          ...proposal,
+          source: {
+            ...proposal.source,
+            sourceHash: hashString(markdown),
+          } as CharacterCanonRecord["canonJson"]["source"],
+        },
+        canonMarkdown: markdown,
+        importSummary: `Operator imported Markdown canon from ${canonImportName || "pasted content"}.`,
+      });
+      if (result.ok === false || !result.canon) {
+        throw new Error(result.message || result.reason || "Imported canon could not be saved.");
+      }
+      setCanonProposal(result.canon.canonJson);
+      await loadCanons(proposal.avatar);
+      setDeepCanonMessage({
+        type: "success",
+        text: "Canon imported as proposed. Review the readiness bars and approve only when it is production-ready.",
+      });
+    } catch (err) {
+      const textMessage = err instanceof Error ? err.message : "Imported canon could not be saved.";
+      setDeepCanonMessage({ type: "error", text: textMessage });
+    } finally {
+      setCanonImporting(false);
+    }
+  };
+
+  const loadCanonImportFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const markdownFiles = Array.from(files).filter((file) => file.name.toLowerCase().endsWith(".md"));
+    if (!markdownFiles.length) {
+      setDeepCanonMessage({ type: "error", text: "Select one or more .md files." });
+      return;
+    }
+    const parts = await Promise.all(
+      markdownFiles.map(async (file) => {
+        const content = await file.text();
+        return `<!-- Source file: ${file.name} -->\n\n${content.trim()}`;
+      }),
+    );
+    setCanonImportName(markdownFiles.map((file) => file.name).join(", "));
+    setCanonImportText(parts.join("\n\n---\n\n"));
+    setDeepCanonMessage({
+      type: "success",
+      text: `${markdownFiles.length} Markdown file${markdownFiles.length === 1 ? "" : "s"} loaded. Preview before saving.`,
+    });
   };
 
   const runCanonPortrait = async () => {
@@ -613,6 +1658,30 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     }
   };
 
+  const promoteReferenceToSceneCanon = async (reference: CharacterReferenceRecord) => {
+    setReferenceSaving(true);
+    setReferenceMessage(null);
+    try {
+      const result = await registerCharacterReference({
+        avatar: reference.avatar,
+        scene: reference.scene,
+        classification: "scene-canon",
+        objectPathOrUrl: reference.url,
+        reviewNotes: `Promoted to scene canon for ${reference.scene} from Characters visual reference intake.`,
+      });
+      if (result.ok === false || !result.reference) {
+        throw new Error(result.message || result.reason || "Scene reference could not be promoted.");
+      }
+      await loadReferences(reference.avatar);
+      setReferenceMessage({ type: "success", text: "Scene canon promoted." });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Scene reference could not be promoted.";
+      setReferenceMessage({ type: "error", text });
+    } finally {
+      setReferenceSaving(false);
+    }
+  };
+
   const currentReadiness = readinessItems(draft);
   const currentStepIndex = WIZARD_STEPS.findIndex((step) => step.id === activeStep);
   const completedStepCount = WIZARD_STEPS.filter((step) => isStepComplete(step.id, draft)).length;
@@ -632,13 +1701,54 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const rejectedCount = references.filter(
     (reference) => reference.classification === "rejected-reference",
   ).length;
+  const sceneCanonByScene = new Map(
+    references
+      .filter((reference) => reference.classification === "scene-canon")
+      .map((reference) => [reference.scene, reference]),
+  );
+  const sceneCandidatesByScene = references.reduce((acc, reference) => {
+    if (reference.classification !== "scene-candidate") return acc;
+    const list = acc.get(reference.scene) ?? [];
+    list.push(reference);
+    acc.set(reference.scene, list);
+    return acc;
+  }, new Map<string, CharacterReferenceRecord[]>());
+  const visualSceneRows = Array.from(
+    new Map(
+      [
+        ...draft.scenes.map((scene) => [
+          scene.scene,
+          {
+            scene: scene.scene,
+            displayName: scene.displayName || scene.scene,
+            description: scene.description || "",
+          },
+        ] as const),
+        ...references
+          .filter((reference) => reference.scene && reference.scene !== "portrait-canon")
+          .map((reference) => [
+            reference.scene,
+            {
+              scene: reference.scene,
+              displayName: reference.scene,
+              description: "",
+            },
+          ] as const),
+      ],
+    ).values(),
+  );
+  const canSaveDraft = Boolean(draft.displayName.trim());
 
   const goToPreviousStep = () => {
     const previous = WIZARD_STEPS[Math.max(0, currentStepIndex - 1)];
     if (previous) setActiveStep(previous.id);
   };
 
-  const goToNextStep = () => {
+  const goToNextStep = async () => {
+    if (activeStep === "identity" && draft.displayName.trim()) {
+      const saved = await save({ silent: true });
+      if (!saved) return;
+    }
     const next = WIZARD_STEPS[Math.min(WIZARD_STEPS.length - 1, currentStepIndex + 1)];
     if (next) setActiveStep(next.id);
   };
@@ -749,7 +1859,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                 {activeBlueprint.label}
               </div>
             </div>
-            <div className="mt-4 grid gap-2 lg:grid-cols-7">
+            <div className="mt-4 grid gap-2 lg:grid-cols-5">
               {WIZARD_STEPS.map((step, index) => {
                 const isActive = activeStep === step.id;
                 const isComplete = isStepComplete(step.id, draft);
@@ -773,6 +1883,21 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                   </button>
                 );
               })}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-raised px-4 py-3">
+              <p className="text-sm text-gray-400">
+                {canSaveDraft
+                  ? "Create the draft now, then complete the character in Canon. Voice, limits, scenes, and content strategy live there."
+                  : "Add a display name in Identity to create the character draft."}
+              </p>
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={saving || !canSaveDraft}
+                className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Saving..." : selectedAvatar ? "Save draft" : "Create draft"}
+              </button>
             </div>
           </div>
 
@@ -821,24 +1946,48 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
 
           {activeStep === "identity" && (
             <>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2">
             <label className="text-sm text-gray-400">
               Display name
               <input
                 value={draft.displayName}
                 onChange={(event) => {
                   const displayName = event.target.value;
+                  const previousSlug = slugify(draft.displayName);
+                  const nextSlug = slugify(displayName);
                   setDraft((prev) => ({
                     ...prev,
                     displayName,
-                    avatar: prev.avatar || slugify(displayName),
-                    avatarShort: prev.avatarShort || slugify(displayName).split("-")[0] || "",
+                    avatar: !prev.avatar || prev.avatar === previousSlug ? nextSlug : prev.avatar,
+                    avatarShort:
+                      !prev.avatarShort || prev.avatarShort === previousSlug.split("-")[0]
+                        ? nextSlug.split("-")[0] || ""
+                        : prev.avatarShort,
                   }));
                 }}
                 className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
                 placeholder="Ej: Mariana Sol"
               />
             </label>
+            <label className="text-sm text-gray-400">
+              Business profile
+              <input
+                value={draft.businessProfile}
+                onChange={(event) => updateDraft("businessProfile", event.target.value)}
+                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
+                placeholder="influencer-brand"
+              />
+            </label>
+          </div>
+
+          <details className="mt-4 rounded-md border border-border bg-surface p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-gray-300">
+              Technical identity fields
+            </summary>
+            <p className="mt-2 text-xs text-gray-500">
+              These are generated from the display name. Edit only if you need a specific internal id.
+            </p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <label className="text-sm text-gray-400">
               Avatar slug
               <input
@@ -857,18 +2006,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                 placeholder="mariana"
               />
             </label>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <label className="text-sm text-gray-400">
-              Business profile
-              <input
-                value={draft.businessProfile}
-                onChange={(event) => updateDraft("businessProfile", event.target.value)}
-                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="influencer-brand"
-              />
-            </label>
             <label className="text-sm text-gray-400">
               Onboarding status
               <select
@@ -885,81 +2022,821 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                 ))}
               </select>
             </label>
-          </div>
+            </div>
+          </details>
 
           <label className="mt-4 block text-sm text-gray-400">
-            Primary objective
+            Initial objective
             <textarea
               value={draft.primaryObjective}
               onChange={(event) => updateDraft("primaryObjective", event.target.value)}
               className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-              placeholder="What this character is meant to create and why."
+              placeholder="Optional seed for Canon. The durable version is refined in the Canon step."
             />
           </label>
             </>
           )}
 
-          {activeStep === "voice" && (
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <label className="text-sm text-gray-400">
-              Content pillars
-              <textarea
-                value={joinList(draft.contentPillars)}
-                onChange={(event) => updateDraft("contentPillars", splitList(event.target.value))}
-                className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="lifestyle, travel, wellness"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Caption tone
-              <textarea
-                value={joinList(draft.captionTone)}
-                onChange={(event) => updateDraft("captionTone", splitList(event.target.value))}
-                className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="warm, reflective, spontaneous"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Brand fit
-              <textarea
-                value={joinList(draft.brandFit)}
-                onChange={(event) => updateDraft("brandFit", splitList(event.target.value))}
-                className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="coffee, fashion, urban lifestyle"
-              />
-            </label>
-          </div>
-          )}
+          {activeStep === "canon" && (
+            <div className="mt-4 space-y-4">
+              <div className="rounded-md border border-blue-900/70 bg-blue-950/20 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-100">
+                      Deep character canon
+                    </h3>
+                    <p className="mt-1 max-w-3xl text-sm text-blue-100/70">
+                      This is the source of truth for personality, boundaries, visual DNA, and
+                      generation context. It is stored in the database as JSON plus a readable
+                      Markdown rendering, not as loose files.
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                      approvedCanon
+                        ? "bg-emerald-950/70 text-emerald-200"
+                        : reviewCanon
+                          ? "bg-blue-950/70 text-blue-200"
+                        : "bg-amber-950/70 text-amber-200"
+                    }`}
+                  >
+                    {approvedCanon
+                      ? `Approved v${approvedCanon.canonVersion}`
+                      : reviewCanon
+                        ? `Imported ${reviewCanon.status} v${reviewCanon.canonVersion}`
+                        : "No approved canon"}
+                  </span>
+                </div>
+              </div>
 
-          {activeStep === "limits" && (
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <label className="text-sm text-gray-400">
-              Publishing limits
-              <textarea
-                value={joinList(draft.publishingLimits)}
-                onChange={(event) =>
-                  updateDraft("publishingLimits", splitList(event.target.value))
-                }
-                className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="No medical claims, no political endorsements..."
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Review triggers
-              <textarea
-                value={joinList(draft.reviewTriggers)}
-                onChange={(event) =>
-                  updateDraft("reviewTriggers", splitList(event.target.value))
-                }
-                className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="sponsored content, factual claims, intimacy boundaries..."
-              />
-            </label>
-          </div>
+              {deepCanonMessage && (
+                <div
+                  className={`rounded-md border px-4 py-3 text-sm ${
+                    deepCanonMessage.type === "success"
+                      ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-200"
+                      : "border-red-800/60 bg-red-950/40 text-red-200"
+                  }`}
+                  role="status"
+                >
+                  {deepCanonMessage.text}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 rounded-md border border-border bg-surface p-2">
+                {CANON_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setCanonTab(tab.id)}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                      canonTab === tab.id
+                        ? "bg-accent text-white"
+                        : "bg-surface-overlay text-gray-300 hover:text-white"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {canonTab === "overview" && (
+              <div className="rounded-md border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                      Canon readiness
+                    </h4>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Separate the base character completeness from the operational objective.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-md border border-border bg-surface-raised p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                          Character completeness
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Identity, psychology, appearance, voice, limits, scenes, and content.
+                        </p>
+                      </div>
+                      <span className="text-2xl font-semibold text-gray-100">
+                        {canonReadinessScore}%
+                      </span>
+                    </div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/30">
+                      <div
+                        className={`h-full rounded-full ${readinessBarClass(canonReadinessScore)}`}
+                        style={{ width: `${canonReadinessScore}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-surface-raised p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                          {objectiveReadiness.label}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {objectiveReadiness.description}
+                        </p>
+                      </div>
+                      <span className="text-2xl font-semibold text-gray-100">
+                        {objectiveReadiness.score}%
+                      </span>
+                    </div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/30">
+                      <div
+                        className={`h-full rounded-full ${readinessBarClass(objectiveReadiness.score)}`}
+                        style={{ width: `${objectiveReadiness.score}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {canonTopicProgress.map((topic) => (
+                    <div
+                      key={topic.key}
+                      className="rounded-md border border-border bg-surface-raised px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                          {topic.label}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            topic.status === "healthy"
+                              ? "bg-emerald-950/70 text-emerald-200"
+                              : topic.status === "thin"
+                                ? "bg-amber-950/70 text-amber-200"
+                                : "bg-red-950/70 text-red-200"
+                          }`}
+                        >
+                          {topic.status}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/30">
+                        <div
+                          className="h-full rounded-full bg-accent"
+                          style={{ width: `${topic.score}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {topic.sectionCount} section{topic.sectionCount === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {missingCanonTopics.length > 0 ? (
+                  <div className="mt-4 rounded-md border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
+                    Character needs more detail:{" "}
+                    {missingCanonTopics.map((topic) => topic.label).join(", ")}.
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-md border border-emerald-900/60 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-100">
+                    Coverage looks strong. Review the content, then approve only if the character
+                    feels production-ready.
+                  </div>
+                )}
+                <div className="mt-4 rounded-md border border-border bg-surface-raised p-4">
+                  <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Objective-specific gaps
+                  </h5>
+                  {objectiveReadiness.weakCriteria.length > 0 ? (
+                    <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                      {objectiveReadiness.weakCriteria.map((criterion) => (
+                        <div
+                          key={criterion.key}
+                          className="rounded-md border border-amber-900/40 bg-amber-950/10 px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-amber-100">
+                              {criterion.label}
+                            </span>
+                            <span className="text-xs text-amber-200">{criterion.score}%</span>
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-amber-100/75">
+                            {criterion.missingHint}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-emerald-200">
+                      Objective-specific coverage looks strong for this character type.
+                    </p>
+                  )}
+                </div>
+              </div>
+              )}
+
+              {canonTab === "conversation" && (
+              <div className="rounded-md border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                      {hasAnyCanon ? "Guided canon conversation" : "Start character conversation"}
+                    </h4>
+                    <p className="mt-1 max-w-3xl text-sm text-gray-500">
+                      {hasAnyCanon
+                        ? "Pick a topic, review what is already captured, and add only the missing nuance. Your answer is saved first, then AI analysis enriches it when available."
+                        : "No canon exists yet. Start with a natural description and the system will create the first proposed canon section."}
+                    </p>
+                    <p className="mt-2 max-w-3xl text-sm text-blue-100/80">
+                      {hasAnyCanon
+                        ? "Start here: choose a topic on the left, read the captured context, then answer only what should be refined, corrected, or expanded."
+                        : "Start here: answer who this character is, what they should make people feel, and what kind of relationship they should create."}
+                    </p>
+                  </div>
+                  {hasAnyCanon && missingCanonTopics[0] ? (
+                    <button
+                      type="button"
+                      onClick={() => setCanonActiveTopic(missingCanonTopics[0].key)}
+                      className="rounded-md border border-amber-900/70 bg-amber-950/30 px-3 py-2 text-sm text-amber-100 hover:text-white"
+                    >
+                      Work on {missingCanonTopics[0].label}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-[280px_1fr]">
+                  <div className="grid gap-2">
+                    {canonTopicProgress.map((topic) => (
+                      <button
+                        key={topic.key}
+                        type="button"
+                        onClick={() => setCanonActiveTopic(topic.key)}
+                        className={`rounded-md border px-3 py-2 text-left text-sm transition ${
+                          canonActiveTopic === topic.key
+                            ? "border-accent bg-accent/10 text-white"
+                            : "border-border bg-surface-raised text-gray-300 hover:border-gray-600"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">{topic.label}</span>
+                          <span className="text-xs text-gray-500">{topic.score}%</span>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">{topic.status}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="rounded-md border border-border bg-surface-raised p-4">
+                    <p className="text-sm font-semibold text-gray-200">
+                      {hasAnyCanon ? topicLabel(canonActiveTopic) : "Foundation"}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-gray-400">
+                      {activeCanonGuide.prompt}
+                    </p>
+                    {activeTopicEvidence.length > 0 ? (
+                      <div className="mt-3 rounded-md border border-emerald-900/50 bg-emerald-950/15 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                          Already captured from onboarding
+                        </p>
+                        <div className="mt-2 space-y-2">
+                          {activeTopicEvidence.map((section) => (
+                            <div key={section.key} className="text-sm leading-6 text-emerald-50/80">
+                              <span className="font-semibold text-emerald-100">{section.label}: </span>
+                              <span>{section.summary}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-xs text-emerald-100/60">
+                          Add only what is missing, contradictory, or too generic. No need to repeat this.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-md border border-amber-900/50 bg-amber-950/15 px-4 py-3 text-sm text-amber-100">
+                        Nothing has been captured for this topic yet. Use this answer to create the first useful detail.
+                      </div>
+                    )}
+                    {canonAssistantMessage ? (
+                      <div className="mt-3 rounded-md border border-blue-900/60 bg-blue-950/20 px-4 py-3 text-sm leading-6 text-blue-100">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">
+                          DeepSeek
+                        </p>
+                        <p className="mt-1">{canonAssistantMessage}</p>
+                      </div>
+                    ) : null}
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      {canonSuggestedQuestions.length ? "Suggested next questions from DeepSeek" : "Starter questions"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(canonSuggestedQuestions.length ? canonSuggestedQuestions : activeCanonGuide.examples).map((example) => (
+                        <button
+                          key={example}
+                          type="button"
+                          onClick={() =>
+                            setCanonTopicAnswer((prev) =>
+                              [prev.trim(), `- ${example}: `].filter(Boolean).join("\n"),
+                            )
+                          }
+                          className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-gray-300 hover:text-white"
+                        >
+                          {example}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="mt-4 block text-sm text-gray-400">
+                      Your answer
+                      <textarea
+                        value={canonTopicAnswer}
+                        onChange={(event) => setCanonTopicAnswer(event.target.value)}
+                        className="mt-1 min-h-28 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
+                        placeholder="Answer naturally. You can be messy; this becomes reviewable canon draft, not final publication copy."
+                      />
+                      {canonTopicAnswer.trim().length > 4500 ? (
+                        <p className="mt-2 rounded-md border border-blue-900/60 bg-blue-950/20 px-3 py-2 text-xs leading-5 text-blue-100/80">
+                          Long answer detected. The full text will be kept locally in the canon
+                          proposal, while DeepSeek receives a compacted version with key excerpts
+                          to avoid request/proxy failures.
+                        </p>
+                      ) : null}
+                    </label>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void applyGuidedCanonAnswer()}
+                        disabled={canonChatLoading}
+                        className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {canonChatLoading
+                          ? "Asking DeepSeek..."
+                          : hasAnyCanon
+                            ? "Ask DeepSeek and update"
+                            : "Start with DeepSeek"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCanonTopicAnswer("")}
+                        className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-gray-300 hover:text-white"
+                      >
+                        Clear answer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              )}
+
+              {canonTab === "import" && (
+              <div className="rounded-md border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                      Import existing canon
+                    </h4>
+                    <p className="mt-1 max-w-3xl text-sm text-gray-500">
+                      Bring Markdown you already wrote into the database as a proposed import.
+                      This does not approve it; it only makes it reviewable here.
+                    </p>
+                  </div>
+                  <label className="cursor-pointer rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm text-gray-200 hover:text-white">
+                    Select .md files
+                    <input
+                      type="file"
+                      accept=".md,text/markdown,text/plain"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => void loadCanonImportFiles(event.target.files)}
+                    />
+                  </label>
+                </div>
+                <label className="mt-4 block text-sm text-gray-400">
+                  Import label
+                  <input
+                    value={canonImportName}
+                    onChange={(event) => setCanonImportName(event.target.value)}
+                    className="mt-1 w-full rounded-md border border-border bg-surface-overlay px-3 py-2 text-gray-100"
+                    placeholder="Andres canon pack v1, Diana private canon notes..."
+                  />
+                </label>
+                <label className="mt-3 block text-sm text-gray-400">
+                  Markdown content
+                  <textarea
+                    value={canonImportText}
+                    onChange={(event) => setCanonImportText(event.target.value)}
+                    className="mt-1 min-h-36 w-full rounded-md border border-border bg-surface-overlay px-3 py-2 text-gray-100"
+                    placeholder="Paste one or many Markdown documents here. Headings become review sections."
+                  />
+                </label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={previewImportedCanon}
+                    className="rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm text-gray-200 hover:text-white"
+                  >
+                    Preview import
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveImportedCanon()}
+                    disabled={canonImporting}
+                    className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {canonImporting ? "Saving..." : "Save as proposed import"}
+                  </button>
+                </div>
+              </div>
+              )}
+
+              {canonTab === "conversation" && (
+              <label className="block text-sm text-gray-400">
+                Creative conversation notes
+                <textarea
+                  value={canonConversationNotes}
+                  onChange={(event) => setCanonConversationNotes(event.target.value)}
+                  className="mt-1 min-h-28 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
+                  placeholder="Describe nuance in natural language: sensuality, emotional posture, visual identity, contradictions, hard limits, audience relationship, things that must never happen..."
+                />
+              </label>
+              )}
+
+              {canonTab === "approval" && (
+              <>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={buildDeepCanonProposal}
+                  className="rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm text-gray-200 hover:text-white"
+                >
+                  Update proposal from notes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveApprovedDeepCanon()}
+                  disabled={saving}
+                  className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {saving ? "Saving..." : "Approve as official canon"}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Updating the proposal is safe and does not save. Approval makes this canon the
+                official generation source for the character.
+              </p>
+              </>
+              )}
+
+              {canonTab === "sections" && visibleCanon && (
+                <div className="rounded-md border border-border bg-surface p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                        Canon sections audit
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Technical traceability by imported topic. Use Document for normal review.
+                      </p>
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      {visibleCanonSections.length} canon sections
+                    </span>
+                  </div>
+                  {hiddenImportWrapperCount > 0 ? (
+                    <div className="mt-3 rounded-md border border-blue-900/50 bg-blue-950/20 px-3 py-2 text-xs text-blue-100/80">
+                      {hiddenImportWrapperCount} source wrapper row
+                      {hiddenImportWrapperCount === 1 ? "" : "s"} hidden. File names are kept
+                      only as import traceability, not as canon topics.
+                    </div>
+                  ) : null}
+                  <div className="mt-4 overflow-hidden rounded-md border border-border">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-surface-overlay text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="px-3 py-2">Section</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Evidence</th>
+                          <th className="px-3 py-2">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {visibleCanonSections.map((section) => {
+                          const fullMarkdown =
+                            typeof section.data.fullMarkdown === "string"
+                              ? section.data.fullMarkdown
+                              : section.summary;
+                          return (
+                            <tr key={section.key} className="bg-surface-raised">
+                              <td className="px-3 py-3 font-semibold text-gray-200">
+                                {section.label}
+                              </td>
+                              <td className="px-3 py-3 text-gray-400">{section.status}</td>
+                              <td className="px-3 py-3 text-gray-500">
+                                {fullMarkdown.length.toLocaleString()} chars
+                              </td>
+                              <td className="px-3 py-3">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCanonDetailModal({
+                                      title: section.label,
+                                      body: fullMarkdown,
+                                    })
+                                  }
+                                  className="rounded-md border border-border bg-surface px-3 py-1 text-xs text-gray-200 hover:text-white"
+                                >
+                                  Review
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {canonTab === "document" && visibleCanon && (
+                <div className="rounded-md border border-border bg-surface p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                        Unified canon document
+                      </h4>
+                      <p className="mt-1 max-w-3xl text-sm text-gray-500">
+                        Read this as the production truth for the character. Sections remain
+                        available only for audit and import traceability.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCanonTab("approval")}
+                        className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white"
+                      >
+                        Go to approval
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCanonDetailModal({
+                            title: "Unified canon document",
+                            body: visibleCanonMarkdown,
+                          })
+                        }
+                        className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
+                      >
+                        Open larger
+                      </button>
+                    </div>
+                  </div>
+                  {visibleCanonMarkdown ? (
+                    <pre className="mt-4 max-h-[620px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-raised p-4 text-sm leading-6 text-gray-200">
+                      {visibleCanonMarkdown}
+                    </pre>
+                  ) : (
+                    <div className="mt-4 rounded-md border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
+                      No unified canon document is available yet. Import notes or use the
+                      conversation to build the first canon proposal.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {canonTab === "overview" && visibleCanon && (
+                <div className="rounded-md border border-border bg-surface p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                        Recent sections
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        A compact sample. Use Sections for full review.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCanonTab("sections")}
+                      className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
+                    >
+                      View all sections
+                    </button>
+                  </div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    {visibleCanonSections.slice(0, 4).map((section) => (
+                      <article
+                        key={section.key}
+                        className="rounded-md border border-border bg-surface-raised p-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <h5 className="text-sm font-semibold text-gray-200">{section.label}</h5>
+                          <span className="text-xs text-gray-500">{section.status}</span>
+                        </div>
+                        <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-500">
+                          {section.summary}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {canonTab !== "overview" &&
+                canonTab !== "document" &&
+                canonTab !== "sections" &&
+                visibleCanon && (
+                <div className="rounded-md border border-border bg-surface p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                        Current proposal snapshot
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {visibleCanonSections.length} canon sections available for review.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCanonTab("document")}
+                      className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
+                    >
+                      Read document
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {canonTab === "approval" && visibleCanonRecord && (
+                <div className="rounded-md border border-border bg-surface p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                        Approval document
+                      </h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Approve only after this unified document reads like the character truth.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCanonDetailModal({
+                          title:
+                            visibleCanonRecord.status === "approved"
+                              ? "Approved canon rendering"
+                              : "Imported canon rendering",
+                          body: visibleCanonMarkdown,
+                        })
+                      }
+                      className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
+                    >
+                      Open larger
+                    </button>
+                  </div>
+                  {visibleCanonMarkdown ? (
+                    <pre className="mt-4 max-h-[460px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-raised p-4 text-sm leading-6 text-gray-200">
+                      {visibleCanonMarkdown}
+                    </pre>
+                  ) : (
+                    <div className="mt-4 rounded-md border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
+                      There is no readable canon document yet. Build or import canon before approval.
+                    </div>
+                  )}
+                  {visibleCanonRecord.canonJson.providerTrace ? (
+                    <div className="mt-3 rounded-md border border-border bg-surface-raised p-3 text-xs text-gray-400">
+                      <p className="font-semibold uppercase tracking-wide text-gray-300">
+                        AI provider trace
+                      </p>
+                      <p className="mt-1">
+                        {visibleCanonRecord.canonJson.providerTrace.task} ·{" "}
+                        {visibleCanonRecord.canonJson.providerTrace.provider} ·{" "}
+                        {visibleCanonRecord.canonJson.providerTrace.model}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {canonTab === "approval" && canons.length > 0 && (
+                <div className="rounded-md border border-border bg-surface p-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                    Canon versions
+                  </h4>
+                  <div className="mt-3 grid gap-2">
+                    {canons.map((canon) => (
+                      <div
+                        key={canon.id ?? `${canon.avatar}-${canon.canonVersion}`}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm"
+                      >
+                        <span className="text-gray-200">
+                          v{canon.canonVersion} · {canon.status}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {canon.updatedAt ?? canon.createdAt ?? ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {activeStep === "visual" && (
             <div className="mt-5 space-y-4">
+              <div className="rounded-md border border-emerald-900/70 bg-emerald-950/20 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-100">
+                      Add identity image
+                    </h3>
+                    <p className="mt-1 max-w-3xl text-sm text-emerald-100/75">
+                      Start here when you already have a good Diana image from ChatGPT, Comfy, or
+                      another generator. Register one clean image first; do not use a collage as the
+                      main identity reference.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-emerald-800/60 bg-emerald-950/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                    Recommended next step
+                  </span>
+                </div>
+
+                {referenceMessage && (
+                  <div
+                    className={`mt-4 rounded-md border px-4 py-3 text-sm ${
+                      referenceMessage.type === "success"
+                        ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-200"
+                        : "border-red-800/60 bg-red-950/40 text-red-200"
+                    }`}
+                    role="status"
+                  >
+                    {referenceMessage.text}
+                  </div>
+                )}
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_auto] lg:items-end">
+                  <label className="text-sm text-emerald-100/80">
+                    Image file
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) =>
+                        setReferenceUploadFile(event.target.files?.[0] ?? null)
+                      }
+                      className="mt-1 w-full rounded-md border border-emerald-900/70 bg-surface-raised px-3 py-2 text-gray-100 file:mr-3 file:rounded-md file:border-0 file:bg-emerald-700 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+                    />
+                  </label>
+                  <label className="text-sm text-emerald-100/80">
+                    Save as
+                    <select
+                      value={referenceForm.classification}
+                      onChange={(event) =>
+                        setReferenceForm((prev) => ({
+                          ...prev,
+                          classification: event.target.value as CharacterReferenceClassification,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-md border border-emerald-900/70 bg-surface-raised px-3 py-2 text-gray-100"
+                    >
+                      <option value="identity-candidate">Identity candidate</option>
+                      <option value="identity-canon">Identity canon</option>
+                      <option value="supporting-reference">Supporting reference</option>
+                      <option value="rejected-reference">Rejected reference</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void uploadAndRegisterReference()}
+                    disabled={referenceUploading || !referenceUploadFile}
+                    className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {referenceUploading ? "Uploading..." : "Upload image"}
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                  <label className="text-sm text-emerald-100/70">
+                    Optional notes
+                    <input
+                      value={referenceForm.reviewNotes}
+                      onChange={(event) =>
+                        setReferenceForm((prev) => ({ ...prev, reviewNotes: event.target.value }))
+                      }
+                      className="mt-1 w-full rounded-md border border-emerald-900/70 bg-surface-raised px-3 py-2 text-gray-100"
+                      placeholder="Why this image defines Diana."
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReferenceForm((prev) => ({
+                        ...prev,
+                        classification: "identity-candidate",
+                        scene: "portrait-canon",
+                      }))
+                    }
+                    className="rounded-md border border-emerald-800/70 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-100"
+                  >
+                    Reset to candidate
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-emerald-100/60">
+                  Upload stores the file in MinIO and registers it as a visual reference. Use
+                  `Identity candidate` first unless you are sure this is the official face.
+                </p>
+              </div>
+
               <div className="rounded-md border border-blue-900/70 bg-blue-950/20 p-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-100">
                   Visual Canon Plan
@@ -993,6 +2870,121 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div className="rounded-md border border-border bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                      Scene canon board
+                    </h3>
+                    <p className="mt-1 max-w-3xl text-sm text-gray-500">
+                      This is the visual map used by generation: one shared scene name, but one
+                      approved visual reference per character when the scene needs identity or mood
+                      guidance. New scene canon is usually approved from Asset Review.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => draft.avatar && void loadReferences(draft.avatar)}
+                    disabled={!draft.avatar || referencesLoading}
+                    className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 disabled:opacity-40"
+                  >
+                    {referencesLoading ? "Refreshing..." : "Refresh"}
+                  </button>
+                </div>
+
+                {visualSceneRows.length === 0 ? (
+                  <p className="mt-4 rounded-md border border-dashed border-border p-4 text-sm text-gray-500">
+                    No scenes are assigned to this character yet. Add shared scenes from the
+                    character canon or catalog first.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    {visualSceneRows.map((scene) => {
+                      const canon = sceneCanonByScene.get(scene.scene);
+                      const candidates = sceneCandidatesByScene.get(scene.scene) ?? [];
+                      return (
+                        <article
+                          key={scene.scene}
+                          className={`grid gap-3 rounded-lg border p-3 sm:grid-cols-[120px_1fr] ${
+                            canon
+                              ? "border-emerald-900/60 bg-emerald-950/10"
+                              : "border-border bg-surface-raised"
+                          }`}
+                        >
+                          <div className="aspect-square overflow-hidden rounded-md border border-border bg-black/30">
+                            {canon ? (
+                              <a href={canon.url} target="_blank" rel="noreferrer">
+                                <img
+                                  src={canon.url}
+                                  alt={`${scene.displayName} scene canon`}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                />
+                              </a>
+                            ) : (
+                              <div className="flex h-full items-center justify-center px-3 text-center text-xs text-gray-500">
+                                No scene canon yet
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-semibold text-gray-100">{scene.displayName}</h4>
+                              <span
+                                className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                  canon
+                                    ? "bg-emerald-950/60 text-emerald-200"
+                                    : candidates.length
+                                      ? "bg-amber-950/60 text-amber-200"
+                                      : "bg-surface-overlay text-gray-400"
+                                }`}
+                              >
+                                {canon
+                                  ? "Ready"
+                                  : candidates.length
+                                    ? `${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`
+                                    : "Missing"}
+                              </span>
+                            </div>
+                            {scene.description && (
+                              <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+                                {scene.description}
+                              </p>
+                            )}
+                            {canon ? (
+                              <>
+                                <p className="mt-2 break-all font-mono text-xs text-gray-500">
+                                  {canon.objectPath}
+                                </p>
+                                {canon.reviewNotes && (
+                                  <p className="mt-2 line-clamp-2 text-sm text-gray-400">
+                                    {canon.reviewNotes}
+                                  </p>
+                                )}
+                              </>
+                            ) : candidates.length ? (
+                              <button
+                                type="button"
+                                onClick={() => void promoteReferenceToSceneCanon(candidates[0])}
+                                disabled={referenceSaving}
+                                className="mt-3 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                              >
+                                Use latest candidate as scene canon
+                              </button>
+                            ) : (
+                              <p className="mt-2 text-sm text-gray-500">
+                                Generate or upload a good image for this character in this scene,
+                                then approve it from Asset Review.
+                              </p>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="rounded-md border border-border bg-surface p-4">
@@ -1129,8 +3121,8 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                       Reference intake
                     </h3>
                     <p className="mt-1 max-w-3xl text-sm text-gray-500">
-                      Register a MinIO image as identity evidence, scene evidence, support, or a
-                      known rejection. This first cut expects an existing MinIO URL or object path.
+                      Advanced reference registry for scene evidence, support images, and known
+                      rejections. Use the green card above for the normal identity-image path.
                     </p>
                   </div>
                   <button
@@ -1324,71 +3316,77 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
             </div>
           )}
 
-          {activeStep === "scenes" && (
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-                Initial scenes
-              </h3>
-              <button
-                type="button"
-                onClick={addScene}
-                className="rounded-md border border-border bg-surface-overlay px-3 py-1.5 text-xs text-gray-200 hover:text-white"
-              >
-                Add scene
-              </button>
-            </div>
-            <div className="mt-3 space-y-3">
-              {draft.scenes.map((scene, index) => (
-                <div key={index} className="grid gap-3 rounded-md border border-border p-3 lg:grid-cols-3">
-                  <input
-                    value={scene.displayName}
-                    onChange={(event) => {
-                      const displayName = event.target.value;
-                      updateScene(index, {
-                        displayName,
-                        scene: scene.scene || slugify(displayName),
-                      });
-                    }}
-                    className="rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                    placeholder="Coffee Rain"
-                  />
-                  <input
-                    value={scene.scene}
-                    onChange={(event) => updateScene(index, { scene: slugify(event.target.value) })}
-                    className="rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                    placeholder="coffee-rain"
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      value={scene.description ?? ""}
-                      onChange={(event) =>
-                        updateScene(index, { description: event.target.value })
-                      }
-                      className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                      placeholder="Scene intent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeScene(index)}
-                      className="rounded-md border border-red-800/70 px-3 py-2 text-sm text-red-200"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {draft.scenes.length === 0 && (
-                <p className="rounded-md border border-dashed border-border p-4 text-sm text-gray-500">
-                  Add at least one scene before testing normal publication jobs.
-                </p>
-              )}
-            </div>
-          </div>
-          )}
-
           {activeStep === "summary" && (
             <>
+          <div className="rounded-md border border-border bg-surface p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
+                  Operational snapshot
+                </h3>
+                <p className="mt-1 max-w-3xl text-sm text-gray-500">
+                  This is what the platform can currently use. If something feels wrong, refine it
+                  in Canon instead of editing duplicate forms.
+                </p>
+              </div>
+              <span className="rounded-full border border-blue-900/70 bg-blue-950/30 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-200">
+                Canon-led
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-md border border-border bg-surface-raised p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Content pillars
+                </p>
+                <p className="mt-2 text-sm text-gray-200">
+                  {joinList(draft.contentPillars) || "Pending in Canon"}
+                </p>
+              </div>
+              <div className="rounded-md border border-border bg-surface-raised p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Caption tone
+                </p>
+                <p className="mt-2 text-sm text-gray-200">
+                  {joinList(draft.captionTone) || "Pending in Canon"}
+                </p>
+              </div>
+              <div className="rounded-md border border-border bg-surface-raised p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Brand fit
+                </p>
+                <p className="mt-2 text-sm text-gray-200">
+                  {joinList(draft.brandFit) || "Pending in Canon"}
+                </p>
+              </div>
+              <div className="rounded-md border border-border bg-surface-raised p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Publishing limits
+                </p>
+                <p className="mt-2 text-sm text-gray-200">
+                  {joinList(draft.publishingLimits) || "Pending in Canon"}
+                </p>
+              </div>
+              <div className="rounded-md border border-border bg-surface-raised p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Review triggers
+                </p>
+                <p className="mt-2 text-sm text-gray-200">
+                  {joinList(draft.reviewTriggers) || "Pending in Canon"}
+                </p>
+              </div>
+              <div className="rounded-md border border-border bg-surface-raised p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Starter scenes
+                </p>
+                <p className="mt-2 text-sm text-gray-200">
+                  {draft.scenes.length
+                    ? draft.scenes.map((scene) => scene.displayName || scene.scene).join(", ")
+                    : "Pending in Canon"}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <label className="mt-4 block text-sm text-gray-400">
             Notes
             <textarea
@@ -1453,7 +3451,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
             ) : (
               <button
                 type="button"
-                onClick={goToNextStep}
+                onClick={() => void goToNextStep()}
                 className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white"
               >
                 Next
@@ -1462,6 +3460,30 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
           </div>
         </section>
       </div>
+      {canonDetailModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-lg border border-border bg-surface shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-100">{canonDetailModal.title}</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Review detail without stretching the main workflow.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCanonDetailModal(null)}
+                className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            <pre className="max-h-[72vh] overflow-auto whitespace-pre-wrap p-5 text-sm leading-6 text-gray-300">
+              {canonDetailModal.body}
+            </pre>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

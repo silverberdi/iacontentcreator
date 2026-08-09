@@ -5,8 +5,15 @@ import type {
   CharacterCanonPortraitQueuePayload,
   CharacterCanonPortraitQueueResponse,
   CharacterCanonPortraitRunResponse,
+  CharacterCanonListPayload,
+  CharacterCanonListResponse,
+  CharacterCanonChatPayload,
+  CharacterCanonChatResponse,
+  CharacterCanonSavePayload,
+  CharacterCanonSaveResponse,
   CharacterReferenceRegisterPayload,
   CharacterReferenceRegisterResponse,
+  CharacterReferenceUploadResponse,
   CharacterReferencesListPayload,
   CharacterReferencesListResponse,
   CharacterOnboardingListResponse,
@@ -22,6 +29,41 @@ export async function saveCharacterOnboarding(
   payload: CharacterOnboardingSavePayload,
 ): Promise<CharacterOnboardingSaveResponse> {
   return postN8nJson<CharacterOnboardingSaveResponse>("/admin/characters/save", payload);
+}
+
+export async function listCharacterCanons(
+  payload: CharacterCanonListPayload,
+): Promise<CharacterCanonListResponse> {
+  return postN8nJson<CharacterCanonListResponse>("/admin/characters/canon/list", payload);
+}
+
+export async function saveCharacterCanon(
+  payload: CharacterCanonSavePayload,
+): Promise<CharacterCanonSaveResponse> {
+  return postN8nJson<CharacterCanonSaveResponse>("/admin/characters/canon/save", payload);
+}
+
+export async function chatCharacterCanon(
+  payload: CharacterCanonChatPayload,
+): Promise<CharacterCanonChatResponse> {
+  const response = await fetch("/api/character-canon/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  let data: CharacterCanonChatResponse;
+  try {
+    data = text ? (JSON.parse(text) as CharacterCanonChatResponse) : {};
+  } catch {
+    throw new Error(
+      `Character canon chat returned non-JSON (${response.status}): ${text.slice(0, 160)}`,
+    );
+  }
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || data.message || data.reason || "Character canon chat failed.");
+  }
+  return data;
 }
 
 export async function listCharacterReferences(
@@ -42,6 +84,34 @@ export async function registerCharacterReference(
   );
 }
 
+export async function uploadCharacterReferenceImage(payload: {
+  avatar: string;
+  scene: string;
+  classification: string;
+  file: File;
+}): Promise<CharacterReferenceUploadResponse> {
+  const form = new FormData();
+  form.append("avatar", payload.avatar);
+  form.append("scene", payload.scene);
+  form.append("classification", payload.classification);
+  form.append("file", payload.file);
+  const response = await fetch("/api/characters/reference-upload", {
+    method: "POST",
+    body: form,
+  });
+  const text = await response.text();
+  let data: CharacterReferenceUploadResponse;
+  try {
+    data = text ? (JSON.parse(text) as CharacterReferenceUploadResponse) : {};
+  } catch {
+    throw new Error(`Reference upload returned non-JSON (${response.status}): ${text.slice(0, 160)}`);
+  }
+  if (!response.ok || data.ok === false || !data.upload) {
+    throw new Error(data.error || data.message || data.reason || "Reference image upload failed.");
+  }
+  return data;
+}
+
 function buildCanonPortraitPromptPack(payload: CharacterCanonPortraitQueuePayload) {
   const pillars = payload.contentPillars.join(", ");
   const tone = payload.captionTone.join(", ");
@@ -49,12 +119,17 @@ function buildCanonPortraitPromptPack(payload: CharacterCanonPortraitQueuePayloa
   const limits = payload.publishingLimits.join("; ");
   const reviewTriggers = payload.reviewTriggers.join("; ");
   const notes = payload.notes?.trim();
+  const approvedCanon = payload.approvedCanon;
+  const canonContext = approvedCanon?.canonMarkdown?.trim();
 
   return {
     positivePrompt: [
       `Create a photorealistic canon portrait for ${payload.displayName}.`,
       `Avatar type: ${payload.avatarType}. Business profile: ${payload.businessProfile}.`,
       `Core identity: ${payload.primaryObjective}.`,
+      canonContext
+        ? `Approved deep character canon to preserve: ${canonContext.slice(0, 5000)}`
+        : "",
       pillars ? `Content world: ${pillars}.` : "",
       tone ? `Emotional tone: ${tone}.` : "",
       brandFit ? `Visual brand fit: ${brandFit}.` : "",
