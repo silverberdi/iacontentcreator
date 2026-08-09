@@ -36,7 +36,11 @@ import {
   buildImportedCanon,
   compactLongOperatorAnswer,
 } from "../domain/characterCanonBuilder";
+import { CanonApprovalPanel } from "./characters/CanonApprovalPanel";
 import { CanonConversationPanel } from "./characters/CanonConversationPanel";
+import { CanonDocumentPanel } from "./characters/CanonDocumentPanel";
+import { CanonImportPanel } from "./characters/CanonImportPanel";
+import { CanonSectionsPanel } from "./characters/CanonSectionsPanel";
 import { CanonWorkspaceShell } from "./characters/CanonWorkspaceShell";
 import { CharacterSummaryPanel } from "./characters/CharacterSummaryPanel";
 import { ReferenceIntakePanel } from "./characters/ReferenceIntakePanel";
@@ -1297,64 +1301,16 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               )}
 
               {canonTab === "import" && (
-              <div className="rounded-md border border-border bg-surface p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-                      Import existing canon
-                    </h4>
-                    <p className="mt-1 max-w-3xl text-sm text-gray-500">
-                      Bring Markdown you already wrote into the database as a proposed import.
-                      This does not approve it; it only makes it reviewable here.
-                    </p>
-                  </div>
-                  <label className="cursor-pointer rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm text-gray-200 hover:text-white">
-                    Select .md files
-                    <input
-                      type="file"
-                      accept=".md,text/markdown,text/plain"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => void loadCanonImportFiles(event.target.files)}
-                    />
-                  </label>
-                </div>
-                <label className="mt-4 block text-sm text-gray-400">
-                  Import label
-                  <input
-                    value={canonImportName}
-                    onChange={(event) => setCanonImportName(event.target.value)}
-                    className="mt-1 w-full rounded-md border border-border bg-surface-overlay px-3 py-2 text-gray-100"
-                    placeholder="Andres canon pack v1, Diana private canon notes..."
-                  />
-                </label>
-                <label className="mt-3 block text-sm text-gray-400">
-                  Markdown content
-                  <textarea
-                    value={canonImportText}
-                    onChange={(event) => setCanonImportText(event.target.value)}
-                    className="mt-1 min-h-36 w-full rounded-md border border-border bg-surface-overlay px-3 py-2 text-gray-100"
-                    placeholder="Paste one or many Markdown documents here. Headings become review sections."
-                  />
-                </label>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={previewImportedCanon}
-                    className="rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm text-gray-200 hover:text-white"
-                  >
-                    Preview import
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void saveImportedCanon()}
-                    disabled={canonImporting}
-                    className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {canonImporting ? "Saving..." : "Save as proposed import"}
-                  </button>
-                </div>
-              </div>
+                <CanonImportPanel
+                  canonImportName={canonImportName}
+                  canonImportText={canonImportText}
+                  canonImporting={canonImporting}
+                  setCanonImportName={setCanonImportName}
+                  setCanonImportText={setCanonImportText}
+                  onLoadFiles={(files) => void loadCanonImportFiles(files)}
+                  onPreviewImport={previewImportedCanon}
+                  onSaveImport={() => void saveImportedCanon()}
+                />
               )}
 
               {canonTab === "conversation" && (
@@ -1370,146 +1326,36 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               )}
 
               {canonTab === "approval" && (
-              <>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={buildDeepCanonProposal}
-                  className="rounded-md border border-border bg-surface-overlay px-4 py-2 text-sm text-gray-200 hover:text-white"
-                >
-                  Update proposal from notes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void saveApprovedDeepCanon()}
-                  disabled={saving}
-                  className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Approve as official canon"}
-                </button>
-              </div>
-              <p className="text-xs text-gray-500">
-                Updating the proposal is safe and does not save. Approval makes this canon the
-                official generation source for the character.
-              </p>
-              </>
+                <CanonApprovalPanel
+                  saving={saving}
+                  canons={canons}
+                  visibleCanonRecord={visibleCanonRecord}
+                  visibleCanonMarkdown={visibleCanonMarkdown}
+                  onBuildProposal={buildDeepCanonProposal}
+                  onApproveCanon={() => void saveApprovedDeepCanon()}
+                  onOpenDocument={(title, body) => setCanonDetailModal({ title, body })}
+                />
               )}
 
               {canonTab === "sections" && visibleCanon && (
-                <div className="rounded-md border border-border bg-surface p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-                        Canon sections audit
-                      </h4>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Technical traceability by imported topic. Use Document for normal review.
-                      </p>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {visibleCanonSections.length} canon sections
-                    </span>
-                  </div>
-                  {hiddenImportWrapperCount > 0 ? (
-                    <div className="mt-3 rounded-md border border-blue-900/50 bg-blue-950/20 px-3 py-2 text-xs text-blue-100/80">
-                      {hiddenImportWrapperCount} source wrapper row
-                      {hiddenImportWrapperCount === 1 ? "" : "s"} hidden. File names are kept
-                      only as import traceability, not as canon topics.
-                    </div>
-                  ) : null}
-                  <div className="mt-4 overflow-hidden rounded-md border border-border">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-surface-overlay text-xs uppercase tracking-wide text-gray-500">
-                        <tr>
-                          <th className="px-3 py-2">Section</th>
-                          <th className="px-3 py-2">Status</th>
-                          <th className="px-3 py-2">Evidence</th>
-                          <th className="px-3 py-2">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {visibleCanonSections.map((section) => {
-                          const fullMarkdown =
-                            typeof section.data.fullMarkdown === "string"
-                              ? section.data.fullMarkdown
-                              : section.summary;
-                          return (
-                            <tr key={section.key} className="bg-surface-raised">
-                              <td className="px-3 py-3 font-semibold text-gray-200">
-                                {section.label}
-                              </td>
-                              <td className="px-3 py-3 text-gray-400">{section.status}</td>
-                              <td className="px-3 py-3 text-gray-500">
-                                {fullMarkdown.length.toLocaleString()} chars
-                              </td>
-                              <td className="px-3 py-3">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setCanonDetailModal({
-                                      title: section.label,
-                                      body: fullMarkdown,
-                                    })
-                                  }
-                                  className="rounded-md border border-border bg-surface px-3 py-1 text-xs text-gray-200 hover:text-white"
-                                >
-                                  Review
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <CanonSectionsPanel
+                  visibleCanonSections={visibleCanonSections}
+                  hiddenImportWrapperCount={hiddenImportWrapperCount}
+                  onOpenSection={(title, body) => setCanonDetailModal({ title, body })}
+                />
               )}
 
               {canonTab === "document" && visibleCanon && (
-                <div className="rounded-md border border-border bg-surface p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-                        Unified canon document
-                      </h4>
-                      <p className="mt-1 max-w-3xl text-sm text-gray-500">
-                        Read this as the production truth for the character. Sections remain
-                        available only for audit and import traceability.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCanonTab("approval")}
-                        className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white"
-                      >
-                        Go to approval
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCanonDetailModal({
-                            title: "Unified canon document",
-                            body: visibleCanonMarkdown,
-                          })
-                        }
-                        className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
-                      >
-                        Open larger
-                      </button>
-                    </div>
-                  </div>
-                  {visibleCanonMarkdown ? (
-                    <pre className="mt-4 max-h-[620px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-raised p-4 text-sm leading-6 text-gray-200">
-                      {visibleCanonMarkdown}
-                    </pre>
-                  ) : (
-                    <div className="mt-4 rounded-md border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
-                      No unified canon document is available yet. Import notes or use the
-                      conversation to build the first canon proposal.
-                    </div>
-                  )}
-                </div>
+                <CanonDocumentPanel
+                  visibleCanonMarkdown={visibleCanonMarkdown}
+                  onGoToApproval={() => setCanonTab("approval")}
+                  onOpenDocument={() =>
+                    setCanonDetailModal({
+                      title: "Unified canon document",
+                      body: visibleCanonMarkdown,
+                    })
+                  }
+                />
               )}
 
               {canonTab === "overview" && visibleCanon && (
@@ -1575,79 +1421,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                 </div>
               )}
 
-              {canonTab === "approval" && visibleCanonRecord && (
-                <div className="rounded-md border border-border bg-surface p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-                        Approval document
-                      </h4>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Approve only after this unified document reads like the character truth.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCanonDetailModal({
-                          title:
-                            visibleCanonRecord.status === "approved"
-                              ? "Approved canon rendering"
-                              : "Imported canon rendering",
-                          body: visibleCanonMarkdown,
-                        })
-                      }
-                      className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
-                    >
-                      Open larger
-                    </button>
-                  </div>
-                  {visibleCanonMarkdown ? (
-                    <pre className="mt-4 max-h-[460px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-raised p-4 text-sm leading-6 text-gray-200">
-                      {visibleCanonMarkdown}
-                    </pre>
-                  ) : (
-                    <div className="mt-4 rounded-md border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
-                      There is no readable canon document yet. Build or import canon before approval.
-                    </div>
-                  )}
-                  {visibleCanonRecord.canonJson.providerTrace ? (
-                    <div className="mt-3 rounded-md border border-border bg-surface-raised p-3 text-xs text-gray-400">
-                      <p className="font-semibold uppercase tracking-wide text-gray-300">
-                        AI provider trace
-                      </p>
-                      <p className="mt-1">
-                        {visibleCanonRecord.canonJson.providerTrace.task} ·{" "}
-                        {visibleCanonRecord.canonJson.providerTrace.provider} ·{" "}
-                        {visibleCanonRecord.canonJson.providerTrace.model}
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              {canonTab === "approval" && canons.length > 0 && (
-                <div className="rounded-md border border-border bg-surface p-4">
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-                    Canon versions
-                  </h4>
-                  <div className="mt-3 grid gap-2">
-                    {canons.map((canon) => (
-                      <div
-                        key={canon.id ?? `${canon.avatar}-${canon.canonVersion}`}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm"
-                      >
-                        <span className="text-gray-200">
-                          v{canon.canonVersion} · {canon.status}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {canon.updatedAt ?? canon.createdAt ?? ""}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
