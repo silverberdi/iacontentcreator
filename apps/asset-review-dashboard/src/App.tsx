@@ -15,7 +15,6 @@ import AutoIngestPanel from "./components/AutoIngestPanel";
 import BackupsPanel from "./components/BackupsPanel";
 import CatalogsPanel from "./components/CatalogsPanel";
 import CharactersPanel from "./components/CharactersPanel";
-import ContentCyclePanel from "./components/content-cycle/ContentCyclePanel";
 import DashboardTabs, { type DashboardTab } from "./components/DashboardTabs";
 import PageContainer from "./components/PageContainer";
 import PublicationsPanel from "./components/PublicationsPanel";
@@ -150,12 +149,6 @@ export default function App({ currentUser }: AppProps) {
   }, [canUseTechnicalMode, technicalMode]);
 
   useEffect(() => {
-    if (!technicalMode && activeTab === "content-cycle") {
-      setActiveTab("publications");
-    }
-  }, [activeTab, technicalMode]);
-
-  useEffect(() => {
     if (selectedAssetIndex === null) return;
     if (selectedAssetIndex >= filteredCandidates.length) {
       if (filteredCandidates.length === 0) {
@@ -188,11 +181,9 @@ export default function App({ currentUser }: AppProps) {
           ? "Review, promote, and reject generated avatar assets"
           : "Images that need a human decision";
       case "publications":
-        return "Create and track Estefania influencer publication jobs";
+        return "Create and track character publication jobs";
       case "characters":
         return "Onboard characters, scenes, and visual canon readiness";
-      case "content-cycle":
-        return "Flujo guiado de contenido y publicación";
       case "ops":
         return "Operational controls, catalogs, ingest runner, and backups";
       default:
@@ -209,8 +200,6 @@ export default function App({ currentUser }: AppProps) {
         return "Publications";
       case "characters":
         return "Characters";
-      case "content-cycle":
-        return "Content Lab";
       case "ops":
         return "Ops / Admin";
       default:
@@ -551,12 +540,6 @@ export default function App({ currentUser }: AppProps) {
           {activeTab === "characters" && (
             <div role="tabpanel">
               <CharactersPanel onCatalogsChanged={() => void refreshCatalogOptions()} />
-            </div>
-          )}
-
-          {technicalMode && activeTab === "content-cycle" && (
-            <div role="tabpanel">
-              <ContentCyclePanel />
             </div>
           )}
 

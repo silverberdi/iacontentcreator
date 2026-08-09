@@ -5,7 +5,6 @@ export type DashboardTab =
   | "review"
   | "publications"
   | "characters"
-  | "content-cycle"
   | "ops";
 
 const BASE_TABS: { id: DashboardTab; label: string; technicalOnly?: boolean }[] = [
@@ -13,7 +12,6 @@ const BASE_TABS: { id: DashboardTab; label: string; technicalOnly?: boolean }[] 
   { id: "review", label: "Asset Review" },
   { id: "publications", label: "Publications" },
   { id: "characters", label: "Characters" },
-  { id: "content-cycle", label: "Content Lab", technicalOnly: true },
   { id: "ops", label: "Ops / Admin" },
 ];
 
