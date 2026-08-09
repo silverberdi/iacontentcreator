@@ -14,7 +14,6 @@ import {
 } from "../api/charactersApi";
 import {
   characterTypeBlueprints,
-  characterTypeOptions,
 } from "../data/characterBlueprints";
 import {
   DEFAULT_CHARACTER,
@@ -42,7 +41,9 @@ import { CanonDocumentPanel } from "./characters/CanonDocumentPanel";
 import { CanonImportPanel } from "./characters/CanonImportPanel";
 import { CanonSectionsPanel } from "./characters/CanonSectionsPanel";
 import { CanonWorkspaceShell } from "./characters/CanonWorkspaceShell";
+import { CharacterIdentityStepPanel } from "./characters/CharacterIdentityStepPanel";
 import { CharacterSummaryPanel } from "./characters/CharacterSummaryPanel";
+import { CharacterTypeStepPanel } from "./characters/CharacterTypeStepPanel";
 import { CharacterVisualStepPanel } from "./characters/CharacterVisualStepPanel";
 import {
   CANON_TOPIC_GUIDES,
@@ -59,7 +60,6 @@ import type {
   CharacterCanonChatResponse,
   CharacterOnboardingRecord,
   CharacterOnboardingSavePayload,
-  CharacterOnboardingStatus,
   CharacterCanonPortraitJob,
   CharacterCanonPortraitPromptPack,
   CharacterReferenceRecord,
@@ -1132,139 +1132,18 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
           </div>
 
           {activeStep === "type" && (
-            <div className="mb-5 rounded-md border border-border bg-surface p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300">
-                  Avatar type
-                </h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                  The type controls starter scenes, tone, limits, review triggers, and later
-                  generation strategy. It is the opposite of a blank generic form.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => applyBlueprint(draft.avatarType)}
-                className="rounded-md border border-border bg-surface-overlay px-3 py-2 text-sm text-gray-200 hover:text-white"
-              >
-                Apply blueprint defaults
-              </button>
-            </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              {characterTypeOptions.map((option) => {
-                const isActive = draft.avatarType === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => applyBlueprint(option.value)}
-                    className={`rounded-md border p-3 text-left transition ${
-                      isActive
-                        ? "border-accent bg-accent/10"
-                        : "border-border bg-surface-raised hover:border-gray-600"
-                    }`}
-                  >
-                    <p className="font-semibold text-gray-100">{option.label}</p>
-                    <p className="mt-1 text-xs leading-5 text-gray-500">{option.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+            <CharacterTypeStepPanel
+              avatarType={draft.avatarType}
+              onApplyBlueprint={applyBlueprint}
+            />
           )}
 
           {activeStep === "identity" && (
-            <>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <label className="text-sm text-gray-400">
-              Display name
-              <input
-                value={draft.displayName}
-                onChange={(event) => {
-                  const displayName = event.target.value;
-                  const previousSlug = slugify(draft.displayName);
-                  const nextSlug = slugify(displayName);
-                  setDraft((prev) => ({
-                    ...prev,
-                    displayName,
-                    avatar: !prev.avatar || prev.avatar === previousSlug ? nextSlug : prev.avatar,
-                    avatarShort:
-                      !prev.avatarShort || prev.avatarShort === previousSlug.split("-")[0]
-                        ? nextSlug.split("-")[0] || ""
-                        : prev.avatarShort,
-                  }));
-                }}
-                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="Ej: Mariana Sol"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Business profile
-              <input
-                value={draft.businessProfile}
-                onChange={(event) => updateDraft("businessProfile", event.target.value)}
-                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="influencer-brand"
-              />
-            </label>
-          </div>
-
-          <details className="mt-4 rounded-md border border-border bg-surface p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-gray-300">
-              Technical identity fields
-            </summary>
-            <p className="mt-2 text-xs text-gray-500">
-              These are generated from the display name. Edit only if you need a specific internal id.
-            </p>
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            <label className="text-sm text-gray-400">
-              Avatar slug
-              <input
-                value={draft.avatar}
-                onChange={(event) => updateDraft("avatar", slugify(event.target.value))}
-                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="mariana-sol"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Short handle
-              <input
-                value={draft.avatarShort}
-                onChange={(event) => updateDraft("avatarShort", slugify(event.target.value))}
-                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                placeholder="mariana"
-              />
-            </label>
-            <label className="text-sm text-gray-400">
-              Onboarding status
-              <select
-                value={draft.status}
-                onChange={(event) =>
-                  updateDraft("status", event.target.value as CharacterOnboardingStatus)
-                }
-                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-              >
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            </div>
-          </details>
-
-          <label className="mt-4 block text-sm text-gray-400">
-            Initial objective
-            <textarea
-              value={draft.primaryObjective}
-              onChange={(event) => updateDraft("primaryObjective", event.target.value)}
-              className="mt-1 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-              placeholder="Optional seed for Canon. The durable version is refined in the Canon step."
+            <CharacterIdentityStepPanel
+              draft={draft}
+              setDraft={setDraft}
+              updateDraft={updateDraft}
             />
-          </label>
-            </>
           )}
 
           {activeStep === "canon" && (
