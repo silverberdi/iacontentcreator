@@ -1,5 +1,6 @@
 import { characterTypeBlueprints } from "../data/characterBlueprints";
 import type {
+  CharacterOnboardingRecord,
   CharacterOnboardingSavePayload,
   CharacterOnboardingStatus,
   CharacterReferenceClassification,
@@ -130,4 +131,61 @@ export function hashString(value: string): string {
     hash |= 0;
   }
   return Math.abs(hash).toString(16).padStart(8, "0");
+}
+
+export function inferStatus(payload: CharacterOnboardingSavePayload): CharacterOnboardingStatus {
+  const profileComplete = Boolean(
+    payload.avatar &&
+      payload.avatarShort &&
+      payload.displayName &&
+      payload.businessProfile &&
+      payload.primaryObjective &&
+      payload.contentPillars.length > 0 &&
+      payload.captionTone.length > 0 &&
+      payload.brandFit.length > 0,
+  );
+  const hasScenes = payload.scenes.some((scene) => scene.scene && scene.displayName);
+  const hasReferencePlan =
+    payload.referencePolicy.identityCanon && payload.referencePolicy.sceneCanon;
+
+  if (profileComplete && hasScenes && hasReferencePlan) return "ready-for-tests";
+  if (profileComplete && hasScenes) return "identity-review";
+  if (profileComplete) return "references-needed";
+  return "draft";
+}
+
+export function readinessItems(character: CharacterOnboardingRecord | CharacterOnboardingSavePayload) {
+  const readiness =
+    "readiness" in character
+      ? character.readiness
+      : {
+          profileComplete: inferStatus(character) !== "draft",
+          hasScenes: character.scenes.length > 0,
+          hasReferencePlan:
+            character.referencePolicy.identityCanon && character.referencePolicy.sceneCanon,
+          readyForPublication: character.status === "ready",
+        };
+  return [
+    { label: "Profile definition", ok: readiness.profileComplete },
+    { label: "Scenes", ok: readiness.hasScenes },
+    { label: "Reference canon plan", ok: readiness.hasReferencePlan },
+    { label: "Normal publications unlocked", ok: readiness.readyForPublication },
+  ];
+}
+
+export function isStepComplete(step: WizardStepId, draft: CharacterOnboardingSavePayload): boolean {
+  switch (step) {
+    case "type":
+      return Boolean(draft.avatarType);
+    case "identity":
+      return Boolean(
+        draft.displayName && draft.avatar && draft.avatarShort && draft.primaryObjective,
+      );
+    case "canon":
+      return Boolean(draft.primaryObjective);
+    case "visual":
+      return draft.referencePolicy.identityCanon && draft.referencePolicy.sceneCanon;
+    case "summary":
+      return inferStatus(draft) !== "draft";
+  }
 }
