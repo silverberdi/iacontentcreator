@@ -16,7 +16,6 @@ import {
   DEFAULT_CHARACTER,
   STATUS_LABELS,
   WIZARD_STEPS,
-  hashString,
   inferStatus,
   isStepComplete,
   readinessItems,
@@ -28,7 +27,6 @@ import {
   applyCanonTopicAnswer,
   buildCanonMarkdown,
   buildCanonProposal,
-  buildImportedCanon,
   compactLongOperatorAnswer,
 } from "../domain/characterCanonBuilder";
 import { CanonApprovalPanel } from "./characters/CanonApprovalPanel";
@@ -41,6 +39,7 @@ import { CharacterIdentityStepPanel } from "./characters/CharacterIdentityStepPa
 import { CharacterSummaryPanel } from "./characters/CharacterSummaryPanel";
 import { CharacterTypeStepPanel } from "./characters/CharacterTypeStepPanel";
 import { CharacterVisualStepPanel } from "./characters/CharacterVisualStepPanel";
+import { useCharacterCanonImport } from "../hooks/useCharacterCanonImport";
 import { useCharacterReferences } from "../hooks/useCharacterReferences";
 import {
   CANON_TOPIC_GUIDES,
@@ -118,11 +117,19 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     title: string;
     body: string;
   } | null>(null);
-  const [canonImportName, setCanonImportName] = useState("");
-  const [canonImportText, setCanonImportText] = useState("");
-  const [canonImporting, setCanonImporting] = useState(false);
   const [canonProposal, setCanonProposal] =
     useState<CharacterCanonRecord["canonJson"] | null>(null);
+  const {
+    canonImportName,
+    canonImportText,
+    canonImporting,
+    setCanonImportName,
+    setCanonImportText,
+    resetCanonImport,
+    previewImportedCanon,
+    saveImportedCanon,
+    loadCanonImportFiles,
+  } = useCharacterCanonImport();
   const [activeStep, setActiveStep] = useState<WizardStepId>("type");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
@@ -291,8 +298,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     setCanonChatLoading(false);
     setCanonTab("overview");
     setCanonDetailModal(null);
-    setCanonImportName("");
-    setCanonImportText("");
+    resetCanonImport();
     setCanonProposal(null);
     setActiveStep("type");
     setMessage(null);
@@ -591,85 +597,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     } finally {
       setSaving(false);
     }
-  };
-
-  const previewImportedCanon = () => {
-    const text = canonImportText.trim();
-    if (!text) {
-      setDeepCanonMessage({ type: "error", text: "Paste Markdown or select files before previewing an import." });
-      return;
-    }
-    const proposal = buildImportedCanon(draft, canonImportName, text);
-    setCanonProposal(proposal);
-    setDeepCanonMessage({
-      type: "success",
-      text: `Import preview ready with ${proposal.sections.length} section${proposal.sections.length === 1 ? "" : "s"}. Review coverage before saving.`,
-    });
-  };
-
-  const saveImportedCanon = async () => {
-    const text = canonImportText.trim();
-    if (!text) {
-      setDeepCanonMessage({ type: "error", text: "Paste Markdown or select files before saving an import." });
-      return;
-    }
-    const proposal = buildImportedCanon(draft, canonImportName, text);
-    const markdown = text;
-    setCanonImporting(true);
-    setDeepCanonMessage(null);
-    try {
-      const result = await saveCharacterCanon({
-        avatar: proposal.avatar,
-        avatarType: proposal.avatarType,
-        displayName: proposal.displayName,
-        status: "proposed-import",
-        schemaVersion: "character-canon-v1",
-        canonJson: {
-          ...proposal,
-          source: {
-            ...proposal.source,
-            sourceHash: hashString(markdown),
-          } as CharacterCanonRecord["canonJson"]["source"],
-        },
-        canonMarkdown: markdown,
-        importSummary: `Operator imported Markdown canon from ${canonImportName || "pasted content"}.`,
-      });
-      if (result.ok === false || !result.canon) {
-        throw new Error(result.message || result.reason || "Imported canon could not be saved.");
-      }
-      setCanonProposal(result.canon.canonJson);
-      await loadCanons(proposal.avatar);
-      setDeepCanonMessage({
-        type: "success",
-        text: "Canon imported as proposed. Review the readiness bars and approve only when it is production-ready.",
-      });
-    } catch (err) {
-      const textMessage = err instanceof Error ? err.message : "Imported canon could not be saved.";
-      setDeepCanonMessage({ type: "error", text: textMessage });
-    } finally {
-      setCanonImporting(false);
-    }
-  };
-
-  const loadCanonImportFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const markdownFiles = Array.from(files).filter((file) => file.name.toLowerCase().endsWith(".md"));
-    if (!markdownFiles.length) {
-      setDeepCanonMessage({ type: "error", text: "Select one or more .md files." });
-      return;
-    }
-    const parts = await Promise.all(
-      markdownFiles.map(async (file) => {
-        const content = await file.text();
-        return `<!-- Source file: ${file.name} -->\n\n${content.trim()}`;
-      }),
-    );
-    setCanonImportName(markdownFiles.map((file) => file.name).join(", "));
-    setCanonImportText(parts.join("\n\n---\n\n"));
-    setDeepCanonMessage({
-      type: "success",
-      text: `${markdownFiles.length} Markdown file${markdownFiles.length === 1 ? "" : "s"} loaded. Preview before saving.`,
-    });
   };
 
   const runCanonPortrait = async () => {
@@ -1005,22 +932,35 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                   canonImporting={canonImporting}
                   setCanonImportName={setCanonImportName}
                   setCanonImportText={setCanonImportText}
-                  onLoadFiles={(files) => void loadCanonImportFiles(files)}
-                  onPreviewImport={previewImportedCanon}
-                  onSaveImport={() => void saveImportedCanon()}
+                  onLoadFiles={(files) => void loadCanonImportFiles(files, setDeepCanonMessage)}
+                  onPreviewImport={() =>
+                    previewImportedCanon({
+                      draft,
+                      onMessage: setDeepCanonMessage,
+                      onProposal: setCanonProposal,
+                    })
+                  }
+                  onSaveImport={() =>
+                    void saveImportedCanon({
+                      draft,
+                      onMessage: setDeepCanonMessage,
+                      onProposal: setCanonProposal,
+                      onSaved: loadCanons,
+                    })
+                  }
                 />
               )}
 
               {canonTab === "conversation" && (
-              <label className="block text-sm text-gray-400">
-                Creative conversation notes
-                <textarea
-                  value={canonConversationNotes}
-                  onChange={(event) => setCanonConversationNotes(event.target.value)}
-                  className="mt-1 min-h-28 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
-                  placeholder="Describe nuance in natural language: sensuality, emotional posture, visual identity, contradictions, hard limits, audience relationship, things that must never happen..."
-                />
-              </label>
+                <label className="block text-sm text-gray-400">
+                  Creative conversation notes
+                  <textarea
+                    value={canonConversationNotes}
+                    onChange={(event) => setCanonConversationNotes(event.target.value)}
+                    className="mt-1 min-h-28 w-full rounded-md border border-border bg-surface px-3 py-2 text-gray-100"
+                    placeholder="Describe nuance in natural language: sensuality, emotional posture, visual identity, contradictions, hard limits, audience relationship, things that must never happen..."
+                  />
+                </label>
               )}
 
               {canonTab === "approval" && (
