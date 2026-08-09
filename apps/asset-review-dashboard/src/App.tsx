@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCanonical, listReviewCandidates } from "./api/assetReviewApi";
-import CanonicalPanel from "./components/CanonicalPanel";
-import CandidateGrid from "./components/CandidateGrid";
 import AssetPreviewModal from "./components/AssetPreviewModal";
 import ConfirmDialog, {
   DEFAULT_PROMOTE_NOTES,
@@ -9,7 +7,6 @@ import ConfirmDialog, {
   DEFAULT_SELECT_NOTES,
 } from "./components/ConfirmDialog";
 import ApiKeyWarning from "./components/ApiKeyWarning";
-import FiltersPanel from "./components/FiltersPanel";
 import Header from "./components/Header";
 import AutoIngestPanel from "./components/AutoIngestPanel";
 import BackupsPanel from "./components/BackupsPanel";
@@ -22,6 +19,7 @@ import OperatorHomePanel from "./components/OperatorHomePanel";
 import OpsDashboardPanel from "./components/OpsDashboardPanel";
 import UserAccessPanel from "./components/UserAccessPanel";
 import UnifiedReviewInboxPanel from "./components/UnifiedReviewInboxPanel";
+import TechnicalAssetReviewPanel from "./components/TechnicalAssetReviewPanel";
 import { defaultFilters } from "./data/catalogs";
 import { useCatalogOptions } from "./hooks/useCatalogOptions";
 import type { AuthUser } from "./types/auth";
@@ -469,58 +467,25 @@ export default function App({ currentUser }: AppProps) {
                   onOpenPublicationJob={handleOpenPublicationJob}
                 />
               ) : (
-                <>
-                  <FiltersPanel
+                <TechnicalAssetReviewPanel
                     filters={filters}
                     catalogOptions={catalogOptions}
                     catalogOptionsLoading={catalogOptionsLoading}
                     loading={loading}
-                    onChange={handleFiltersChange}
-                    onRefresh={handleRefresh}
-                  />
-
-                  {error && (
-                    <div
-                      role="alert"
-                      className="rounded-lg border border-red-800/60 bg-red-950/40 px-4 py-3 text-sm text-red-200"
-                    >
-                      <p className="font-medium">Error loading data</p>
-                      <p className="mt-1 text-red-300/90">{error}</p>
-                    </div>
-                  )}
-
-                  {operationMessage && (
-                    <div
-                      role="status"
-                      className={`rounded-lg border px-4 py-3 text-sm ${
-                        operationMessage.type === "success"
-                          ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-200"
-                          : "border-red-800/60 bg-red-950/40 text-red-200"
-                      }`}
-                    >
-                      {operationMessage.text}
-                    </div>
-                  )}
-
-                  <CanonicalPanel
+                    error={error}
+                    operationMessage={operationMessage}
                     canonical={canonical}
-                    reason={canonicalReason}
-                    loading={loading && !error}
-                  />
-
-                  <CandidateGrid
+                    canonicalReason={canonicalReason}
                     candidates={filteredCandidates}
-                    totalCount={candidateCount}
-                    loading={loading && !error}
-                    statusFilter={filters.statusFilter}
-                    showCanonicalInCandidates={filters.showCanonicalInCandidates}
+                    candidateCount={candidateCount}
+                    operationPending={operationPending}
+                    onFiltersChange={handleFiltersChange}
+                    onRefresh={handleRefresh}
                     onImageClick={openImageModal}
                     onPromote={openPromoteDialog}
                     onSelect={openSelectDialog}
                     onReject={openRejectDialog}
-                    operationPending={operationPending}
                   />
-                </>
               )}
             </div>
           )}
