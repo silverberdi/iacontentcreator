@@ -4,20 +4,16 @@ import {
   ingestCanonPortraitOutput,
   listCharacterCanons,
   listCharacterOnboarding,
-  listCharacterReferences,
   queueCanonPortraitGeneration,
-  registerCharacterReference,
   runCanonPortraitGeneration,
   saveCharacterCanon,
   saveCharacterOnboarding,
-  uploadCharacterReferenceImage,
 } from "../api/charactersApi";
 import {
   characterTypeBlueprints,
 } from "../data/characterBlueprints";
 import {
   DEFAULT_CHARACTER,
-  EMPTY_REFERENCE_FORM,
   STATUS_LABELS,
   WIZARD_STEPS,
   hashString,
@@ -45,6 +41,7 @@ import { CharacterIdentityStepPanel } from "./characters/CharacterIdentityStepPa
 import { CharacterSummaryPanel } from "./characters/CharacterSummaryPanel";
 import { CharacterTypeStepPanel } from "./characters/CharacterTypeStepPanel";
 import { CharacterVisualStepPanel } from "./characters/CharacterVisualStepPanel";
+import { useCharacterReferences } from "../hooks/useCharacterReferences";
 import {
   CANON_TOPIC_GUIDES,
   getCanonTopicProgress,
@@ -76,18 +73,29 @@ type CharactersPanelProps = {
 
 export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelProps) {
   const [characters, setCharacters] = useState<CharacterOnboardingRecord[]>([]);
-  const [references, setReferences] = useState<CharacterReferenceRecord[]>([]);
   const [canons, setCanons] = useState<CharacterCanonRecord[]>([]);
   const [approvedCanon, setApprovedCanon] = useState<CharacterCanonRecord | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [draft, setDraft] = useState<CharacterOnboardingSavePayload>(DEFAULT_CHARACTER);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [referencesLoading, setReferencesLoading] = useState(false);
-  const [referenceSaving, setReferenceSaving] = useState(false);
-  const [referenceUploading, setReferenceUploading] = useState(false);
-  const [referenceUploadFile, setReferenceUploadFile] = useState<File | null>(null);
-  const [referenceForm, setReferenceForm] = useState(EMPTY_REFERENCE_FORM);
+  const {
+    references,
+    referencesLoading,
+    referenceSaving,
+    referenceUploading,
+    referenceUploadFile,
+    referenceForm,
+    referenceMessage,
+    setReferenceForm,
+    setReferenceUploadFile,
+    loadReferences,
+    clearReferences,
+    registerReference,
+    uploadAndRegisterReference,
+    promoteReferenceToIdentityCanon,
+    promoteReferenceToSceneCanon,
+  } = useCharacterReferences();
   const [canonSaving, setCanonSaving] = useState(false);
   const [canonRunning, setCanonRunning] = useState(false);
   const [canonIngesting, setCanonIngesting] = useState(false);
@@ -119,10 +127,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
-  const [referenceMessage, setReferenceMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const [canonMessage, setCanonMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -226,26 +230,9 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     });
   }, [selectedCharacter]);
 
-  const loadReferences = async (avatar: string) => {
-    setReferencesLoading(true);
-    setReferenceMessage(null);
-    try {
-      const result = await listCharacterReferences({ avatar });
-      if (result.ok === false) {
-        throw new Error(result.message || result.reason || "References could not load.");
-      }
-      setReferences(result.references ?? []);
-    } catch (err) {
-      const text = err instanceof Error ? err.message : "References could not load.";
-      setReferenceMessage({ type: "error", text });
-    } finally {
-      setReferencesLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!selectedAvatar) {
-      setReferences([]);
+      clearReferences();
       setCanons([]);
       setApprovedCanon(null);
       return;
@@ -288,10 +275,9 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const startNewCharacter = () => {
     setSelectedAvatar(null);
     setDraft(DEFAULT_CHARACTER);
-    setReferences([]);
     setCanons([]);
     setApprovedCanon(null);
-    setReferenceForm(EMPTY_REFERENCE_FORM);
+    clearReferences();
     setCanonJob(null);
     setCanonPromptPack(null);
     setCanonInstructions([]);
@@ -310,7 +296,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
     setCanonProposal(null);
     setActiveStep("type");
     setMessage(null);
-    setReferenceMessage(null);
     setCanonMessage(null);
     setDeepCanonMessage(null);
   };
@@ -378,123 +363,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       return false;
     } finally {
       setSaving(false);
-    }
-  };
-
-  const registerReference = async () => {
-    const payloadAvatar = draft.avatar || slugify(draft.displayName);
-    const isSceneReference = referenceForm.classification.startsWith("scene-");
-    const payloadScene =
-      referenceForm.scene ||
-      (isSceneReference ? draft.scenes.find((scene) => scene.scene)?.scene : "portrait-canon");
-
-    if (!payloadAvatar) {
-      setReferenceMessage({
-        type: "error",
-        text: "Save or define the character avatar before registering references.",
-      });
-      return;
-    }
-    if (isSceneReference && !payloadScene) {
-      setReferenceMessage({
-        type: "error",
-        text: "Scene references need a selected scene.",
-      });
-      return;
-    }
-    if (!referenceForm.objectPathOrUrl.trim()) {
-      setReferenceMessage({
-        type: "error",
-        text: "Paste a MinIO URL or object path before registering the reference.",
-      });
-      return;
-    }
-
-    setReferenceSaving(true);
-    setReferenceMessage(null);
-    try {
-      const result = await registerCharacterReference({
-        avatar: payloadAvatar,
-        scene: payloadScene || "portrait-canon",
-        classification: referenceForm.classification,
-        objectPathOrUrl: referenceForm.objectPathOrUrl,
-        reviewNotes: referenceForm.reviewNotes,
-      });
-      if (result.ok === false || !result.reference) {
-        throw new Error(result.message || result.reason || "Reference could not be registered.");
-      }
-      setSelectedAvatar(payloadAvatar);
-      await loadReferences(payloadAvatar);
-      setReferenceForm((prev) => ({
-        ...prev,
-        objectPathOrUrl: "",
-        reviewNotes: "",
-      }));
-      setReferenceMessage({ type: "success", text: "Reference registered in visual canon." });
-    } catch (err) {
-      const text = err instanceof Error ? err.message : "Reference could not be registered.";
-      setReferenceMessage({ type: "error", text });
-    } finally {
-      setReferenceSaving(false);
-    }
-  };
-
-  const uploadAndRegisterReference = async () => {
-    const payloadAvatar = draft.avatar || slugify(draft.displayName);
-    const payloadScene = referenceForm.scene || "portrait-canon";
-    if (!payloadAvatar) {
-      setReferenceMessage({
-        type: "error",
-        text: "Save or define the character avatar before uploading references.",
-      });
-      return;
-    }
-    if (!referenceUploadFile) {
-      setReferenceMessage({ type: "error", text: "Choose an image file from your computer first." });
-      return;
-    }
-    setReferenceUploading(true);
-    setReferenceMessage(null);
-    try {
-      const uploaded = await uploadCharacterReferenceImage({
-        avatar: payloadAvatar,
-        scene: payloadScene,
-        classification: referenceForm.classification,
-        file: referenceUploadFile,
-      });
-      const objectPathOrUrl = uploaded.upload?.publicUrl;
-      if (!objectPathOrUrl) {
-        throw new Error("Upload succeeded but did not return a MinIO path.");
-      }
-      const result = await registerCharacterReference({
-        avatar: payloadAvatar,
-        scene: payloadScene,
-        classification: referenceForm.classification,
-        objectPathOrUrl,
-        reviewNotes:
-          referenceForm.reviewNotes ||
-          `Uploaded from local file: ${referenceUploadFile.name}`,
-      });
-      if (result.ok === false || !result.reference) {
-        throw new Error(result.message || result.reason || "Uploaded image could not be registered.");
-      }
-      setSelectedAvatar(payloadAvatar);
-      await loadReferences(payloadAvatar);
-      setReferenceUploadFile(null);
-      setReferenceForm((prev) => ({
-        ...prev,
-        objectPathOrUrl: "",
-        reviewNotes: "",
-      }));
-      setReferenceMessage({
-        type: "success",
-        text: "Image uploaded and registered in visual canon.",
-      });
-    } catch (err) {
-      const text = err instanceof Error ? err.message : "Image upload failed.";
-      setReferenceMessage({ type: "error", text });
-    } finally {
-      setReferenceUploading(false);
     }
   };
 
@@ -861,54 +729,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       setCanonMessage({ type: "error", text });
     } finally {
       setCanonIngesting(false);
-    }
-  };
-
-  const promoteReferenceToIdentityCanon = async (reference: CharacterReferenceRecord) => {
-    setReferenceSaving(true);
-    setReferenceMessage(null);
-    try {
-      const result = await registerCharacterReference({
-        avatar: reference.avatar,
-        scene: "portrait-canon",
-        classification: "identity-canon",
-        objectPathOrUrl: reference.url,
-        reviewNotes: "Promoted to identity canon from Characters visual reference intake.",
-      });
-      if (result.ok === false || !result.reference) {
-        throw new Error(result.message || result.reason || "Reference could not be promoted.");
-      }
-      await loadReferences(reference.avatar);
-      setReferenceMessage({ type: "success", text: "Identity canon promoted." });
-    } catch (err) {
-      const text = err instanceof Error ? err.message : "Reference could not be promoted.";
-      setReferenceMessage({ type: "error", text });
-    } finally {
-      setReferenceSaving(false);
-    }
-  };
-
-  const promoteReferenceToSceneCanon = async (reference: CharacterReferenceRecord) => {
-    setReferenceSaving(true);
-    setReferenceMessage(null);
-    try {
-      const result = await registerCharacterReference({
-        avatar: reference.avatar,
-        scene: reference.scene,
-        classification: "scene-canon",
-        objectPathOrUrl: reference.url,
-        reviewNotes: `Promoted to scene canon for ${reference.scene} from Characters visual reference intake.`,
-      });
-      if (result.ok === false || !result.reference) {
-        throw new Error(result.message || result.reason || "Scene reference could not be promoted.");
-      }
-      await loadReferences(reference.avatar);
-      setReferenceMessage({ type: "success", text: "Scene canon promoted." });
-    } catch (err) {
-      const text = err instanceof Error ? err.message : "Scene reference could not be promoted.";
-      setReferenceMessage({ type: "error", text });
-    } finally {
-      setReferenceSaving(false);
     }
   };
 
@@ -1331,13 +1151,17 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
               setReferenceUploadFile={setReferenceUploadFile}
               setCanonOutputUrl={setCanonOutputUrl}
               updateReferencePolicy={(referencePolicy) => updateDraft("referencePolicy", referencePolicy)}
-              onUploadReference={() => void uploadAndRegisterReference()}
+              onUploadReference={() =>
+                void uploadAndRegisterReference({ draft, onAvatarSelected: setSelectedAvatar })
+              }
               onRefreshReferences={() => draft.avatar && void loadReferences(draft.avatar)}
               onPromoteSceneCanon={(reference) => void promoteReferenceToSceneCanon(reference)}
               onQueueCanonPortrait={() => void queueCanonPortrait()}
               onRunCanonPortrait={() => void runCanonPortrait()}
               onIngestCanonPortrait={() => void ingestCanonPortrait()}
-              onRegisterReference={() => void registerReference()}
+              onRegisterReference={() =>
+                void registerReference({ draft, onAvatarSelected: setSelectedAvatar })
+              }
               onPromoteIdentityCanon={(reference) => void promoteReferenceToIdentityCanon(reference)}
             />
           )}
