@@ -5,7 +5,6 @@ import {
   listCharacterOnboarding,
   queueCanonPortraitGeneration,
   runCanonPortraitGeneration,
-  saveCharacterCanon,
   saveCharacterOnboarding,
 } from "../api/charactersApi";
 import {
@@ -22,11 +21,7 @@ import {
   type CanonTabId,
   type WizardStepId,
 } from "../domain/characterOnboardingModel";
-import {
-  applyCanonTopicAnswer,
-  buildCanonMarkdown,
-  buildCanonProposal,
-} from "../domain/characterCanonBuilder";
+import { buildCanonMarkdown, buildCanonProposal } from "../domain/characterCanonBuilder";
 import { CanonApprovalPanel } from "./characters/CanonApprovalPanel";
 import { CanonConversationPanel } from "./characters/CanonConversationPanel";
 import { CanonDocumentPanel } from "./characters/CanonDocumentPanel";
@@ -37,6 +32,7 @@ import { CharacterIdentityStepPanel } from "./characters/CharacterIdentityStepPa
 import { CharacterSummaryPanel } from "./characters/CharacterSummaryPanel";
 import { CharacterTypeStepPanel } from "./characters/CharacterTypeStepPanel";
 import { CharacterVisualStepPanel } from "./characters/CharacterVisualStepPanel";
+import { useCharacterCanonApproval } from "../hooks/useCharacterCanonApproval";
 import { useCharacterCanonConversation } from "../hooks/useCharacterCanonConversation";
 import { useCharacterCanonImport } from "../hooks/useCharacterCanonImport";
 import { useCharacterReferences } from "../hooks/useCharacterReferences";
@@ -121,6 +117,7 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   } | null>(null);
   const [canonProposal, setCanonProposal] =
     useState<CharacterCanonRecord["canonJson"] | null>(null);
+  const { buildDeepCanonProposal, saveApprovedDeepCanon } = useCharacterCanonApproval();
   const {
     canonImportName,
     canonImportText,
@@ -410,50 +407,6 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
       setCanonMessage({ type: "error", text });
     } finally {
       setCanonSaving(false);
-    }
-  };
-
-  const buildDeepCanonProposal = () => {
-    const base = visibleCanon ?? buildCanonProposal(draft, "");
-    const proposal = canonConversationNotes.trim()
-      ? applyCanonTopicAnswer(base, draft, "operator_notes", canonConversationNotes)
-      : base;
-    setCanonProposal(proposal);
-    setDeepCanonMessage({
-      type: "success",
-      text: "Canon proposal updated from the current character definition and conversation notes.",
-    });
-  };
-
-  const saveApprovedDeepCanon = async () => {
-    const proposal = canonProposal ?? reviewCanon?.canonJson ?? buildCanonProposal(draft, canonConversationNotes);
-    const markdown = buildCanonMarkdown(proposal.sections);
-    setSaving(true);
-    setDeepCanonMessage(null);
-    try {
-      const result = await saveCharacterCanon({
-        avatar: proposal.avatar,
-        avatarType: proposal.avatarType,
-        displayName: proposal.displayName,
-        status: "approved",
-        canonJson: proposal,
-        canonMarkdown: markdown,
-        conversationSummary: canonConversationNotes.trim(),
-      });
-      if (result.ok === false || !result.canon) {
-        throw new Error(result.message || result.reason || "Deep canon could not be saved.");
-      }
-      setApprovedCanon(result.canon);
-      await loadCanons(proposal.avatar);
-      setDeepCanonMessage({
-        type: "success",
-        text: "Approved deep canon saved in the database.",
-      });
-    } catch (err) {
-      const text = err instanceof Error ? err.message : "Deep canon could not be saved.";
-      setDeepCanonMessage({ type: "error", text });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -838,8 +791,27 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
                   canons={canons}
                   visibleCanonRecord={visibleCanonRecord}
                   visibleCanonMarkdown={visibleCanonMarkdown}
-                  onBuildProposal={buildDeepCanonProposal}
-                  onApproveCanon={() => void saveApprovedDeepCanon()}
+                  onBuildProposal={() =>
+                    buildDeepCanonProposal({
+                      draft,
+                      visibleCanon,
+                      conversationNotes: canonConversationNotes,
+                      onProposal: setCanonProposal,
+                      onMessage: setDeepCanonMessage,
+                    })
+                  }
+                  onApproveCanon={() =>
+                    void saveApprovedDeepCanon({
+                      draft,
+                      canonProposal,
+                      reviewCanon,
+                      conversationNotes: canonConversationNotes,
+                      setSaving,
+                      onApproved: setApprovedCanon,
+                      onMessage: setDeepCanonMessage,
+                      onSaved: loadCanons,
+                    })
+                  }
                   onOpenDocument={(title, body) => setCanonDetailModal({ title, body })}
                 />
               )}
