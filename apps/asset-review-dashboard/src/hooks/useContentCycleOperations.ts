@@ -34,6 +34,7 @@ import {
   type StepperStepId,
   type StepStatus,
 } from "../utils/contentCycleFlow";
+import { useContentCycleTechnicalActions } from "./useContentCycleTechnicalActions";
 
 export type ContentCycleOperation =
   | "prepareContent"
@@ -161,6 +162,15 @@ export function useContentCycleOperations(context: ContentCycleContext) {
   }, [context]);
 
   const promptDisplay = mergePromptDisplay(data.sceneBrief, data.promptPack);
+  const technicalActions = useContentCycleTechnicalActions({
+    context,
+    jobId: data.jobId,
+    requireContext,
+    setOperationError,
+    setOpLoading,
+    appendDebug,
+    setData,
+  });
 
   const loadGeneratedCandidates = useCallback(async (): Promise<boolean> => {
     if (!requireContext()) return false;
@@ -523,85 +533,6 @@ export function useContentCycleOperations(context: ContentCycleContext) {
     setLoading({});
   }, []);
 
-  const runTechnical = useCallback(
-    async (
-      op: ContentCycleOperation,
-      action: () => Promise<unknown>,
-      debugKey: string,
-    ): Promise<boolean> => {
-      if (!requireContext()) return false;
-      setOperationError(null);
-      setOpLoading(op, true);
-      try {
-        const raw = await action();
-        appendDebug(debugKey, raw);
-        return true;
-      } catch (err) {
-        setOperationError(humanizeError(err, "La acción técnica falló."));
-        return false;
-      } finally {
-        setOpLoading(op, false);
-      }
-    },
-    [appendDebug, requireContext, setOpLoading],
-  );
-
-  const techResolveBrief = useCallback(
-    () =>
-      runTechnical("techResolveBrief", async () => {
-        const r = await resolveSceneBrief(context);
-        setData((prev) => ({ ...prev, sceneBrief: r.parsed }));
-        return r.raw;
-      }, "resolve-brief"),
-    [context, runTechnical],
-  );
-
-  const techResolveIdentity = useCallback(
-    () =>
-      runTechnical("techResolveIdentity", async () => {
-        const r = await resolveIdentityPack(context);
-        setData((prev) => ({ ...prev, identityPack: r.parsed }));
-        return r.raw;
-      }, "resolve-pack"),
-    [context, runTechnical],
-  );
-
-  const techGeneratePrompt = useCallback(
-    () =>
-      runTechnical("techGeneratePrompt", async () => {
-        const r = await generatePromptPack(context);
-        setData((prev) => ({ ...prev, promptPack: r.parsed }));
-        return r.raw;
-      }, "generate-prompt-pack"),
-    [context, runTechnical],
-  );
-
-  const techQueueJob = useCallback(
-    () =>
-      runTechnical("techQueueJob", async () => {
-        const r = await queueGenerationJob(context);
-        setData((prev) => ({
-          ...prev,
-          jobId: r.parsed.jobId ?? null,
-          jobData: r.parsed,
-          contentPrepared: Boolean(r.parsed.jobId),
-        }));
-        return r.raw;
-      }, "queue-job"),
-    [context, runTechnical],
-  );
-
-  const techRunComfy = useCallback(
-    () =>
-      runTechnical("techRunComfy", async () => {
-        if (!data.jobId) throw new Error("No hay jobId.");
-        const r = await runComfyJob(data.jobId);
-        setData((prev) => ({ ...prev, jobData: { ...prev.jobData, ...r.parsed } }));
-        return r.raw;
-      }, "run-comfy"),
-    [data.jobId, runTechnical],
-  );
-
   return {
     data,
     promptDisplay,
@@ -620,10 +551,6 @@ export function useContentCycleOperations(context: ContentCycleContext) {
     loadPublicationDrafts,
     approvePublicationDraft,
     manualExport,
-    techResolveBrief,
-    techResolveIdentity,
-    techGeneratePrompt,
-    techQueueJob,
-    techRunComfy,
+    ...technicalActions,
   };
 }
