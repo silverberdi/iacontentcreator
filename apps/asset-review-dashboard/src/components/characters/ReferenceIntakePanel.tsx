@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   EMPTY_REFERENCE_FORM,
   REFERENCE_CLASSIFICATION_OPTIONS,
@@ -51,6 +51,11 @@ export function ReferenceIntakePanel({
   onRegisterReference,
   onPromoteIdentityCanon,
 }: ReferenceIntakePanelProps) {
+  const [showRejected, setShowRejected] = useState(false);
+  const visibleReferences = showRejected
+    ? references
+    : references.filter((reference) => reference.status !== "rejected");
+
   return (
     <div className="rounded-md border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -188,13 +193,30 @@ export function ReferenceIntakePanel({
         )?.helper ?? ""}
       </p>
 
-      <div className="mt-5 grid gap-3">
-        {references.length === 0 && (
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-gray-500">
+          Showing {visibleReferences.length} of {references.length} registered references.
+        </p>
+        <label className="flex items-center gap-2 text-xs text-gray-400">
+          <input
+            type="checkbox"
+            checked={showRejected}
+            onChange={(event) => setShowRejected(event.target.checked)}
+            className="size-4 accent-accent"
+          />
+          Show rejected / broken evidence
+        </label>
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        {visibleReferences.length === 0 && (
           <p className="rounded-md border border-dashed border-border p-4 text-sm text-gray-500">
-            No visual references registered yet for this character.
+            {references.length === 0
+              ? "No visual references registered yet for this character."
+              : "Only rejected references are hidden. Enable the toggle above to inspect them."}
           </p>
         )}
-        {references.map((reference) => (
+        {visibleReferences.map((reference) => (
           <article
             key={reference.assetId}
             className="grid gap-3 rounded-md border border-border bg-surface-raised p-3 md:grid-cols-[120px_1fr]"
@@ -236,7 +258,12 @@ export function ReferenceIntakePanel({
               {reference.reviewNotes && (
                 <p className="mt-2 text-sm text-gray-400">{reference.reviewNotes}</p>
               )}
-              {reference.classification === "identity-candidate" && (
+              {reference.status === "rejected" && (
+                <p className="mt-3 rounded-md border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                  Rejected evidence is kept for audit only and cannot be promoted.
+                </p>
+              )}
+              {reference.classification === "identity-candidate" && reference.status !== "rejected" && (
                 <button
                   type="button"
                   onClick={() => onPromoteIdentityCanon(reference)}

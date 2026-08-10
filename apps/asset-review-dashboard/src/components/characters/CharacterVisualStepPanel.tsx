@@ -258,7 +258,7 @@ export function CharacterVisualStepPanel({
 
       <ReferenceIntakePanel
         avatar={draft.avatar}
-        scenes={draft.scenes}
+        scenes={visualSceneRows}
         references={references}
         referenceForm={referenceForm}
         referenceMessage={referenceMessage}

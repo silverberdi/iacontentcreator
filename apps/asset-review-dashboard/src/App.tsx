@@ -504,7 +504,10 @@ export default function App({ currentUser }: AppProps) {
 
           {activeTab === "characters" && (
             <div role="tabpanel">
-              <CharactersPanel onCatalogsChanged={() => void refreshCatalogOptions()} />
+              <CharactersPanel
+                catalogOptions={catalogOptions}
+                onCatalogsChanged={() => void refreshCatalogOptions()}
+              />
             </div>
           )}
 

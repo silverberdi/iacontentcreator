@@ -43,6 +43,10 @@ import {
   getTopicEvidence,
 } from "../domain/characterCanonReadiness";
 import type {
+  CatalogOptionsBundle,
+  CatalogSelectOption,
+} from "../types/catalogs";
+import type {
   CharacterAvatarType,
   CharacterCanonRecord,
   CharacterCanonSection,
@@ -59,10 +63,19 @@ function isImportWrapperSection(section: CharacterCanonSection) {
 }
 
 type CharactersPanelProps = {
+  catalogOptions: CatalogOptionsBundle;
   onCatalogsChanged?: () => void;
 };
 
-export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelProps) {
+function sceneOptionToDraft(option: CatalogSelectOption) {
+  return {
+    scene: option.value,
+    displayName: option.label || option.value,
+    description: "",
+  };
+}
+
+export default function CharactersPanel({ catalogOptions, onCatalogsChanged }: CharactersPanelProps) {
   const [characters, setCharacters] = useState<CharacterOnboardingRecord[]>([]);
   const [canons, setCanons] = useState<CharacterCanonRecord[]>([]);
   const [approvedCanon, setApprovedCanon] = useState<CharacterCanonRecord | null>(null);
@@ -504,6 +517,10 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
   const visualSceneRows = Array.from(
     new Map(
       [
+        ...catalogOptions.scenes.map((scene) => [
+          scene.value,
+          sceneOptionToDraft(scene),
+        ] as const),
         ...draft.scenes.map((scene) => [
           scene.scene,
           {
@@ -518,7 +535,9 @@ export default function CharactersPanel({ onCatalogsChanged }: CharactersPanelPr
             reference.scene,
             {
               scene: reference.scene,
-              displayName: reference.scene,
+              displayName:
+                catalogOptions.scenes.find((scene) => scene.value === reference.scene)?.label ||
+                reference.scene,
               description: "",
             },
           ] as const),
